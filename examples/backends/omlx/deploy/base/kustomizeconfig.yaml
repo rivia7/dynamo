@@ -1,0 +1,16 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+#
+# Where a DynamoGraphDeployment names ConfigMaps. Kustomize appends a content
+# hash to generated ConfigMap names, and these paths let it rename the
+# references too, so a change to the code or the profile rolls the proxies.
+nameReference:
+- kind: ConfigMap
+  version: v1
+  fieldSpecs:
+  - kind: DynamoGraphDeployment
+    path: spec/components/podTemplate/spec/volumes/configMap/name
+  - kind: DynamoGraphDeployment
+    path: spec/components/podTemplate/spec/containers/envFrom/configMapRef/name
+  - kind: DynamoGraphDeployment
+    path: spec/components/podTemplate/spec/initContainers/envFrom/configMapRef/name

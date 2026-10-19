@@ -1,0 +1,79 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+#
+# A proxy in front of the frontend's Anthropic Messages API, which Claude Code
+# calls. When a turn calls several tools, Dynamo 1.5.1 sends the text between
+# the calls as deltas of a closed block, and Claude Code ends the turn with
+# "The response stream was malformed". anthropic_fix.py repairs those streams
+# and passes everything else through; the Ingress sends /v1/messages to it.
+# Drop both once the frontend's stream converter is fixed.
+apiVersion: v1
+kind: Service
+metadata:
+  name: omlx-anthropic-fix
+spec:
+  selector:
+    app.kubernetes.io/name: omlx-anthropic-fix
+  ports:
+  - name: http
+    port: 8080
+    targetPort: http
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: omlx-anthropic-fix
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: omlx-anthropic-fix
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: omlx-anthropic-fix
+    spec:
+      containers:
+      - name: main
+        # Any image with python3 and aiohttp works; this one is on the node already.
+        image: nvcr.io/nvidia/ai-dynamo/dynamo-frontend:1.5.1
+        # The frontend Service of the DynamoGraphDeployment in dgd.yaml.
+        command:
+        - python3
+        - /app/anthropic_fix.py
+        - --upstream
+        - http://omlx-frontend:8000
+        ports:
+        - name: http
+          containerPort: 8080
+        readinessProbe:
+          httpGet:
+            path: /healthz
+            port: http
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: http
+        resources:
+          requests:
+            cpu: 10m
+            memory: 64Mi
+          limits:
+            # A request is read whole before it goes on, up to 64 MiB.
+            memory: 512Mi
+        securityContext:
+          # The image names its user (dynamo), which runAsNonRoot cannot check.
+          runAsUser: 1000
+          runAsNonRoot: true
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop: ["ALL"]
+        volumeMounts:
+        - name: code
+          mountPath: /app
+          readOnly: true
+      volumes:
+      - name: code
+        configMap:
+          name: omlx-anthropic-fix-code

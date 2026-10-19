@@ -1,0 +1,546 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+#
+# Grafana dashboard of the oMLX proxies' omlx_* metrics. kube-prometheus-stack's
+# Grafana loads ConfigMaps labelled grafana_dashboard=1:
+#   kubectl apply -f deploy/monitoring/grafana-omlx-dashboard.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-omlx-dashboard
+  namespace: monitoring
+  labels:
+    grafana_dashboard: "1"
+data:
+  omlx-dashboard.json: |
+    {
+      "title": "oMLX on Dynamo",
+      "uid": "omlx-dynamo",
+      "editable": true,
+      "schemaVersion": 39,
+      "tags": [
+        "dynamo",
+        "omlx"
+      ],
+      "time": {
+        "from": "now-1h",
+        "to": "now"
+      },
+      "refresh": "30s",
+      "templating": {
+        "list": [
+          {
+            "name": "datasource",
+            "type": "datasource",
+            "query": "prometheus",
+            "label": "Data source"
+          },
+          {
+            "name": "pod",
+            "type": "query",
+            "datasource": {
+              "type": "prometheus",
+              "uid": "${datasource}"
+            },
+            "label": "Proxy",
+            "query": {
+              "query": "label_values(omlx_bridge_up, pod)",
+              "refId": "pod"
+            },
+            "definition": "label_values(omlx_bridge_up, pod)",
+            "includeAll": true,
+            "multi": true,
+            "allValue": ".*",
+            "refresh": 2,
+            "current": {
+              "text": "All",
+              "value": "$__all"
+            }
+          }
+        ]
+      },
+      "panels": [
+        {
+          "type": "stat",
+          "title": "Bridge",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "gridPos": {
+            "h": 5,
+            "w": 6,
+            "x": 0,
+            "y": 0
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "omlx_bridge_up{pod=~\"$pod\"}",
+              "legendFormat": "{{pod}}",
+              "instant": true
+            }
+          ],
+          "description": "1 when the proxy's last poll of the Mac's bridge succeeded.",
+          "fieldConfig": {
+            "defaults": {
+              "mappings": [
+                {
+                  "type": "value",
+                  "options": {
+                    "0": {
+                      "text": "down",
+                      "color": "red"
+                    },
+                    "1": {
+                      "text": "up",
+                      "color": "green"
+                    }
+                  }
+                }
+              ],
+              "color": {
+                "mode": "thresholds"
+              },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "red",
+                    "value": null
+                  },
+                  {
+                    "color": "green",
+                    "value": 1
+                  }
+                ]
+              }
+            }
+          },
+          "options": {
+            "colorMode": "background",
+            "graphMode": "none",
+            "textMode": "value_and_name",
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
+            }
+          }
+        },
+        {
+          "type": "stat",
+          "title": "Model loaded",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "gridPos": {
+            "h": 5,
+            "w": 6,
+            "x": 6,
+            "y": 0
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "omlx_model_loaded{pod=~\"$pod\"}",
+              "legendFormat": "{{pod}}",
+              "instant": true
+            }
+          ],
+          "description": "1 while oMLX has the model loaded and the bridge answers.",
+          "fieldConfig": {
+            "defaults": {
+              "mappings": [
+                {
+                  "type": "value",
+                  "options": {
+                    "0": {
+                      "text": "down",
+                      "color": "red"
+                    },
+                    "1": {
+                      "text": "up",
+                      "color": "green"
+                    }
+                  }
+                }
+              ],
+              "color": {
+                "mode": "thresholds"
+              },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "red",
+                    "value": null
+                  },
+                  {
+                    "color": "green",
+                    "value": 1
+                  }
+                ]
+              }
+            }
+          },
+          "options": {
+            "colorMode": "background",
+            "graphMode": "none",
+            "textMode": "value_and_name",
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
+            }
+          }
+        },
+        {
+          "type": "stat",
+          "title": "KV events live",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "gridPos": {
+            "h": 5,
+            "w": 6,
+            "x": 12,
+            "y": 0
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "omlx_proxy_kv_sync_state{pod=~\"$pod\",state=\"live\"}",
+              "legendFormat": "{{pod}}",
+              "instant": true
+            }
+          ],
+          "description": "1 while the proxy mirrors the Mac's prefix cache into the KV router.",
+          "fieldConfig": {
+            "defaults": {
+              "mappings": [
+                {
+                  "type": "value",
+                  "options": {
+                    "0": {
+                      "text": "down",
+                      "color": "red"
+                    },
+                    "1": {
+                      "text": "up",
+                      "color": "green"
+                    }
+                  }
+                }
+              ],
+              "color": {
+                "mode": "thresholds"
+              },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "red",
+                    "value": null
+                  },
+                  {
+                    "color": "green",
+                    "value": 1
+                  }
+                ]
+              }
+            }
+          },
+          "options": {
+            "colorMode": "background",
+            "graphMode": "none",
+            "textMode": "value_and_name",
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
+            }
+          }
+        },
+        {
+          "type": "stat",
+          "title": "Prefix cache hit ratio (5m)",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "gridPos": {
+            "h": 5,
+            "w": 6,
+            "x": 18,
+            "y": 0
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "sum(rate(omlx_proxy_cached_tokens_total{pod=~\"$pod\"}[5m])) / clamp_min(sum(rate(omlx_proxy_prompt_tokens_total{pod=~\"$pod\"}[5m])), 1)",
+              "legendFormat": "hit ratio",
+              "instant": true
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percentunit"
+            }
+          },
+          "description": "Cached prompt tokens divided by prompt tokens.",
+          "options": {
+            "colorMode": "background",
+            "graphMode": "none",
+            "textMode": "value_and_name",
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
+            }
+          }
+        },
+        {
+          "type": "timeseries",
+          "title": "Requests by outcome",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 0,
+            "y": 5
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "sum by (outcome) (rate(omlx_proxy_requests_total{pod=~\"$pod\"}[$__rate_interval]))",
+              "legendFormat": "{{outcome}}"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "reqps"
+            }
+          }
+        },
+        {
+          "type": "timeseries",
+          "title": "Tokens",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 12,
+            "y": 5
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "sum(rate(omlx_proxy_prompt_tokens_total{pod=~\"$pod\"}[$__rate_interval]))",
+              "legendFormat": "prompt"
+            },
+            {
+              "refId": "B",
+              "expr": "sum(rate(omlx_proxy_cached_tokens_total{pod=~\"$pod\"}[$__rate_interval]))",
+              "legendFormat": "prompt, cached"
+            },
+            {
+              "refId": "C",
+              "expr": "sum(rate(omlx_proxy_completion_tokens_total{pod=~\"$pod\"}[$__rate_interval]))",
+              "legendFormat": "completion"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short"
+            }
+          },
+          "description": "Tokens per second."
+        },
+        {
+          "type": "timeseries",
+          "title": "oMLX load",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 0,
+            "y": 13
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "omlx_running_requests{pod=~\"$pod\"}",
+              "legendFormat": "running {{pod}}"
+            },
+            {
+              "refId": "B",
+              "expr": "omlx_waiting_requests{pod=~\"$pod\"}",
+              "legendFormat": "waiting {{pod}}"
+            },
+            {
+              "refId": "C",
+              "expr": "omlx_proxy_inflight_requests{pod=~\"$pod\"}",
+              "legendFormat": "streaming {{pod}}"
+            }
+          ]
+        },
+        {
+          "type": "timeseries",
+          "title": "Bridge round trip",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 12,
+            "y": 13
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "omlx_bridge_rtt_seconds{pod=~\"$pod\"}",
+              "legendFormat": "{{pod}}"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "s"
+            }
+          },
+          "description": "Latency of the proxy's stats poll to the Mac."
+        },
+        {
+          "type": "timeseries",
+          "title": "Prefix blocks",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 0,
+            "y": 21
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "omlx_proxy_kv_announced_blocks{pod=~\"$pod\"}",
+              "legendFormat": "announced to the router {{pod}}"
+            },
+            {
+              "refId": "B",
+              "expr": "omlx_bridge_kv_live_blocks{pod=~\"$pod\"}",
+              "legendFormat": "tracked by the bridge {{pod}}"
+            }
+          ]
+        },
+        {
+          "type": "timeseries",
+          "title": "KV sync activity",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 12,
+            "y": 21
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "sum by (pod) (rate(omlx_proxy_kv_events_total{pod=~\"$pod\"}[$__rate_interval]))",
+              "legendFormat": "events {{pod}}"
+            },
+            {
+              "refId": "B",
+              "expr": "sum by (pod) (increase(omlx_proxy_kv_snapshots_total{pod=~\"$pod\"}[$__rate_interval]))",
+              "legendFormat": "snapshots {{pod}}"
+            },
+            {
+              "refId": "C",
+              "expr": "sum by (pod) (increase(omlx_proxy_kv_resyncs_total{pod=~\"$pod\"}[$__rate_interval]))",
+              "legendFormat": "resyncs {{pod}}"
+            },
+            {
+              "refId": "D",
+              "expr": "sum by (pod) (increase(omlx_proxy_kv_reconnects_total{pod=~\"$pod\"}[$__rate_interval]))",
+              "legendFormat": "reconnects {{pod}}"
+            }
+          ]
+        },
+        {
+          "type": "timeseries",
+          "title": "SSD prefix cache",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 0,
+            "y": 29
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "omlx_ssd_cache_bytes{pod=~\"$pod\"} / omlx_ssd_cache_capacity_bytes{pod=~\"$pod\"}",
+              "legendFormat": "{{pod}}"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percentunit"
+            }
+          },
+          "description": "Share of OMLX_SSD_CACHE_MAX_SIZE in use."
+        },
+        {
+          "type": "timeseries",
+          "title": "Bridge KV faults",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 12,
+            "y": 29
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "omlx_bridge_kv_faults{pod=~\"$pod\"}",
+              "legendFormat": "{{kind}} {{pod}}"
+            }
+          ],
+          "description": "Hook errors and hash mismatches since the bridge started."
+        }
+      ]
+    }

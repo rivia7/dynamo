@@ -1,0 +1,37 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+#
+# Sends http://<node>/v1/... to the frontend Service, <DGD name>-frontend,
+# through traefik: the OpenAI API, and the Anthropic Messages API that Claude
+# Code calls, which passes the stream repair of anthropic-fix.yaml first. Every
+# request needs an API token (auth.yaml). /metrics and /health stay inside the
+# cluster.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: omlx
+  annotations:
+    # Plain HTTP on port 80 only.
+    traefik.ingress.kubernetes.io/router.entrypoints: web
+    # <namespace>-<Middleware name>: the token check of auth.yaml.
+    traefik.ingress.kubernetes.io/router.middlewares: dynamo-omlx-omlx-auth@kubernetescrd
+spec:
+  ingressClassName: traefik
+  rules:
+  - http:
+      paths:
+      # The longer prefix wins.
+      - path: /v1/messages
+        pathType: Prefix
+        backend:
+          service:
+            name: omlx-anthropic-fix
+            port:
+              number: 8080
+      - path: /v1
+        pathType: Prefix
+        backend:
+          service:
+            name: omlx-frontend
+            port:
+              number: 8000

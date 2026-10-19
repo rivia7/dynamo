@@ -1,0 +1,31 @@
+#!/bin/sh
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+#
+# Init container of an oMLX proxy pod. Lays out the dynamo_omlx package from the
+# flat ConfigMap in $PREPARE_SRC, where "--" in a key stands for "/". Then
+# fetches the model's config, tokenizer and chat template, without weights, into
+# $PREPARE_MODELS/$SERVED_MODEL_NAME, the proxy's --model-path. The model
+# settings come from the omlx-profile ConfigMap.
+
+set -eu
+
+: "${OMLX_MODEL_REPO:?set it in the overlay's profile.env}"
+: "${OMLX_MODEL_REVISION:?set it in the overlay's profile.env}"
+: "${SERVED_MODEL_NAME:?set it in the overlay's profile.env}"
+SRC="${PREPARE_SRC:-/src}"
+CODE="${PREPARE_CODE:-/opt/omlx}"
+MODELS="${PREPARE_MODELS:-/models}"
+
+for file in "$SRC"/dynamo_omlx--*; do
+    dest="$CODE/$(basename "$file" | sed 's|--|/|g')"
+    mkdir -p "$(dirname "$dest")"
+    cp "$file" "$dest"
+done
+
+# A pinned revision gives every proxy of the model byte-identical files. When a
+# restarted pod finds them already fetched, the downloader keeps them after a
+# few failed attempts to reach the Hub; Kubernetes retries a first download.
+python3 "$SRC/download_model.py" "$OMLX_MODEL_REPO" --revision "$OMLX_MODEL_REVISION" \
+    --metadata-only --attempts 3 --model-dir "$MODELS" --name "$SERVED_MODEL_NAME"
+ls -l "$MODELS/$SERVED_MODEL_NAME"

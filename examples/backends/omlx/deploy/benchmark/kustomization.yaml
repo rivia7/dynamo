@@ -1,0 +1,22 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+#
+# An AIPerf Job against the deployment in the same namespace. It takes the
+# model from the deployed overlay's profile.env, which lies outside this
+# directory, so render with
+#
+#   kubectl kustomize --load-restrictor=LoadRestrictionsNone deploy/benchmark
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: dynamo-omlx
+resources:
+- aiperf-job.yaml
+configMapGenerator:
+- name: omlx-benchmark
+  envs:
+  - benchmark.env
+  # The overlay that is deployed.
+  - ../overlays/qwen3.8-flash-next/profile.env
+- name: omlx-benchmark-script
+  files:
+  - run-aiperf.sh

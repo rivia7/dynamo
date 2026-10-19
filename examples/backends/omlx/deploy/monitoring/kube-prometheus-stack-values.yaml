@@ -1,0 +1,52 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+#
+# Values for kube-prometheus-stack 91.4.1 next to the example on a single k3s
+# node. Install it before dynamo-platform: the platform chart creates its
+# PodMonitors only when their CRD exists.
+
+prometheus:
+  prometheusSpec:
+    # The platform's PodMonitors do not carry this release's label.
+    podMonitorSelectorNilUsesHelmValues: false
+    retention: 15d
+    storageSpec:
+      volumeClaimTemplate:
+        spec:
+          accessModes: [ReadWriteOnce]
+          resources:
+            requests:
+              storage: 20Gi
+
+grafana:
+  # Served at http://<node>/grafana through traefik. Dashboards come as
+  # ConfigMaps labelled grafana_dashboard=1 from any namespace.
+  grafana.ini:
+    server:
+      root_url: "%(protocol)s://%(domain)s/grafana"
+      serve_from_sub_path: true
+  ingress:
+    enabled: true
+    ingressClassName: traefik
+    annotations:
+      traefik.ingress.kubernetes.io/router.entrypoints: web
+    path: /grafana
+    pathType: Prefix
+
+# Nothing routes alerts here.
+alertmanager:
+  enabled: false
+defaultRules:
+  rules:
+    alertmanager: false
+
+# k3s runs these inside one process without endpoints of their own; turning
+# them off also drops their alert rules.
+kubeEtcd:
+  enabled: false
+kubeControllerManager:
+  enabled: false
+kubeScheduler:
+  enabled: false
+kubeProxy:
+  enabled: false

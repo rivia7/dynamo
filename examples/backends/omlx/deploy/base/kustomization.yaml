@@ -1,0 +1,45 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+#
+# What every deployment of the example shares: the DynamoGraphDeployment, its
+# Ingress with the API token check and the repair of Claude Code's streams, and
+# the proxy code. An overlay adds the namespace and the model profile. The code
+# comes from outside this directory, so render with
+#
+#   kubectl kustomize --load-restrictor=LoadRestrictionsNone deploy/overlays/<name>
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+- dgd.yaml
+- ingress.yaml
+- auth.yaml
+- anthropic-fix.yaml
+configurations:
+- kustomizeconfig.yaml
+configMapGenerator:
+# The proxy package for prepare.sh to lay out again. ConfigMap keys cannot hold
+# "/", so "--" stands for it. The bridge stays out: it runs on the Macs.
+- name: omlx-proxy-code
+  files:
+  - dynamo_omlx--__init__.py=../../dynamo_omlx/__init__.py
+  - dynamo_omlx--protocol.py=../../dynamo_omlx/protocol.py
+  - dynamo_omlx--proxy--__init__.py=../../dynamo_omlx/proxy/__init__.py
+  - dynamo_omlx--proxy--__main__.py=../../dynamo_omlx/proxy/__main__.py
+  - dynamo_omlx--proxy--args.py=../../dynamo_omlx/proxy/args.py
+  - dynamo_omlx--proxy--bridge_client.py=../../dynamo_omlx/proxy/bridge_client.py
+  - dynamo_omlx--proxy--engine.py=../../dynamo_omlx/proxy/engine.py
+  - dynamo_omlx--proxy--kv_reconciler.py=../../dynamo_omlx/proxy/kv_reconciler.py
+  - dynamo_omlx--proxy--kv_sink.py=../../dynamo_omlx/proxy/kv_sink.py
+  - dynamo_omlx--proxy--kv_sync.py=../../dynamo_omlx/proxy/kv_sync.py
+  - dynamo_omlx--proxy--metrics.py=../../dynamo_omlx/proxy/metrics.py
+  - dynamo_omlx--proxy--request_map.py=../../dynamo_omlx/proxy/request_map.py
+  - download_model.py=../../mac/download_model.py
+  - prepare.sh
+# The token check of auth.yaml.
+- name: omlx-auth-code
+  files:
+  - token_auth.py
+# The stream repair of anthropic-fix.yaml.
+- name: omlx-anthropic-fix-code
+  files:
+  - anthropic_fix.py

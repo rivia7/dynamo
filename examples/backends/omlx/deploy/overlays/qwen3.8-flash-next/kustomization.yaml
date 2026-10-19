@@ -1,0 +1,16 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+#
+# The main deployment of mac/omlx-mac.env.example: Qwen3.8-Flash-Next.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: dynamo-omlx
+resources:
+- ../../base
+configMapGenerator:
+- name: omlx-profile
+  envs:
+  - profile.env
+# A second Mac: create its Secret omlx-mac-2, then uncomment.
+# components:
+# - ../../components/mac-2

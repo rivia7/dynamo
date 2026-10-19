@@ -1,0 +1,43 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+#
+# One AIPerf run of run-aiperf.sh; its log holds the results. A Job runs once,
+# so delete it before the next run.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: omlx-aiperf
+spec:
+  backoffLimit: 0
+  activeDeadlineSeconds: 5400
+  ttlSecondsAfterFinished: 259200
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+      - name: aiperf
+        image: nvcr.io/nvidia/ai-dynamo/dynamo-frontend:1.5.1
+        # The image's entrypoint is /epp.
+        command: ["/bin/sh", "/bench/run-aiperf.sh"]
+        envFrom:
+        - configMapRef:
+            name: omlx-benchmark
+        # HF_TOKEN lifts the Hub's limits on anonymous downloads of the tokenizer.
+        - secretRef:
+            name: hf-token-secret
+            optional: true
+        env:
+        - name: HF_HOME
+          value: /tmp/hf
+        resources:
+          requests:
+            cpu: "1"
+            memory: 2Gi
+        volumeMounts:
+        - name: script
+          mountPath: /bench
+          readOnly: true
+      volumes:
+      - name: script
+        configMap:
+          name: omlx-benchmark-script
