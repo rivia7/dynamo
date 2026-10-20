@@ -1,8 +1,8 @@
 ---
 # SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
-name: omlx-install
-description: Installs the oMLX-on-Mac example behind Dynamo. Prepares each Mac (oMLX, settings and API key, Hugging Face token, model download, background service), then starts the Linux side (model metadata, frontend with KV routing, one proxy per Mac) and verifies it end to end. Use when setting the example up for the first time, adding a Mac, or reinstalling after omlx-uninstall.
+name: omlx-mac-install
+description: Installs the Mac side of the oMLX-on-Mac example behind Dynamo. Copies the example to each Mac, sets up oMLX with its settings and API key, saves a Hugging Face token, downloads the model, starts the background service, and hands the Mac's URL and key to the Kubernetes side. Use when setting up a Mac for the first time, adding a Mac, or reinstalling one after omlx-mac-uninstall; omlx-dynamo-install then serves the Macs from the cluster.
 license: Apache-2.0
 metadata:
   author: NVIDIA
@@ -13,11 +13,12 @@ metadata:
     - install
 ---
 
-# Skill: Install the oMLX Example
+# Skill: Install the oMLX Example on a Mac
 
-The example serves a model with oMLX on Macs while the Dynamo frontend, KV router and one proxy
-per Mac run on Linux. Each Mac needs only this example directory and oMLX; Linux needs a Dynamo
-environment built from this repository. Paths below are relative to `examples/backends/omlx`.
+Each Mac serves the model with oMLX and needs only this example directory and oMLX; Dynamo
+does not run there. The frontend, the KV router and one proxy per Mac run on a Kubernetes
+cluster, which `omlx-dynamo-install` sets up. Paths below are relative to
+`examples/backends/omlx`.
 
 ## Ground Rules
 
@@ -36,7 +37,6 @@ Settle these with the operator first:
 | The Macs: SSH alias or address of each | none |
 | First Mac, or one more for an existing deployment | first: `setup.sh` creates the API key; more: reuse the key |
 | Hugging Face repo | `Jundot/Qwen3.8-Flash-Next-oQ4e-mtp` (oMLX model id `Qwen3.8-Flash-Next-oQ4e-mtp`) |
-| Served model name and Linux metadata directory | `Qwen3.8-Flash-Next`, `/models/Qwen3.8-Flash-Next` |
 | A Hugging Face read token | strongly recommended; the Hub limits anonymous downloads |
 | Multi-token prediction (MTP) | off; `OMLX_MTP=on` in a Mac's settings file turns it on there |
 
@@ -97,8 +97,8 @@ tail -f ~/Library/Logs/dynamo-omlx/download-<model id>.log
 
 It waits until oMLX has loaded the model, then prints `Model: <id> ready, block size <n>`,
 `KV: events live`, `MTP: off` or `MTP: on, at most <n> draft tokens per cycle`, and the URL for
-Linux. Afterwards `./service.sh status`, `logs`, `stop` and `restart` manage it; the service
-restarts when oMLX exits, but not after a reboot.
+the cluster. Afterwards `./service.sh status`, `logs`, `stop` and `restart` manage it; the
+service restarts when oMLX exits, but not after a reboot: then `./service.sh start` again.
 
 | Message | Cause |
 |---|---|
@@ -107,42 +107,29 @@ restarts when oMLX exits, but not after a reboot.
 | `is still downloading` | the download has not finished |
 | `rules out MTP` or `choose one speculative` in the log | `OMLX_MTP=on` while oMLX runs another speculative decoder (DFlash or VLM MTP) for the model: start once without `OMLX_MTP=on`, turn that decoder off on oMLX's admin page, then set `OMLX_MTP=on` again |
 
-## 5. Start the Linux Side
+## 5. Hand Over to the Cluster
 
-To run the Linux side on a Kubernetes cluster instead, continue with `omlx-k8s-deploy`.
+The cluster needs two things from each Mac:
 
-From the repository root, in the Dynamo environment:
+- **The URL** that `service.sh start` printed, with an address the cluster's pods can reach: an
+  IP address or a name the cluster's DNS resolves, never a `.local` name.
+- **The key**: `OMLX_API_KEY` in `~/.config/dynamo-omlx/omlx-mac.env`. The operator copies it
+  into a mode-600 file on the Linux host, for example `~/.config/dynamo-omlx/api_key`. The key
+  alone or the whole `OMLX_API_KEY=...` line both work there. Never relay it through a chat or a
+  command line.
 
-```bash
-python3 examples/backends/omlx/mac/download_model.py <repo> --metadata-only \
-    --model-dir /models --name <served name>
-export OMLX_API_KEY=...   # the operator sets it from the Mac's settings file
-OMLX_BRIDGE_URLS="http://<mac-1>:8000 http://<mac-2>:8000" \
-    examples/backends/omlx/launch/agg.sh --model-path /models/<served name>
-```
-
-- The URLs are the ones `service.sh start` printed.
-- `agg.sh` runs the frontend on port 8000 and the proxies' metrics from port 8081 up. It
-  defaults to the `qwen3_coder` and `qwen3` parsers; set `TOOL_CALL_PARSER` and
-  `REASONING_PARSER` for another model family.
-- Every proxy of one model needs the same metadata at the same path.
-
-## 6. Verify
+From the Linux host, check that the Mac answers:
 
 ```bash
-curl -s localhost:8000/v1/chat/completions -H 'Content-Type: application/json' \
-    -d '{"model": "<served name>", "messages": [{"role": "user", "content": "Hello"}], "max_tokens": 32}'
-curl -s localhost:8081/metrics | grep -E '^omlx_(bridge_up|model_loaded|proxy_kv_sync_state)'
+curl -s -o /dev/null -m 5 -w '%{http_code}\n' http://<address of the Mac>:<port>/dynamo/v1/info
 ```
 
-Expect a completion, `omlx_bridge_up 1`, `omlx_model_loaded 1` and
-`omlx_proxy_kv_sync_state{state="live"} 1` on each proxy's port. A proxy that never registers
-usually means a mismatched `OMLX_API_KEY` (its log says `the bridge rejected the API key`) or a
-macOS firewall blocking the port. Prefix-cache routing only applies to prompts of at least one
-block (8192 tokens).
+`401` means the Mac answers and wants the key. `000` means the Linux host cannot reach it: the
+Mac sleeps, left the network, or its firewall blocks oMLX's Python. Then continue with
+`omlx-dynamo-install`: all of it for the first Mac, its Add a Mac section for a further one.
 
 ## Adding a Mac
 
-Repeat steps 1 to 4 on the new Mac with the shared API key and the same settings, add its URL
-to `OMLX_BRIDGE_URLS`, and restart `agg.sh`. A Mac with a different block size or checkpoint
+Repeat steps 1 to 5 on the new Mac with the shared API key (`OMLX_API_KEY=<key> ./setup.sh`)
+and the same model and `OMLX_KV_BLOCK_SIZE`. A Mac with a different block size or checkpoint
 does not join: its model card differs.

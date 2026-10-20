@@ -27,7 +27,8 @@ SPDX-License-Identifier: Apache-2.0
 
 Skills live in `.agents/skills/`; `.claude/skills` links to it. `python3 scripts/validate_skills.py examples/backends/omlx` (from the repository root) checks them and this index.
 
-- `omlx-install` — install the example on Macs and Linux, or add a Mac
-- `omlx-k8s-deploy` — run the Linux side on Kubernetes with NGC Dynamo, add a Mac or switch the model there
-- `omlx-uninstall` — remove the example from a Mac, from Linux and from Kubernetes
+- `omlx-mac-install` — set up a Mac: oMLX, settings and key, model and service, then hand it to the cluster; or add a Mac
+- `omlx-mac-uninstall` — remove the example from a Mac
+- `omlx-dynamo-install` — install the Dynamo side on Kubernetes with NGC Dynamo, verify and publish it; add a Mac, switch the model, roll out changes
+- `omlx-dynamo-uninstall` — remove the Dynamo side from Kubernetes: one Mac, a token, the deployment, the platform, monitoring
 - `omlx-status` — show the Kubernetes deployment's state, how to reach it and how to call its OpenAI API

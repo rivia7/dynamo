@@ -1,8 +1,8 @@
 ---
 # SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
-name: omlx-k8s-deploy
-description: Deploys the Linux side of the oMLX-on-Mac example on Kubernetes with the NGC Dynamo 1.5.1 platform. Imports the images, installs Prometheus with Grafana and the dynamo-platform chart, creates one Secret per Mac, applies a model overlay (frontend with KV routing, one proxy per Mac, Ingress), verifies it end to end and runs AIPerf. Use when serving the Macs from a cluster instead of agg.sh, adding a Mac or switching the model there, or rolling out a change to the proxy.
+name: omlx-dynamo-install
+description: Installs the Dynamo side of the oMLX-on-Mac example on Kubernetes with NGC Dynamo 1.5.1. Checks the cluster and the Macs, imports the images, installs Prometheus with Grafana and the dynamo-platform chart, creates the Macs' Secrets and the API tokens, applies a model overlay (frontend with KV routing, one proxy per Mac, an Ingress with a token check, the stream repair for Claude Code), verifies it with curl, Claude Code and Codex, and optionally publishes the API and runs AIPerf. Also adds a Mac, switches the model, rolls out changes and recovers after a node reboot. Use once omlx-mac-install has the Macs serving, or to change the cluster side later.
 license: Apache-2.0
 metadata:
   author: NVIDIA
@@ -10,18 +10,18 @@ metadata:
     - dynamo
     - omlx
     - kubernetes
-    - deploy
+    - install
 ---
 
-# Skill: Deploy the oMLX Example on Kubernetes
+# Skill: Install the oMLX Example on Kubernetes
 
-The Macs run oMLX with the bridge exactly as for the bare-metal setup (`omlx-install` steps 1-4).
-On the cluster, a DynamoGraphDeployment named `omlx` runs the frontend with KV routing and one
-proxy pod per Mac. Paths below are relative to `examples/backends/omlx`.
+The Macs run oMLX with the bridge (`omlx-mac-install`). On the cluster, a
+DynamoGraphDeployment named `omlx` runs the frontend with KV routing and one proxy pod per Mac,
+behind an Ingress that checks API tokens. Paths below are relative to `examples/backends/omlx`.
 
 | Path | Contents |
 |---|---|
-| `deploy/base/` | The DGD (`Frontend`, `mac-1`), the Ingress (`/v1` only) with its API token check (`auth.yaml`, `token_auth.py`), the repair of Claude Code's streams in front of `/v1/messages` (`anthropic-fix.yaml`, `anthropic_fix.py`), the proxy code ConfigMap and `prepare.sh`, the proxy pod's init container |
+| `deploy/base/` | The DGD (`Frontend`, `mac-1`), the Ingress with its API token check (`auth.yaml`, `token_auth.py`), the repair of Claude Code's streams in front of `/v1/messages` (`anthropic-fix.yaml`, `anthropic_fix.py`), the proxy code ConfigMap and `prepare.sh`, the proxy pod's init container |
 | `deploy/overlays/<model>/` | `profile.env` (repo, pinned revision, served name, block size, parsers) and the namespace |
 | `deploy/components/mac-2/` | The proxy of a second Mac, a copy of `mac-1` that an overlay lists under `components` |
 | `deploy/monitoring/` | kube-prometheus-stack values and the oMLX Grafana dashboard |
@@ -29,7 +29,8 @@ proxy pod per Mac. Paths below are relative to `examples/backends/omlx`.
 
 ## Ground Rules
 
-- Mac steps run on the Mac. Give the operator the commands; run them over SSH only when asked.
+- Mac steps belong to `omlx-mac-install` and run on the Mac. Give the operator the commands;
+  run them over SSH only when asked.
 - Never print the Macs' API key, an API token or a Hugging Face token, and never put one on a
   command line. Create Secrets from files through pipes, hand tokens to curl on stdin
   (`-K -`), and never read a Secret with `-o yaml`, `-o json` or `describe`.
@@ -49,12 +50,34 @@ proxy pod per Mac. Paths below are relative to `examples/backends/omlx`.
 | Overlay | `qwen3.8-flash-next`; another model gets its own, see Switch the Model |
 | Each Mac's bridge URL | what `service.sh start` printed; an IP or a name cluster DNS resolves, not `.local` |
 | The Macs' `OMLX_API_KEY` | a mode-600 file on Linux, for example `~/.config/dynamo-omlx/api_key` |
+| API token holders | one per client, for example `claude-code` and `codex` |
 | Hugging Face token | optional; the init container and AIPerf download from the Hub anonymously otherwise |
+| Public URL | none; see step 8 before publishing the API beyond the local network |
 
-## 1. Images
+## 1. Preflight
+
+```bash
+kubectl config current-context
+kubectl get nodes -o wide                  # Ready
+helm version --short                       # v3
+kubectl get ingressclass                   # traefik
+kubectl get storageclass                   # one marked (default)
+MAC_URL=http://<address of the Mac>:<port>
+curl -s -o /dev/null -m 5 -w '%{http_code}\n' "$MAC_URL/dynamo/v1/info"    # 401
+```
+
+- The Ingress and its token check are Traefik objects, so the cluster needs the `traefik`
+  IngressClass; k3s ships it. Prometheus keeps its data on a 20 GiB volume of the default
+  StorageClass. Nothing needs a GPU: inference runs on the Macs.
+- `401` from every Mac means it answers and wants the key; pods reach it through their node.
+  `000` means the node cannot reach it: the Mac sleeps, left the network, or its firewall blocks
+  oMLX's Python. Fix that on the Mac first (`omlx-mac-install` step 5).
+
+## 2. Images
 
 Every pod uses `nvcr.io/nvidia/ai-dynamo/dynamo-frontend:1.5.1` (3.9 GB): frontend, proxy, init
-container and AIPerf. The platform adds `kubernetes-operator:1.5.1`. Pods use `IfNotPresent`.
+container, token check, stream repair and AIPerf. The platform adds `kubernetes-operator:1.5.1`.
+Pods use `IfNotPresent`.
 
 ```bash
 sudo k3s ctr -n k8s.io images ls | grep ai-dynamo     # on a k3s node
@@ -64,7 +87,7 @@ When the node pulls nvcr.io slowly, import image archives instead (`docker save`
 better connection): `sudo k3s ctr -n k8s.io images import --platform linux/amd64 <tar>`. The
 names must read exactly `nvcr.io/nvidia/ai-dynamo/<image>:1.5.1`.
 
-## 2. Monitoring
+## 3. Monitoring
 
 Install it before the platform: the platform chart creates its PodMonitors only when their CRD
 exists.
@@ -80,10 +103,12 @@ kubectl apply --server-side -f ../../../deploy/observability/grafana-dynamo-dash
 - The values turn off what k3s cannot be scraped for (etcd, scheduler, controller manager,
   kube-proxy) and Alertmanager, and serve Grafana at `http://<node>/grafana`. On a cluster that
   is not k3s, keep those scrape targets.
+- Grafana's Ingress, like the API's, sits on Traefik's port 80 without a host rule: whatever
+  publishes that port publishes Grafana too (step 8).
 - Grafana's user is `admin`. Give the operator the command for the password instead of running
   it: `kubectl -n monitoring get secret prometheus-grafana -o jsonpath='{.data.admin-password}' | base64 -d`.
 
-## 3. Platform
+## 4. Platform
 
 ```bash
 helm upgrade --install dynamo-platform \
@@ -98,7 +123,7 @@ The defaults install only the operator: Kubernetes discovery, TCP requests and Z
 NATS and no etcd. Missing PodMonitors mean monitoring came second; rerun the same `helm upgrade`
 with `--reuse-values`.
 
-## 4. Secrets
+## 5. Secrets and API Tokens
 
 One Secret per Mac holds its URL and the key; the proxy reads both from its environment.
 
@@ -117,9 +142,9 @@ test -s "$KEY_FILE" && cut -d= -f2- "$KEY_FILE" |
 
 Operators often save the whole `OMLX_API_KEY=...` line from the Mac's settings file; `cut`
 keeps only the key either way, and the proxy ignores a trailing newline. `test -s` stops a
-missing key file from producing a Secret with an empty key. A 401 means a key that is not the Mac's `OMLX_API_KEY`; a
-timeout means the Mac or its firewall does not accept the node. For a Hugging Face token, create `hf-token-secret` with the key
-`HF_TOKEN` the same way.
+missing key file from producing a Secret with an empty key. A 401 means a key that is not the
+Mac's `OMLX_API_KEY`; a timeout means the Mac or its firewall does not accept the node. For a
+Hugging Face token, create `hf-token-secret` with the key `HF_TOKEN` the same way.
 
 Every client of the API needs a token of its own: the Ingress lets a request through only with
 one from the Secret `omlx-api-tokens`, one key per holder. Agree the holders with the operator;
@@ -138,7 +163,7 @@ kubectl -n dynamo-omlx create secret generic omlx-api-tokens --from-file="$TOKEN
 The token check reads the Secret again on every request; a token shorter than 32 characters
 counts as none.
 
-## 5. Deploy
+## 6. Deploy
 
 ```bash
 R=$(mktemp)
@@ -153,20 +178,27 @@ kubectl -n dynamo-omlx wait --for=condition=Ready dgd/omlx --timeout=15m
 | A webhook or x509 error on apply | The operator is still starting; retry after a minute |
 | The proxy pod stays in `Init` | `kubectl -n dynamo-omlx logs <pod> -c prepare`: the Hub is unreachable. Set `HF_ENDPOINT` in `profile.env`, or add a token |
 | `CreateContainerConfigError` | The pod's `omlx-mac-<n>` Secret is missing |
-| `Running` but `0/1`, log `waiting for the oMLX bridge` | The Mac is unreachable from pods, or its model is still loading |
+| `Running` but `0/1`, log `waiting for the oMLX bridge` | The Mac is unreachable from pods, or its model is still loading. The startup probe allows 2 hours (720 × 10 s), then the pod restarts and waits again |
 | Restarts, log `the oMLX bridge refused the proxy` | The key in the Secret is not the Mac's |
 | Restarts, log `block size ... expected` | `EXPECT_BLOCK_SIZE` differs from the Mac's `OMLX_KV_BLOCK_SIZE`: the overlay does not match the model the Mac serves |
-| `0/1` for minutes after `oMLX bridge ... ready`, the log ends at `Registering event channel`, and `kubectl -n dynamo-omlx get dynamoworkermetadatas` has no entry for the pod | A hang in Dynamo 1.5.1's Kubernetes discovery registration, seen once right after the DGD was recreated; the startup probe would wait 2 hours. Delete the pod; the replacement registers within seconds |
+| `0/1` for minutes after `oMLX bridge ... ready`, the log ends at `Registering event channel`, and `kubectl -n dynamo-omlx get dynamoworkermetadatas` has no entry for the pod | A hang in Dynamo 1.5.1's Kubernetes discovery registration, seen once right after the DGD was recreated. Delete the pod; the replacement registers within seconds |
 
 The proxy pod becomes Ready only once it registered the model, and only Ready proxies receive
 requests. Select pods by label; worker names carry a hash:
 `kubectl -n dynamo-omlx get pods -l nvidia.com/dynamo-component=mac-1`.
 
-## 6. Verify
+The base also sets on the frontend:
+
+- `DYN_ENABLE_ANTHROPIC_API` and `DYN_STRIP_ANTHROPIC_PREAMBLE`: the Anthropic Messages API for
+  Claude Code, with its billing preamble stripped so that every client shares the cached prefix.
+- `DYN_HTTP_SSE_KEEP_ALIVE_INTERVAL_MS=15000`: an SSE comment line (`:`) after 15 s without data,
+  so a stream that waits long for its first token survives proxies that close idle responses.
+
+## 7. Verify
 
 ```bash
 NODE=<node address>
-AUTH=~/.config/dynamo-omlx/api-tokens/codex
+AUTH=~/.config/dynamo-omlx/api-tokens/<holder>      # any holder of step 5
 curl -s -o /dev/null -w '%{http_code}\n' http://$NODE/v1/models                 # 401
 printf 'header = "Authorization: Bearer %s"\n' "$(cat "$AUTH")" |
     curl -s -K - http://$NODE/v1/models
@@ -184,16 +216,53 @@ kubectl -n dynamo-omlx exec "$P" -c main -- curl -s localhost:9090/metrics |
 - Send one prompt longer than two blocks twice, one after the other. The second answer's
   `usage.prompt_tokens_details.cached_tokens` is above 0. oMLX caches blocks when a request
   finishes, so concurrent requests do not hit.
-- In Grafana: the Dynamo dashboard (frontend) and "oMLX on Dynamo" (proxies and Macs).
-- The frontend also serves the Anthropic Messages API for Claude Code
-  (`DYN_ENABLE_ANTHROPIC_API` in `deploy/base/dgd.yaml`), which answers the same prompt:
-  the same `printf ... | curl -s -K -` with
+- The Anthropic Messages API answers the same prompt: the same `printf ... | curl -s -K -` with
   `http://$NODE/v1/messages -H 'Content-Type: application/json' -H 'anthropic-version: 2023-06-01' -d '{"model": "<SERVED_MODEL_NAME>", "max_tokens": 64, "messages": [{"role": "user", "content": "Hello"}]}'`.
-  The answer passes `omlx-anthropic-fix`, so its `Server` header names aiohttp; that proxy
-  repairs the streams of turns with several tool calls, which Claude Code otherwise rejects.
-  `omlx-status` has the Claude Code and Codex settings.
+  It passes `omlx-anthropic-fix`, so its `Server` header names aiohttp.
+- In Grafana: the Dynamo dashboard (frontend) and "oMLX on Dynamo" (proxies and Macs).
 
-## 7. Benchmark
+Then run both coding agents once, with the settings of `omlx-status`'s Coding Agents section
+(Codex reads its provider from `~/.codex/omlx.config.toml`):
+
+```bash
+TOKENS=~/.config/dynamo-omlx/api-tokens
+D=$(mktemp -d) && printf 'one\n' > "$D/a.txt" && printf 'two\n' > "$D/b.txt" && cd "$D"
+CLAUDE_CONFIG_DIR=$(mktemp -d) ANTHROPIC_BASE_URL=http://$NODE \
+ANTHROPIC_AUTH_TOKEN=$(cat "$TOKENS/<holder>") \
+ANTHROPIC_MODEL=<SERVED_MODEL_NAME> ANTHROPIC_SMALL_FAST_MODEL=<SERVED_MODEL_NAME> \
+CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1 \
+    claude -p "Read a.txt and b.txt at the same time, then print both lines." \
+    --allowedTools Read < /dev/null
+OMLX_API_TOKEN=$(cat "$TOKENS/<holder>") codex exec --profile omlx --skip-git-repo-check \
+    -s read-only "Reply with just the word OK." < /dev/null
+kubectl -n dynamo-omlx logs deploy/omlx-anthropic-fix --since=10m | grep dropped
+```
+
+- Claude Code prints `one` and `two` after a notice that it does not recognize the model;
+  Codex prints `OK` after a harmless warning that the model's metadata is missing.
+- A turn that called both tools at once shows up in the stream repair's log as
+  `dropped <n> whitespace deltas of closed blocks`. Without the repair, Claude Code stops such
+  turns with `API Error: The response stream was malformed`.
+- From inside a Claude Code session, start the nested `claude` with
+  `env -i HOME=$HOME PATH=$PATH` in front: it inherits the session's settings otherwise.
+
+## 8. Publish the API
+
+Skip this while every client is on the local network. Otherwise agree the way with the
+operator; a front proxy, a tunnel or a CDN all work.
+
+- Put TLS in front. The Ingress serves plain HTTP on Traefik's port 80, where a token crosses the
+  network readable.
+- Route only `/v1` to the node's port 80. That port also serves Grafana at `/grafana`, so
+  forwarding the whole port publishes Grafana's login page.
+- Clients take the published origin: Claude Code's `ANTHROPIC_BASE_URL` without `/v1`, Codex's
+  `base_url` with it.
+- Idle timeouts: Cloudflare closes a response after 100 s without data. Streams carry the
+  frontend's `:` line every 15 s and survive; a request without streaming that takes longer gets
+  524.
+- Repeat step 7's curl checks against the public URL, the one without a token included.
+
+## Benchmark
 
 ```bash
 kubectl -n dynamo-omlx delete job omlx-aiperf --ignore-not-found
@@ -221,12 +290,13 @@ kubectl -n dynamo-omlx logs -f job/omlx-aiperf
 
 ## Add a Mac
 
-1. Set up the Mac with the same model, `OMLX_KV_BLOCK_SIZE` and `OMLX_API_KEY`.
-2. Create its Secret `omlx-mac-2` as in step 4.
+1. Set up the Mac with `omlx-mac-install`: the same model, `OMLX_KV_BLOCK_SIZE` and
+   `OMLX_API_KEY`.
+2. Create its Secret `omlx-mac-2` as in step 5.
 3. Uncomment `components` in the overlay's `kustomization.yaml`. For a third Mac, copy
    `deploy/components/mac-2` to `mac-3`, change 2 to 3 in its last two operations, and list it
    after `mac-2`.
-4. Render, dry-run and apply as in step 5. Both proxies must become Ready; a proxy whose model
+4. Render, dry-run and apply as in step 6. Both proxies must become Ready; a proxy whose model
    card differs (another revision, block size or served name) is not admitted.
 
 ## Switch the Model
@@ -247,9 +317,27 @@ point `deploy/benchmark/kustomization.yaml` at its `profile.env`.
 - A new module under `dynamo_omlx/proxy/` needs a line in `deploy/base/kustomization.yaml`;
   `tests/test_omlx_deploy.py` fails until it has one.
 - A change to the `Frontend` component rolls only the frontend: its new pod takes over once
-  Ready, and the proxies keep running.
+  Ready, within about 20 seconds, and the proxies keep running.
 - A Secret change rolls nothing: delete the proxy pods to pick it up.
 - To add or revoke an API token, add or delete its file and run the `omlx-api-tokens` line of
-  step 4 again. The token check sees the change within two minutes;
+  step 5 again. The token check sees the change within two minutes;
   `kubectl -n dynamo-omlx rollout restart deploy/omlx-auth` applies it at once.
 - A Dynamo upgrade changes the chart version and every image tag under `deploy/` together.
+
+## After a Node Reboot
+
+The pods restart by themselves, and the Macs keep serving. Check the pods and step 7's
+`/v1/models`:
+
+```bash
+kubectl -n dynamo-omlx get pods
+kubectl -n dynamo-omlx logs deploy/omlx-frontend | grep -c 'lease conflicts'
+```
+
+When the frontend lists no model and its log has `endpoint registration lease conflicts with a
+pre-existing specification`, a registration from before the reboot blocks it. Only then delete
+the pod; its replacement registers anew:
+
+```bash
+kubectl -n dynamo-omlx delete pod -l nvidia.com/dynamo-component=Frontend
+```

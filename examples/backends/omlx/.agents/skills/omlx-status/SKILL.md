@@ -17,7 +17,7 @@ metadata:
 # Skill: Show the oMLX Example's Status
 
 The Linux side runs on Kubernetes as the DynamoGraphDeployment `omlx` in the namespace
-`dynamo-omlx`: the frontend with KV routing and one proxy pod per Mac (`omlx-k8s-deploy`).
+`dynamo-omlx`: the frontend with KV routing and one proxy pod per Mac (`omlx-dynamo-install`).
 This skill reports its state, how to reach it and how to call it. Paths below are relative to
 `examples/backends/omlx`.
 
@@ -85,11 +85,11 @@ Answer in the operator's language, in three parts:
 
 | Finding | Cause and fix |
 |---|---|
-| No `dynamo-platform` or `kube-prometheus-stack` release | Not installed: `omlx-k8s-deploy` steps 2 and 3 |
+| No `dynamo-platform` or `kube-prometheus-stack` release | Not installed: `omlx-dynamo-install` steps 3 and 4 |
 | A release with pods that are not ready | `kubectl -n <namespace> get pods`, then the failing pod's events and log |
-| No DynamoGraphDeployment | Another namespace or name (`--namespace`, `--name`), or not deployed: `omlx-k8s-deploy` step 5 |
+| No DynamoGraphDeployment | Another namespace or name (`--namespace`, `--name`), or not deployed: `omlx-dynamo-install` step 6 |
 | Pod not ready: `Init:...` | `kubectl -n dynamo-omlx logs <pod> -c prepare`; usually the Hub is unreachable |
-| Pod not ready: `CreateContainerConfigError`, or a Secret is missing | The Mac's Secret `omlx-mac-<n>`: `omlx-k8s-deploy` step 4 |
+| Pod not ready: `CreateContainerConfigError`, or a Secret is missing | The Mac's Secret `omlx-mac-<n>`: `omlx-dynamo-install` step 5 |
 | Pod not ready: `Running` | `kubectl -n dynamo-omlx logs <pod> -c main --tail=20`. `waiting for the oMLX bridge`: the Mac is unreachable or still loading. With `unregistered` and a log that ends at `Registering event channel`: Dynamo 1.5.1's discovery hang; deleting the pod fixes it |
 | Pod not ready: `CrashLoopBackOff` or `Error` | `kubectl -n dynamo-omlx logs <pod> -c main --previous`. `the oMLX bridge refused the proxy`: the Secret's key is not the Mac's. `block size ... expected`: the overlay does not match the model the Mac serves |
 | The proxy cannot reach the Mac's bridge | `curl -s -o /dev/null -m 5 -w '%{http_code}\n' <bridge url>/dynamo/v1/info` from Linux: 401 means the Mac answers, 000 that it does not, because it sleeps, left the network or its service stopped. After 30 seconds the proxy exits, and the pod restarts until the Mac is back |
@@ -97,13 +97,13 @@ Answer in the operator's language, in three parts:
 | KV events are not live | Bridge `degraded`: hash mismatches or hook errors, `./service.sh restart` on the Mac resumes them. Bridge `disabled`: oMLX runs without its SSD cache. Proxy sync `connecting` or `syncing`: passes after either side restarted |
 | Requests failed on the Mac | The errors in the proxy's log: `kubectl -n dynamo-omlx logs <pod> -c main --since=1h` |
 | Requests failed at the frontend | `validation`: the frontend or the chat template refused the request, such as `reasoning_effort: high`. `internal` includes the proxy's 400 for unsupported parameters; nothing failed on a Mac when the Macs count no `error`. The `Backend error detected` lines of `kubectl -n dynamo-omlx logs deploy/omlx-frontend --since=1h` show the messages. The counts cover the frontend's whole uptime |
-| Metrics did not answer, or no model is served | The pod is starting or stuck, or no proxy is ready: its log, and the Macs section |
+| Metrics did not answer, or no model is served | The pod is starting or stuck, or no proxy is ready: its log, and the Macs section. Right after a node reboot, a frontend log with `endpoint registration lease conflicts with a pre-existing specification` means deleting the frontend pod (`omlx-dynamo-install`, After a Node Reboot) |
 | A Job is running | Skip the smoke test until it finishes |
 | A Job failed | `kubectl -n dynamo-omlx logs job/<name>` |
 | ConfigMaps from earlier rollouts | Harmless leftovers; the operator may run the printed delete |
 | No Ingress routes to the frontend | Use the port-forward under Access |
-| The API Ingress runs no token check | The Ingress lacks the `omlx-auth` middleware: apply the overlay again (`omlx-k8s-deploy` step 5) |
-| The Secret `omlx-api-tokens` holds no token | Every request through the Ingress gets 401: create tokens as in `omlx-k8s-deploy` step 4 |
+| The API Ingress runs no token check | The Ingress lacks the `omlx-auth` middleware: apply the overlay again (`omlx-dynamo-install` step 6) |
+| The Secret `omlx-api-tokens` holds no token | Every request through the Ingress gets 401: create tokens as in `omlx-dynamo-install` step 5 |
 | Pod `omlx-auth-...` not ready | The token check is down, so requests through the Ingress fail: `kubectl -n dynamo-omlx logs deploy/omlx-auth` |
 | Pod `omlx-anthropic-fix-...` not ready | The stream repair in front of `/v1/messages` is down, so Claude Code's requests through the Ingress fail: `kubectl -n dynamo-omlx logs deploy/omlx-anthropic-fix` |
 
@@ -235,7 +235,7 @@ the operator's usual Claude Code login and settings stay untouched, and a token:
 ```bash
 CLAUDE_CONFIG_DIR=~/.claude-omlx \
 ANTHROPIC_BASE_URL=http://<node> \
-ANTHROPIC_AUTH_TOKEN=$(cat ~/.config/dynamo-omlx/api-tokens/claude-code) \
+ANTHROPIC_AUTH_TOKEN=$(cat ~/.config/dynamo-omlx/api-tokens/<holder>) \
 ANTHROPIC_MODEL=<model> ANTHROPIC_SMALL_FAST_MODEL=<model> \
 CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1 claude
 ```
@@ -259,7 +259,9 @@ CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1 claude
 
 Codex calls the Responses API and reads its token from the variable that `env_key` names. Save
 this as `~/.codex/omlx.config.toml` and run
-`OMLX_API_TOKEN=$(cat ~/.config/dynamo-omlx/api-tokens/codex) codex --profile omlx`:
+`OMLX_API_TOKEN=$(cat ~/.config/dynamo-omlx/api-tokens/<holder>) codex --profile omlx`, with
+`<holder>` one of the holders Access lists, ideally one per client so that each can be revoked
+alone:
 
 ```toml
 model = "<model>"
