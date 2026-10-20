@@ -236,6 +236,9 @@ examples/backends/omlx/launch/agg.sh --model-path /models/qwen3_vl/Qwen3.8-Flash
   directory's `preprocessor_config.json` before starting `agg.sh`.
 - `agg.sh` starts the frontend with `--router-mode kv` and one proxy per URL. Each proxy waits
   until its Mac has the model loaded before it registers.
+- Dynamo main turns structural-tag guided decoding on for requests with tools, which the Macs
+  cannot honor, so the proxy rejects every such request. With a Dynamo that has the flag
+  `--dyn-structural-tag`, append `--dyn-structural-tag false` to `agg.sh` to turn it off.
 
 Then send a request:
 
@@ -402,7 +405,8 @@ env_key = "OMLX_API_TOKEN"
 - Qwen3.8's chat template takes the reasoning efforts `low`, `medium` and `xhigh`, and uses
   `xhigh`, the highest, when a request names none. Codex without `model_reasoning_effort` names
   none as well; its `high` and `minimal` fail with HTTP 400. Claude Code always runs at `xhigh`
-  with thinking on: Dynamo 1.5.1 passes neither its effort setting nor its thinking switch.
+  with thinking on: Dynamo passes neither its effort setting nor its thinking switch, see
+  [Dynamo Issues](#dynamo-issues).
 - Claude Code sends about 16,000 tokens of system prompt and tools with every request. A new
   session prefills all but the whole 8,192-token blocks a Mac already caches; its later turns
   reuse the whole prefix.
@@ -738,6 +742,26 @@ The proxy accepts all Dynamo runtime flags (`--namespace`, `--discovery-backend`
 - **Dedicate the Mac to one model.** Other models sharing oMLX's SSD cache directory can evict
   its files.
 
+## Dynamo Issues
+
+These bugs and gaps in Dynamo itself affect this example. `main` means commit `92a28f812` of
+2026-10-19, the Dynamo this example was last checked against. `AGENTS.md` tracks the same
+issues for coding agents, under the same names, and `tests/test_omlx_docs.py` checks that the
+two lists agree. When `deploy/` or the Dynamo that `agg.sh` runs moves to a newer version,
+check every issue against it. Once one is fixed there, remove its workaround, tests and
+mentions, then its entries in both lists.
+
+| Issue | Affects | Workaround here | Once fixed |
+|---|---|---|---|
+| **Text after tool calls.** When a turn calls several tools, `/v1/messages` streams the text between the calls as deltas of a text block it has already closed. Claude Code stops with `API Error: The response stream was malformed`. | 1.5.1. main has the fix, [#15467](https://github.com/ai-dynamo/dynamo/pull/15467). | The Ingress sends `/v1/messages` through the stream repair, `deploy/base/anthropic_fix.py`. | Remove the repair with its Ingress path, test and mentions; `grep -rli -e anthropic.fix -e 'stream repair' .` lists them. |
+| **Images sent twice.** The frontend sends a worker each `data:` image URL twice, in `multi_modal_data` and in `extra_args.messages`. Two photos then exceed the default request-plane message of 32 MiB. | 1.5.1. main has the fix, [#14801](https://github.com/ai-dynamo/dynamo/pull/14801). | The proxies' `DYN_TCP_MAX_MESSAGE_SIZE` of 128 MiB in `deploy/base/dgd.yaml`. | Keep the limit, but drop the duplication from its comment and from [Images](#images): a request then holds about 128 MiB of images. |
+| **Canary health check.** The health check's canary request gives a worker 3 seconds for its first token and otherwise marks it not ready. A worker's `/live` answers from the same check, so a Mac that takes longer, as in a long prefill, gets its proxy restarted. | 1.5.1 and main | `DYN_HEALTH_CHECK_ENABLED=false` on the proxies. | Turn the check back on, with `DYN_HEALTH_CHECK_REQUEST_TIMEOUT` above a long prefill. |
+| **Qwen3.8 missing from the image registry.** The router counts image tokens only for models in llm-multimodal's registry, which knows no `qwen4_exp`, Qwen3.8's model type. Without a match it routes image requests by the text before their first image. | 1.5.1 (llm-multimodal 1.9.0) and main | `qwen3_vl` in the proxies' `--model-path` selects Qwen3-VL's image processor: `OMLX_MODEL_DIR` in the overlay's `profile.env`, and the path in [Linux Setup](#linux-setup). | Drop `qwen3_vl/` from both, rewrite the paragraph about it in [Images](#images), and update the registry that `tests/test_omlx_deploy.py` copies. |
+| **Claude Code's effort and thinking.** `/v1/messages` ignores `output_config.effort`, and runs a model that has a reasoning parser with thinking unless `thinking.type` is `disabled`. Claude Code 2.1.304 sends `adaptive` with thinking on and no `thinking` with it off. | 1.5.1 and main | None. Claude Code always runs Qwen3.8 at `xhigh` with thinking. | Correct [Coding Agents](#coding-agents) and the Claude Code notes in `omlx-status`. |
+| **Lease conflict after a reboot.** After a node reboot, the frontend can refuse to register its endpoint, with `endpoint registration lease conflicts with a pre-existing specification`, and then serves no model. | 1.5.1. main has the same check. | Delete the frontend pod: "After a Node Reboot" in `omlx-dynamo-install`, and `omlx-status`. | Delete those steps. |
+| **Discovery registration hang.** A proxy hung after `Registering event channel` while it registered with Kubernetes discovery, and got no `dynamoworkermetadatas` entry. | 1.5.1, once, right after the DGD was recreated | Delete the pod: the troubleshooting tables under [Changes](#changes), in `omlx-dynamo-install` and in `omlx-status`. | Delete those rows. |
+| **Duplicate-store warnings.** The router's index of predicted blocks (`DYN_ROUTER_PREDICTED_TTL_SECS`) counts a prediction it already holds as `duplicate_store` in `dynamo_component_kv_cache_event_warnings`, the counter for the workers' KV events. It rises by one for every repeated request whose blocks are all cached, though the proxy sends no event. | 1.5.1 and main | None needed. The counter says nothing about the proxy's KV events. | Delete the entries. |
+
 ## Tests
 
 ```bash
@@ -754,6 +778,8 @@ The tests run on Linux without oMLX or Dynamo:
   sends for a turn with two tool calls, and over HTTP against a fake frontend.
 - **Token check.** `deploy/base/token_auth.py` is tested over HTTP against a directory laid
   out like a mounted Secret.
+- **Dynamo issues.** The README and `AGENTS.md` are checked to track the same issues against
+  the same commit.
 - **Kubernetes manifests.** The proxy code that `deploy/` ships is checked against the package,
   and the overlays are rendered where `kubectl` is installed.
 

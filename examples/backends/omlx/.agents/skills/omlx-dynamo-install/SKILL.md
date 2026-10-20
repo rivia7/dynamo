@@ -331,7 +331,10 @@ point `deploy/benchmark/kustomization.yaml` at its `profile.env`.
 - To add or revoke an API token, add or delete its file and run the `omlx-api-tokens` line of
   step 5 again. The token check sees the change within two minutes;
   `kubectl -n dynamo-omlx rollout restart deploy/omlx-auth` applies it at once.
-- A Dynamo upgrade changes the chart version and every image tag under `deploy/` together.
+- A Dynamo upgrade changes the chart version and every image tag under `deploy/` together, and
+  from 1.6 on sets `DYN_STRUCTURAL_TAG=false` on the proxies. Then go through Dynamo Issues in
+  `AGENTS.md` and the README: for each issue the new version fixes, remove its workaround,
+  tests and mentions, then its entries in both.
 
 ## After a Node Reboot
 
