@@ -9,11 +9,47 @@ from dynamo_omlx.protocol import (
     decode_tokens,
     encode_frame,
     encode_tokens,
+    format_mm_hash,
+    pad_value_for_mm_hash,
     parse_blocks,
     parse_hashes,
+    parse_mm_hash,
 )
 
 pytestmark = [pytest.mark.post_merge, pytest.mark.gpu_0, pytest.mark.unit]
+
+MM_HASHES = [0, 1, 2**30 - 1, 2**30, 0xABCDEF0123456789, 2**64 - 1]
+
+
+def test_pad_values_match_the_router():
+    # dynamo_kv_router::protocols::pad_value_for_mm_hash keeps the low 30 bits.
+    assert [pad_value_for_mm_hash(h) for h in MM_HASHES] == [
+        1_000_000,
+        1_000_001,
+        1_000_000 + 2**30 - 1,
+        1_000_000,
+        1_000_000 + (0xABCDEF0123456789 & (2**30 - 1)),
+        1_000_000 + 2**30 - 1,
+    ]
+
+
+def test_pad_values_match_dynamos_python_mirror():
+    routing_utils = pytest.importorskip("dynamo.common.multimodal.routing_utils")
+    for mm_hash in MM_HASHES:
+        assert pad_value_for_mm_hash(mm_hash) == routing_utils.pad_value_for_mm_hash(
+            mm_hash
+        )
+
+
+def test_mm_hash_round_trip():
+    # The frontend writes extra_args.mm_hashes as format!("{:016x}").
+    assert format_mm_hash(0xFF) == "00000000000000ff"
+    for mm_hash in MM_HASHES:
+        assert parse_mm_hash(format_mm_hash(mm_hash)) == mm_hash
+    assert parse_mm_hash(None) is None
+    for bad in ("ff", "g" * 16, " " * 16, 255, "0x" + "0" * 14):
+        with pytest.raises(ProtocolError):
+            parse_mm_hash(bad)
 
 
 def test_frame_round_trip():

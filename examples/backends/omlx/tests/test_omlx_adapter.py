@@ -9,12 +9,15 @@ the equivalent check against a real oMLX install.
 """
 
 import asyncio
+import base64
 import dataclasses
 import importlib
+import io
 import signal
 import sys
 import types
 from collections import deque
+from concurrent.futures import ThreadPoolExecutor
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from types import SimpleNamespace
@@ -28,9 +31,15 @@ try:
 except ImportError as e:
     pytest.skip(f"Skip (missing dependency): {e}", allow_module_level=True)
 
+try:  # the image tests skip without them
+    import numpy as np
+    from PIL import Image
+except ImportError:
+    np = Image = None
+
 from dynamo_omlx.bridge.config import BridgeConfig
-from dynamo_omlx.bridge.service import BridgeError, GenerateSpec, ModelState
-from dynamo_omlx.protocol import API_PREFIX, ErrorCode
+from dynamo_omlx.bridge.service import BridgeError, GenerateSpec, ImageInput, ModelState
+from dynamo_omlx.protocol import API_PREFIX, ErrorCode, pad_value_for_mm_hash
 from omlx_fakes import omlx_hash
 
 pytestmark = [
@@ -46,6 +55,31 @@ B = 2
 
 def compute_block_hash(parent_hash, token_ids, extra_keys=None, model_name=None):
     return omlx_hash(parent_hash, token_ids, model_name, extra_keys)
+
+
+def resolve_block_extra_keys(
+    block_end, extra_keys=None, extra_key_token_start=None, extra_key_ranges=None
+):
+    """omlx.cache.paged_cache.resolve_block_extra_keys at oMLX 31b6b6a0."""
+    if extra_key_ranges:
+        selected = None
+        for start, keys in extra_key_ranges:
+            if block_end > start:
+                selected = keys
+            else:
+                break
+        return selected
+    if extra_keys is not None and (
+        extra_key_token_start is None or block_end > extra_key_token_start
+    ):
+        return extra_keys
+    return None
+
+
+def _capture_vlm_position_state(lm, extra_kwargs):
+    """omlx.engine.vlm._capture_vlm_position_state, without the language model."""
+    if extra_kwargs.get("rope_deltas") is not None:
+        extra_kwargs["_captured_rope_deltas"] = extra_kwargs["rope_deltas"]
 
 
 @dataclass
@@ -184,7 +218,9 @@ class BlockAwarePrefixCache:
             bid = compute_block_hash(
                 parent,
                 tokens[i * B : (i + 1) * B],
-                extra_keys,
+                resolve_block_extra_keys(
+                    (i + 1) * B, extra_keys, extra_key_token_start, extra_key_ranges
+                ),
                 self.paged_cache.model_name,
             )
             block_id = len(self.paged_cache.allocated_blocks) + 1
@@ -203,9 +239,15 @@ class FakeCore:
         self.added = []
         self.aborted = []
         self.add_error = None
+        self._mlx_executor = ThreadPoolExecutor(max_workers=1)
 
     async def add_request(
-        self, prompt, sampling_params=None, request_id=None, skip_cache_store=False
+        self,
+        prompt,
+        sampling_params=None,
+        request_id=None,
+        skip_cache_store=False,
+        **vlm,
     ):
         if self.add_error is not None:
             raise self.add_error
@@ -215,6 +257,7 @@ class FakeCore:
                 params=sampling_params,
                 rid=request_id,
                 skip=skip_cache_store,
+                vlm=vlm,
             )
         )
         return request_id
@@ -230,7 +273,16 @@ class FakeCore:
 
 class EngineCore:
     async def add_request(
-        self, prompt, sampling_params=None, request_id=None, skip_cache_store=False
+        self,
+        prompt,
+        sampling_params=None,
+        request_id=None,
+        vlm_inputs_embeds=None,
+        vlm_extra_kwargs=None,
+        vlm_image_hash=None,
+        vlm_cache_key_start=0,
+        vlm_cache_key_ranges=None,
+        skip_cache_store=False,
     ):
         raise NotImplementedError
 
@@ -362,7 +414,17 @@ def fake(monkeypatch):
         ),
         "omlx.cli": module("omlx.cli", main=lambda: None),
         "omlx.cache.paged_cache": module(
-            "omlx.cache.paged_cache", compute_block_hash=compute_block_hash
+            "omlx.cache.paged_cache",
+            compute_block_hash=compute_block_hash,
+            resolve_block_extra_keys=resolve_block_extra_keys,
+        ),
+        "omlx.engine": module("omlx.engine", __path__=[]),
+        "omlx.engine.vlm": module(
+            "omlx.engine.vlm", _capture_vlm_position_state=_capture_vlm_position_state
+        ),
+        "omlx.utils": module("omlx.utils", __path__=[]),
+        "omlx.utils.image": module(
+            "omlx.utils.image", get_max_image_bytes=lambda: 50 * 1024 * 1024
         ),
         "omlx.cache.paged_ssd_cache": module(
             "omlx.cache.paged_ssd_cache", PagedSSDCacheManager=PagedSSDCacheManager
@@ -418,7 +480,9 @@ def fake(monkeypatch):
         entry=entry,
         settings=settings,
         mtp=mtp,
+        modules=modules,
     )
+    core._mlx_executor.shutdown(wait=False)
     sys.modules.pop("dynamo_omlx.bridge.omlx_adapter", None)
 
 
@@ -516,9 +580,8 @@ def test_store_and_removal_hooks_feed_the_tracker(fake):
     runtime, _ = install(fake)
     cache = fake.scheduler.block_aware_cache
     cache.store_cache("r1", [1, 2, 3, 4, 5], cache_data=None)
-    cache.store_cache(
-        "r2", [7, 8], None, extra_keys=("image",)
-    )  # image chains are skipped
+    # An image request to oMLX's own API: the router cannot know its image.
+    cache.store_cache("r2", [7, 8], None, extra_keys=("image",))
     runtime.tracker.process_pending()
     assert len(runtime.log) == 2 and runtime.tracker.stats()["state"] == "live"
     first = compute_block_hash(None, [1, 2], model_name=MODEL)
@@ -547,6 +610,339 @@ def test_eviction_hook_withdraws_blocks(fake):
     fake.ssd._evict_tracked_until_size(0, max_count=1)
     runtime.tracker.process_pending()
     assert len(runtime.log) == 0
+
+
+# -- images ------------------------------------------------------------------------
+
+PAD, START, END = 9, 7, 8  # image placeholder, vision start, vision end
+HIDDEN = 4
+
+
+class FakeImageProcessor:
+    """Qwen-VL shaped: an image w pixels wide gets a (1, 2, 2w) grid, w tokens.
+
+    ``max_pixels`` caps that width, so tests can see the pixel range applied.
+    """
+
+    merge_size = 2
+    min_pixels, max_pixels = 1, 1000  # the model's own range
+
+    def __init__(self):
+        self.calls: list[dict] = []
+
+    def __call__(self, images, **limits):
+        self.calls.append(limits)
+        cap = limits.get("max_pixels", self.max_pixels)
+        grid = [[1, 2, 2 * min(image.size[0], cap)] for image in images]
+        return {
+            "pixel_values": np.zeros((sum(t * h * w for t, h, w in grid), 3)),
+            "image_grid_thw": np.array(grid),
+        }
+
+
+class FakeVisionTower:
+    deepstack_visual_indexes: list = []
+    patch_embed = SimpleNamespace(
+        proj=SimpleNamespace(weight=SimpleNamespace(dtype="float32"))
+    )
+
+    def __init__(self):
+        self.calls = 0
+
+    def __call__(self, pixel_values, grid):
+        self.calls += 1
+        tokens = sum(t * h * w // 4 for t, h, w in grid.tolist())
+        return np.full((tokens, HIDDEN), float(self.calls)), []
+
+
+class FakeVlmModel:
+    def __init__(self):
+        self.config = SimpleNamespace(image_token_id=PAD, vision_start_token_id=START)
+        self.vision_tower = FakeVisionTower()
+        self.language_model = SimpleNamespace()
+        self.embedded: list[dict] = []
+        self.pixel_shapes: list[tuple] = []
+
+    def get_input_embeddings(self, input_ids, pixel_values=None, **kwargs):
+        self.embedded.append(kwargs)
+        self.pixel_shapes.append(pixel_values.shape)
+        length = input_ids.shape[1]
+        features = {
+            "inputs_embeds": np.zeros((1, length, HIDDEN)),
+            "position_ids": np.zeros((3, 1, length)),
+            "rope_deltas": np.array([[-1]]),
+        }
+        return SimpleNamespace(
+            inputs_embeds=features["inputs_embeds"], to_dict=lambda: features
+        )
+
+
+class FakeVisionCache:
+    def __init__(self):
+        self.entries = {}
+
+    def get(self, image_hash, model_name):
+        return self.entries.get((model_name, image_hash))
+
+    def put(self, image_hash, model_name, features):
+        self.entries[(model_name, image_hash)] = features
+
+
+def png(width: int) -> str:
+    if Image is None:
+        pytest.skip("needs PIL")
+    buffer = io.BytesIO()
+    Image.new("RGB", (width, 2), (width, 0, 0)).save(buffer, format="PNG")
+    return base64.b64encode(buffer.getvalue()).decode()
+
+
+@pytest.fixture
+def vlm(fake, monkeypatch):
+    """``fake`` with a Qwen-VL shaped model loaded in oMLX's VLM engine; mlx is numpy."""
+    if np is None or Image is None:
+        pytest.skip("needs numpy and PIL")
+    mx = module(
+        "mlx.core",
+        array=np.asarray,
+        zeros=np.zeros,
+        ones_like=np.ones_like,
+        int32=np.int32,
+        concatenate=lambda arrays, axis=0: np.concatenate(arrays, axis=axis),
+        eval=lambda *arrays: None,
+        synchronize=lambda: None,
+        clear_cache=lambda: None,
+    )
+    monkeypatch.setitem(sys.modules, "mlx", module("mlx", __path__=[], core=mx))
+    monkeypatch.setitem(sys.modules, "mlx.core", mx)
+    engine = fake.entry.engine
+    engine.model_type = "qwen4_exp"
+    engine._vlm_model = FakeVlmModel()
+    engine._processor = SimpleNamespace(image_processor=FakeImageProcessor())
+    engine._vision_cache = FakeVisionCache()
+    engine._vision_cache_enabled = True
+    engine._model_name = "/models/" + MODEL
+    fake.core.outputs = [omlx_output([5], finished=True, reason="stop")]
+    return fake
+
+
+def image_spec(images, token_ids=(1, START, PAD, END, 2), **overrides):
+    return GenerateSpec(
+        request_id="client-1",
+        token_ids=list(token_ids),
+        images=tuple(ImageInput(data, mm_hash) for data, mm_hash in images),
+        **overrides,
+    )
+
+
+async def run(facade, spec):
+    async with facade.open(spec) as request:
+        return [output async for output in request.outputs()]
+
+
+def image_keys(payloads, min_pixels=1, max_pixels=1000) -> list[str]:
+    """The bridge's cumulative oMLX keys of these images."""
+    from dynamo_omlx.bridge.images import cumulative_keys, image_key, read_images
+
+    files = read_images(payloads, max_bytes=0)
+    return cumulative_keys(
+        [image_key(file.digest, min_pixels, max_pixels) for file in files]
+    )
+
+
+async def test_image_requests_reach_omlx_expanded_and_keyed(vlm):
+    runtime, _ = install(vlm)
+    facade = runtime.facade
+    assert runtime.info()["model"]["vision"] is True
+    spec = image_spec([(png(3), 0xA)], max_tokens=5000, expanded_prompt_len=7)
+    await run(facade, spec)
+    added = vlm.core.added[-1]
+    assert added.prompt == [1, START, PAD, PAD, PAD, END, 2]
+    assert added.params.max_tokens == 4096 - 7  # the context minus the expanded prompt
+    [image_hash] = image_keys([png(3)])
+    assert added.vlm["vlm_cache_key_ranges"] == [(2, image_hash)]
+    assert (added.vlm["vlm_image_hash"], added.vlm["vlm_cache_key_start"]) == (
+        image_hash,
+        2,
+    )
+    assert added.vlm["vlm_inputs_embeds"].shape == (1, 7, HIDDEN)
+    extra = added.vlm["vlm_extra_kwargs"]
+    assert "inputs_embeds" not in extra and "_captured_rope_deltas" in extra
+    assert facade.image_stats() == {
+        "requests": 1,
+        "images": 1,
+        "images_decoded": 1,
+        "vision_cache_hits": 0,
+        "vision_cache_misses": 1,
+        "token_count_mismatches": 0,
+    }
+
+    # oMLX stores the finished request with the keys add_request derived.
+    vlm.scheduler.block_aware_cache.store_cache(
+        added.rid,
+        added.prompt + [5],
+        None,
+        extra_keys=(image_hash,),
+        extra_key_token_start=2,
+        extra_key_ranges=[(2, (image_hash,))],
+    )
+    runtime.tracker.process_pending()
+    pad = pad_value_for_mm_hash(0xA)
+    assert [list(block.tokens) for block in runtime.log.snapshot().blocks] == [
+        [1, START],
+        [pad, pad],
+        [pad, END],
+        [2, 5],
+    ]
+    assert runtime.tracker.stats()["state"] == "live"
+
+
+async def test_cached_images_need_no_pixels(vlm):
+    runtime, _ = install(vlm)
+    engine = vlm.entry.engine
+    model, processor = engine._vlm_model, engine._processor.image_processor
+    for _ in range(2):
+        await run(runtime.facade, image_spec([(png(3), 0xA)]))
+    # The second request found every image's features and grid in the cache.
+    assert (model.vision_tower.calls, len(processor.calls)) == (1, 1)
+    assert model.pixel_shapes[1] == (1, 1)
+    first, second = model.embedded
+    assert np.array_equal(
+        first["cached_image_features"], second["cached_image_features"]
+    )
+    assert second["image_grid_thw"].tolist() == [[1, 2, 6]]
+    one, two = vlm.core.added
+    assert (one.prompt, one.vlm["vlm_cache_key_ranges"]) == (
+        two.prompt,
+        two.vlm["vlm_cache_key_ranges"],
+    )
+    stats = runtime.facade.image_stats()
+    assert (
+        stats["images_decoded"],
+        stats["vision_cache_misses"],
+        stats["vision_cache_hits"],
+    ) == (1, 1, 1)
+
+
+async def test_models_that_might_ignore_cached_features_still_get_pixels(vlm):
+    runtime, _ = install(vlm)
+    engine = vlm.entry.engine
+    engine.model_type = "qwen2_vl"
+    for _ in range(2):
+        await run(runtime.facade, image_spec([(png(3), 0xA)]))
+    model = engine._vlm_model
+    assert (
+        model.vision_tower.calls == 1
+        and len(engine._processor.image_processor.calls) == 2
+    )
+    assert model.pixel_shapes[1] != (1, 1)
+    assert "cached_image_features" in model.embedded[1]
+
+
+async def test_the_pixel_range_reaches_the_processor_and_the_keys(vlm):
+    runtime, _ = install(vlm)
+    engine = vlm.entry.engine
+    processor = engine._processor.image_processor
+    await run(
+        runtime.facade,
+        image_spec([(png(3), 0xA)], min_pixels=1, max_pixels=2, expanded_prompt_len=6),
+    )
+    assert processor.calls == [{"min_pixels": 1, "max_pixels": 2}]
+    added = vlm.core.added[-1]
+    assert added.prompt == [1, START, PAD, PAD, END, 2]  # 2 tokens within the range
+    assert added.vlm["vlm_image_hash"] == image_keys([png(3)], 1, 2)[0]
+    assert runtime.facade.image_stats()["token_count_mismatches"] == 0
+    # Another range is another image to the caches.
+    await run(runtime.facade, image_spec([(png(3), 0xA)], max_pixels=3))
+    assert engine._vlm_model.vision_tower.calls == 2
+
+
+async def test_a_damaged_cache_entry_is_recomputed(vlm):
+    runtime, _ = install(vlm)
+    engine = vlm.entry.engine
+    await run(runtime.facade, image_spec([(png(3), 0xA)]))
+    for key in engine._vision_cache.entries:
+        features, grid = engine._vision_cache.entries[key]
+        engine._vision_cache.entries[key] = [features, np.array([1, 2, 8])]
+    await run(runtime.facade, image_spec([(png(3), 0xA)]))
+    assert engine._vlm_model.vision_tower.calls == 2
+    assert vlm.core.added[-1].prompt == [1, START, PAD, PAD, PAD, END, 2]
+
+
+async def test_images_without_mm_hash_are_announced_up_to_the_image(vlm):
+    runtime, _ = install(vlm)
+    await run(
+        runtime.facade,
+        image_spec([(png(1), None)], token_ids=(1, 2, 3, START, PAD, END)),
+    )
+    added = vlm.core.added[-1]
+    vlm.scheduler.block_aware_cache.store_cache(
+        added.rid,
+        added.prompt,
+        None,
+        extra_key_ranges=[(4, (added.vlm["vlm_image_hash"],))],
+    )
+    runtime.tracker.process_pending()
+    assert [list(b.tokens) for b in runtime.log.snapshot().blocks] == [
+        [1, 2],
+        [3, START],
+    ]
+
+
+def test_images_omlx_served_itself_announce_only_the_text_before_them(fake):
+    runtime, _ = install(fake)
+    fake.scheduler.block_aware_cache.store_cache(
+        "native", [1, 2, 3, PAD, PAD, 4], None, extra_key_ranges=[(3, ("h",))]
+    )
+    runtime.tracker.process_pending()
+    assert [list(b.tokens) for b in runtime.log.snapshot().blocks] == [[1, 2]]
+
+
+async def test_a_token_count_the_router_disagrees_with_is_counted(vlm, caplog):
+    runtime, _ = install(vlm)
+    await run(runtime.facade, image_spec([(png(3), 0xA)], expanded_prompt_len=6))
+    assert runtime.facade.image_stats()["token_count_mismatches"] == 1
+    assert "cannot match its blocks" in caplog.text
+
+
+@pytest.mark.parametrize(
+    "token_ids, context, message",
+    [
+        ((1, PAD, 2), 4096, "vision start token"),
+        ((1, START, PAD, END, START, PAD, END), 4096, "2 image placeholders for 1"),
+        ((1, START, PAD, END, 2), 7, "model context is 7"),
+    ],
+)
+async def test_image_requests_need_placeholders_and_room(
+    vlm, token_ids, context, message
+):
+    runtime, _ = install(vlm)
+    vlm.entry.model_context_length = context
+    with pytest.raises(BridgeError, match=message) as info:
+        await run(runtime.facade, image_spec([(png(3), 0xA)], token_ids=token_ids))
+    assert info.value.code == ErrorCode.INVALID_REQUEST
+    assert vlm.core.added == []
+
+
+async def test_text_models_refuse_images(fake):
+    runtime, _ = install(fake)
+    assert runtime.info()["model"]["vision"] is False
+    with pytest.raises(BridgeError, match="not a vision-language model"):
+        await run(runtime.facade, image_spec([(png(3), 0xA)]))
+
+
+def test_images_can_be_turned_off(vlm):
+    runtime, _ = install(vlm, images=False)
+    assert runtime.info()["model"]["vision"] is False
+
+
+def test_an_omlx_without_the_vlm_surface_serves_text_only(vlm, monkeypatch):
+    assert vlm.adapter.probe_vision() == []
+    monkeypatch.delattr(vlm.modules["omlx.engine.vlm"], "_capture_vlm_position_state")
+    assert vlm.adapter.probe_vision() == [
+        "omlx.engine.vlm._capture_vlm_position_state is missing"
+    ]
+    runtime, _ = install(vlm)
+    assert runtime.info()["model"]["vision"] is False
 
 
 async def test_facade_streams_outputs_with_omlx_sampling_defaults(fake):

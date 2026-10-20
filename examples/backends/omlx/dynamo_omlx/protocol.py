@@ -10,7 +10,22 @@ Every stream is NDJSON: one compact JSON object per line, discriminated by the
 ``"t"`` field. Consumers ignore unknown frame types and unknown fields, so
 either side can add fields without a protocol version bump.
 
-Generate stream (``POST {API_PREFIX}/generate``)::
+Generate request (``POST {API_PREFIX}/generate``), prompt as Dynamo tokenized it::
+
+    {"v":1,"request_id":"...","token_ids":[...],"max_tokens":N,"stop_token_ids":[...],
+     "skip_cache_store":false,"temperature":...,
+     "images":[{"data":"<base64 image file>","mm_hash":"<16 hex digits>"|null}, ...],
+     "expanded_prompt_len":N|null,"min_pixels":N|null,"max_pixels":N|null}
+
+``images`` lists one entry per image placeholder token in ``token_ids``, in
+order; ``mm_hash`` is the image's identity in Dynamo's KV router,
+``expanded_prompt_len`` the prompt length the frontend routed with after
+expanding the images, and ``min_pixels``/``max_pixels`` the pixel range it
+counted their tokens with. A bridge that predates images would ignore them and read
+the placeholders as text, so the proxy sends images only to a bridge whose
+``/info`` reports ``model.vision``.
+
+Generate stream::
 
     {"t":"start","v":1,"rid":"...","inc":"..."}
     {"t":"hb"}                                   # while waiting for tokens
@@ -33,7 +48,9 @@ KV event stream (``GET {API_PREFIX}/kv/stream?inc=...&after=N``)::
     {"t":"reset","reason":"incarnation|floor|ahead|disabled|shutdown"}   # then EOF
 
 Snapshot blocks are parent-first, store events are parent-first chain
-segments, and remove events list whole subtrees leaf-first.
+segments, and remove events list whole subtrees leaf-first. A block's tokens
+are its routing tokens: the image tokens of an image request carry the
+image's pad value (:func:`pad_value_for_mm_hash`), as in Dynamo's router.
 """
 
 from __future__ import annotations
@@ -63,6 +80,12 @@ MAX_BLOCKS_PER_FRAME = 16
 
 _HASH_DOMAIN = b"dynamo-omlx-kv-hash-v1"
 _HASH_PERSON = b"dynomlx1"
+# Dynamo's KV router sees every token of an image as one pad value derived from
+# the image's mm_hash, above any vocabulary, so blocks holding different images
+# hash differently. Mirrors dynamo_kv_router::protocols::pad_value_for_mm_hash.
+MM_PAD_SHIFT_VALUE = 1_000_000
+MM_PAD_HASH_MASK = (1 << 30) - 1
+_MM_HASH_HEX_DIGITS = 16
 _I64 = struct.Struct("<q")
 _U64 = struct.Struct("<Q")
 _I64_MIN = -(2**63)
@@ -231,6 +254,31 @@ def block_hash(
     h.update(b"\x00" if parent is None else b"\x01" + _I64.pack(parent))
     h.update(_le_bytes(tokens))
     return int.from_bytes(h.digest(), "big", signed=True)
+
+
+def pad_value_for_mm_hash(mm_hash: int) -> int:
+    """The token Dynamo's router sees at every position of the image ``mm_hash``."""
+    return MM_PAD_SHIFT_VALUE + (mm_hash & MM_PAD_HASH_MASK)
+
+
+def format_mm_hash(mm_hash: int) -> str:
+    """``mm_hash`` as Dynamo's frontend writes it: 16 lowercase hex digits."""
+    return f"{mm_hash:016x}"
+
+
+def parse_mm_hash(value: Any) -> int | None:
+    """An image's mm_hash from :func:`format_mm_hash` form; None stays None."""
+    if value is None:
+        return None
+    if (
+        not isinstance(value, str)
+        or len(value) != _MM_HASH_HEX_DIGITS
+        or value.strip("0123456789abcdefABCDEF")
+    ):
+        raise ProtocolError(
+            f"mm_hash must be {_MM_HASH_HEX_DIGITS} hex digits, got {value!r}"
+        )
+    return int(value, 16)
 
 
 @dataclass(frozen=True, slots=True)

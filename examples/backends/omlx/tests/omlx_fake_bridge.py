@@ -46,6 +46,7 @@ class FakeBridge:
         self.generate_service: GenerateService | None = None
         self.generate_error: tuple[str, str] | None = None  # (code, message)
         self.info_error: tuple[int, dict | str] | None = None  # (status, body)
+        self.specs: list[GenerateSpec] = []  # every generate request received
         self.model = {
             "id": "m",
             "state": "ready",
@@ -53,6 +54,7 @@ class FakeBridge:
             "max_num_seqs": 4,
             "max_num_batched_tokens": 2048,
             "context_length": 64,
+            "vision": False,
         }
         app = web.Application(middlewares=[self._auth])
         app.router.add_get(API_PREFIX + "/info", self.info)
@@ -111,6 +113,7 @@ class FakeBridge:
                 {"error": error_payload(*self.generate_error)}, status=503
             )
         spec = GenerateSpec.from_body(await request.json())
+        self.specs.append(spec)
         self.generate_service = GenerateService(
             FakeFacade(self.request), self.log.incarnation, heartbeat_s=0.05
         )

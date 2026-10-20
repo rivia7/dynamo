@@ -41,8 +41,8 @@ The example has two components:
   plain oMLX. Hooks on oMLX's prefix cache record which blocks are stored or evicted.
 - **Proxy** (`dynamo_omlx.proxy`). This is a Dynamo worker built on the unified backend SDK.
   It loads no weights: it registers the model from a directory holding only `config.json`, the
-  tokenizer and the chat template. It forwards token ids to its Mac, streams tokens back, and
-  publishes the Mac's cache state to the router.
+  tokenizer and the chat template. It forwards token ids and the files of any images to its
+  Mac, streams tokens back, and publishes the Mac's cache state to the router.
 
 The bridge and proxy share one versioned wire protocol, `dynamo_omlx/protocol.py`. All traffic
 between them is HTTP with NDJSON streams on oMLX's port, authenticated with oMLX's API key.
@@ -77,6 +77,54 @@ Block identity comes from two hashes:
 - **External block hash.** The bridge derives it from the parent hash and the tokens
   (`protocol.block_hash`). It does not use oMLX's own hash, which is salted with the local model
   directory name. Two Macs therefore announce identical hashes for identical prefixes.
+
+### Images
+
+A vision-language model on the Macs takes images in `image_url` content parts, as `data:` URLs
+of a base64 image or as `http(s)` URLs. Qwen3.8-Flash-Next is one. The prefix cache covers
+images as it covers text: on the Mac and in the router.
+
+1. **Frontend.** It applies the chat template, which leaves one `<|image_pad|>` per image, and
+   passes the URLs on. It identifies each image by `mm_hash`, the XXH3 hash of its URL, and
+   routes by the prompt with each placeholder expanded into that many pad values derived from
+   the image's `mm_hash`.
+2. **Proxy.** It sends the Mac the token ids, each image file and its `mm_hash`. It fetches
+   `http(s)` images itself, from public addresses only unless `DYN_MM_ALLOW_INTERNAL=1`, as for
+   the frontend.
+3. **Bridge.** It runs the second half of oMLX's own VLM path on Dynamo's tokens:
+   - It knows an image by the hash of its file and the pixel range it is processed within.
+   - It expands each placeholder by the model's image processor and encodes the images,
+     through oMLX's vision feature cache, which keeps each image's features and patch grid.
+     A request whose images are all cached skips their vision encoder and, for Qwen3.8, their
+     decoding and preprocessing too.
+   - From each image's first token on, it keys oMLX's prefix cache blocks with the identity of
+     the images so far. A cached prefix then never stands in for other images.
+   - It announces stored blocks with each image's tokens replaced by the image's pad value,
+     exactly the tokens the router hashes for a request. The router therefore matches image
+     blocks, and only those of the same images.
+
+The router expands images only for a model it has an image token counter for. It picks one by
+a name in the proxies' `--model-path`, then by `model_type` in `config.json`, and knows no
+`qwen4_exp`. Qwen3.8 uses Qwen3-VL's image processor, so its path must contain `qwen3_vl`: the
+Kubernetes overlay uses `/models/qwen3_vl/Qwen3.8-Flash-Next`, and `agg.sh` needs a path like it.
+The frontend then logs `MM-aware KV routing enabled` for the model. Without a counter, image
+requests still work and still reuse the Mac's cache, but the router matches them only by the
+text before the first image.
+
+An image costs its pixels / 1024 tokens within the pixel range of the proxies'
+`preprocessor_config.json`. The frontend counts image tokens with that range, and the proxy has
+the Macs scale images into it, so the two counts agree. The model's own range goes up to 16.7
+megapixels, 16,384 tokens, which costs a 12-megapixel photo about 15 seconds of prefill instead
+of 2. The Kubernetes overlay therefore caps it at 4,194,304 pixels (`OMLX_IMAGE_MAX_PIXELS` in
+`profile.env`), about what oMLX's own API shrinks images to. With `agg.sh`, set `max_pixels` in
+`preprocessor_config.json` of `--model-path` the same way.
+
+A request reaches the proxy as one request-plane message that carries its images as base64,
+and Dynamo 1.5.1 puts each image in it twice. Dynamo's default limit of 32 MiB per message
+would therefore fail a request with about 16 MiB of images, two photos, with HTTP 500. The
+overlay raises the proxies' `DYN_TCP_MAX_MESSAGE_SIZE` to 128 MiB, about 64 MiB of images per
+request; export the same variable before `agg.sh`. The frontend separately refuses a `data:`
+URL over 16 MiB (`DYN_MM_MAX_DATA_URL_MB`).
 
 ## Prerequisites
 
@@ -172,16 +220,20 @@ cd ~/dynamo-omlx/mac
 
 ```bash
 python3 examples/backends/omlx/mac/download_model.py Jundot/Qwen3.8-Flash-Next-oQ4e-mtp \
-    --metadata-only --model-dir /models --name Qwen3.8-Flash-Next
+    --metadata-only --model-dir /models/qwen3_vl --name Qwen3.8-Flash-Next
 
 export OMLX_API_KEY=...   # the key from the Macs' settings file
 OMLX_BRIDGE_URLS="http://<mac-1>:8000 http://<mac-2>:8000" \
-examples/backends/omlx/launch/agg.sh --model-path /models/Qwen3.8-Flash-Next
+examples/backends/omlx/launch/agg.sh --model-path /models/qwen3_vl/Qwen3.8-Flash-Next
 ```
 
 - Use the URLs that `service.sh start` prints on each Mac.
 - `--metadata-only` fetches the config, tokenizer and chat template files and needs
   `huggingface_hub`. Copying the same files from a Mac's model directory works as well.
+- `qwen3_vl` in the path makes the router route images by their content; see
+  [Images](#images). The served model name stays the last part of the path.
+- To cap images as the Kubernetes overlay does, add `"max_pixels": 4194304` to that
+  directory's `preprocessor_config.json` before starting `agg.sh`.
 - `agg.sh` starts the frontend with `--router-mode kv` and one proxy per URL. Each proxy waits
   until its Mac has the model loaded before it registers.
 
@@ -408,7 +460,7 @@ confidence intervals, and the `profile_runs` files hold the single runs.
 | Task | How |
 |---|---|
 | Add a Mac | Create its Secret `omlx-mac-2`, uncomment `components` in the overlay's `kustomization.yaml`, and apply the overlay again. `deploy/components/mac-2` says how to add a third. |
-| Switch the model | Copy `deploy/overlays/qwen3.8-flash-next` to a new overlay and set every value in its `profile.env`; `OMLX_MODEL_REVISION` is the `sha` in `.dynamo-omlx-download.json` of the model's directory on a Mac. Delete the current overlay's objects (`kubectl kustomize ... <overlay> \| kubectl delete -f -`), recreate each Mac's Secret with the URL of its new service, apply the new overlay, and point `deploy/benchmark/kustomization.yaml` at its `profile.env`. |
+| Switch the model | Copy `deploy/overlays/qwen3.8-flash-next` to a new overlay and set every value in its `profile.env`; `OMLX_MODEL_REVISION` is the `sha` in `.dynamo-omlx-download.json` of the model's directory on a Mac, and `OMLX_MODEL_DIR` names the image processor the model uses, as [Images](#images) describes. Delete the current overlay's objects (`kubectl kustomize ... <overlay> \| kubectl delete -f -`), recreate each Mac's Secret with the URL of its new service, apply the new overlay, and point `deploy/benchmark/kustomization.yaml` at its `profile.env`. |
 | Update the proxy code or a profile | Apply the overlay again. The ConfigMap names change, so the proxies roll, and each new pod replaces the old one once it is ready. |
 | Rotate the key | Recreate the Secrets, then delete the proxy pods. |
 | Add or revoke an API token | Add or delete a file in `~/.config/dynamo-omlx/api-tokens`, then rerun the `kubectl create secret generic omlx-api-tokens` line of [Deploy](#deploy). The token check rereads the Secret, so the change applies within two minutes; `kubectl -n dynamo-omlx rollout restart deploy/omlx-auth` applies it at once. |
@@ -560,6 +612,11 @@ Each proxy also exposes oMLX state on its `/metrics` (`DYN_SYSTEM_PORT`, startin
 | `omlx_proxy_kv_announced_blocks`, `omlx_proxy_kv_sync_state{state}` | Blocks announced to the router, sync state |
 | `omlx_proxy_kv_events_total`, `_snapshots_total`, `_resyncs_total`, `_reconnects_total` | KV sync activity |
 | `omlx_proxy_requests_total{outcome}`, `omlx_proxy_cached_tokens_total`, `omlx_proxy_prompt_tokens_total` | Request outcomes and prefix-cache hit volume |
+| `omlx_model_vision`, `omlx_proxy_images_total` | 1 when the loaded model takes images; images sent to the Mac |
+| `omlx_bridge_image_requests`, `omlx_bridge_images` | Image requests and images the bridge prepared since it started |
+| `omlx_bridge_vision_cache_hits`, `omlx_bridge_vision_cache_misses` | Images whose vision features came from oMLX's cache, and images encoded |
+| `omlx_bridge_images_decoded` | Images whose pixels the bridge decoded; a request whose images are all cached decodes none |
+| `omlx_bridge_image_token_mismatches` | Image requests the model's processor expanded to another length than the router; the router cannot match their blocks from the first image on |
 
 The per-rank gauges `dynamo_component_total_blocks`, `gpu_cache_usage_percent` and
 `kv_cache_hit_rate` are fed by the proxy:
@@ -607,12 +664,13 @@ takes `--config FILE` (or `DYNAMO_OMLX_CONFIG`) to use another settings file.
 | `--model-id` | `OMLX_BRIDGE_MODEL_ID` | oMLX model id served to Dynamo |
 | `--kv-block-size` | unset | Preset for oMLX's paged cache block size; oMLX may still enlarge it |
 | `--no-kv-events` | off | Serve tokens only |
+| `--no-images` | off | Refuse images, even for a vision-language model |
 | `--no-pin`, `--no-preload` | off | Leave pinning and loading to oMLX |
 | `--no-verify-hashes` | off | Skip recomputing oMLX block hashes before announcing |
 | `--audit-interval` | 30 s | Check that announced blocks still exist on SSD |
 | `--ring-max-events`, `--ring-max-bytes` | 100000, 64 MiB | Replay ring size |
 | `--mtp`, `--mtp-depth` | unset | Write multi-token prediction (`on` or `off`) and its maximum draft depth to oMLX's per-model settings |
-| `--check` | off | Report oMLX compatibility and exit |
+| `--check` | off | Report oMLX compatibility and exit; `no image input:` lines name what image input lacks |
 
 The proxy accepts all Dynamo runtime flags (`--namespace`, `--discovery-backend`,
 `--dyn-tool-call-parser`, and so on), plus these:
@@ -632,6 +690,8 @@ The proxy accepts all Dynamo runtime flags (`--namespace`, `--discovery-backend`
 | `--stats-interval` | 1 s | Seconds between bridge stats polls |
 | `--generate-read-timeout` | 60 s | Fail a generation after this long without a frame; the bridge sends heartbeats every 5 s |
 | `--startup-timeout` | 0 | Seconds to wait for the model (0: wait forever) |
+| `--max-image-bytes` | 50 MiB | Largest image file a request may carry or link to; oMLX's `max_image_upload_size` applies too |
+| `--image-fetch-timeout` | 30 s | Seconds to fetch an `http(s)` image |
 
 ## Failure Behavior
 
@@ -649,11 +709,18 @@ The proxy accepts all Dynamo runtime flags (`--namespace`, `--discovery-backend`
 
 ## Limitations
 
-- **Text, aggregated serving only.**
-  - No multimodal input and no prefill/decode disaggregation.
+- **Text and images, aggregated serving only.**
+  - No video, audio, frontend-decoded media or prefill/decode disaggregation. Images need a
+    vision-language model from the Qwen-VL family, whose processor expands each image
+    placeholder by a patch grid.
   - Requests using `ignore_eos`, `min_tokens`, a thinking budget, `n > 1`, beam search, guided
     decoding, logprobs, LoRA or `cache_salt` are rejected. oMLX cannot honor them through this
     path, and it cannot isolate prefix caches per salt.
+- **The router knows images by URL, oMLX by file.**
+  - The same picture in two files, for example re-encoded, is two images to both, and one URL
+    whose content changed is one image to the router. The Mac's cache stays correct either
+    way; the router's estimate may not.
+  - Images sent to oMLX's own API reach the router only as the text before their first image.
 - **Blocks become visible only after the request finishes.**
   - oMLX commits prefix blocks when a request finishes, so the router learns a prefix only then.
   - `agg.sh` sets `--router-predicted-ttl-secs` so the router can anticipate concurrent requests

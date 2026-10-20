@@ -15,8 +15,8 @@ B = 4
 MODEL = "Qwen3.8-Flash-Next-oQ4e-mtp"
 
 
-def verify(parent, tokens, bid, model_name) -> bool:
-    return omlx_hash(parent, list(tokens), model_name) == bid
+def verify(parent, tokens, bid, model_name, extra_keys) -> bool:
+    return omlx_hash(parent, list(tokens), model_name, extra_keys) == bid
 
 
 @dataclass
@@ -133,6 +133,50 @@ def test_exact_terminal_block_is_not_announced():
     h.tracker.on_store(h.paged, FakeTable([1, 2]), tokens, exclude_last=True)
     h.tracker.process_pending()
     assert h.log.contains(bid0) and not h.log.contains(bid1)
+
+
+def image_chain(h: Harness, keys) -> tuple[list[int], list[bytes]]:
+    """Three blocks whose oMLX hashes carry ``keys[i]``, stored and persisted."""
+    tokens = list(range(3 * B))
+    bids, parent = [], None
+    for i, key in enumerate(keys):
+        parent = omlx_hash(parent, tokens[i * B : (i + 1) * B], MODEL, key)
+        h.paged.allocated_blocks[10 + i] = FakeBlock(parent, B)
+        h.ssd.blocks.add(parent)
+        bids.append(parent)
+    return tokens, bids
+
+
+def test_image_blocks_verify_with_their_keys_and_announce_routing_tokens():
+    h = Harness()
+    keys = [None, ("img",), ("img",)]
+    tokens, bids = image_chain(h, keys)
+    routing = tokens[:B] + [1_000_007] * B + tokens[2 * B :]
+    h.tracker.on_store(
+        h.paged,
+        FakeTable([10, 11, 12]),
+        tokens,
+        routing_tokens=routing,
+        extra_keys=keys,
+    )
+    h.tracker.process_pending()
+    assert len(h.log) == 3 and h.tracker.stats().get("faults_hash_mismatch") is None
+    announced = [list(block.tokens) for block in h.log.snapshot().blocks]
+    assert announced == [routing[i * B : (i + 1) * B] for i in range(3)]
+
+
+def test_image_blocks_need_their_keys_and_respect_max_blocks():
+    h = Harness()
+    keys = [None, ("img",), ("img",)]
+    tokens, _ = image_chain(h, keys)
+    h.tracker.on_store(h.paged, FakeTable([10, 11, 12]), tokens)  # keys left out
+    h.tracker.process_pending()
+    assert len(h.log) == 1 and h.tracker.stats()["faults_hash_mismatch"] == 1
+    h.tracker.on_store(
+        h.paged, FakeTable([10, 11, 12]), tokens, extra_keys=keys, max_blocks=2
+    )
+    h.tracker.process_pending()
+    assert len(h.log) == 2
 
 
 def test_hash_mismatch_stops_the_chain_and_trips_the_breaker():

@@ -90,9 +90,15 @@ class FakeRequest:
 
 
 class FakeFacade:
-    def __init__(self, request: FakeRequest | None = None, state=ModelState.READY):
+    def __init__(
+        self,
+        request: FakeRequest | None = None,
+        state=ModelState.READY,
+        vision: bool = False,
+    ):
         self.request = request
         self.state = state
+        self.vision = vision
         self.opened: list[GenerateSpec] = []
         self.load_calls = 0
 
@@ -103,10 +109,14 @@ class FakeFacade:
             block_size=4,
             kv_available=True,
             max_num_seqs=8,
+            vision=self.vision,
         )
 
     def engine_stats(self):
         return {"loaded": self.state == ModelState.READY}
+
+    def image_stats(self):
+        return {"requests": len([s for s in self.opened if s.images])}
 
     @asynccontextmanager
     async def open(self, spec):

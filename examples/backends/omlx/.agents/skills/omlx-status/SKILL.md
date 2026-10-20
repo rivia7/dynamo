@@ -168,6 +168,23 @@ curl -s <api>/chat/completions -H "Authorization: Bearer $OMLX_API_TOKEN" \
 as `{"role": "tool", "tool_call_id": "<id>", "content": "..."}` after the assistant message
 that carries the `tool_calls`, with the same `tools`.
 
+Images, while the proxies' `omlx_model_vision` is 1, go in `image_url` parts as a base64 `data:`
+URL or an `http(s)` URL on a public address:
+
+```bash
+jq -n --arg url "data:image/jpeg;base64,$(base64 -w0 photo.jpg)" '{model: "<model>",
+  max_tokens: 1024, messages: [{role: "user", content: [
+    {type: "image_url", image_url: {url: $url}}, {type: "text", text: "What is in it?"}]}]}' |
+curl -s <api>/chat/completions -H "Authorization: Bearer $OMLX_API_TOKEN" \
+    -H 'Content-Type: application/json' -d @- | jq -r '.choices[0].message.content'
+```
+
+- An image costs about width × height / 1024 prompt tokens, at most `OMLX_IMAGE_MAX_PIXELS`
+  / 1024 of the overlay's `profile.env`: 4,096 for Qwen3.8. Larger images are scaled down.
+- Sending an image file again reuses the Mac's prefix cache and vision features for it, and
+  the router sends it to the Mac that holds them; `usage.prompt_tokens_details.cached_tokens`
+  counts the image's tokens too.
+
 ```bash
 curl -s <api>/completions -H "Authorization: Bearer $OMLX_API_TOKEN" \
     -H 'Content-Type: application/json' \
@@ -214,7 +231,8 @@ Tools built on the SDK take `OPENAI_BASE_URL=<api>` and the token as `OPENAI_API
 | `temperature`, `top_p`, `top_k`, `min_p`, `seed`, `presence_penalty`, `frequency_penalty`, `repetition_penalty`, `stop` | Passed to oMLX; unset ones keep oMLX's defaults for the model |
 | `max_tokens`, `max_completion_tokens`; `max_output_tokens` on `/responses` | Unset: up to 32768, never past the context |
 | Thinking | On by default. Off: `"chat_template_kwargs": {"enable_thinking": false}`, `"thinking": {"type": "disabled"}` or `"reasoning_effort": "none"`. Qwen3.8's chat template takes `reasoning_effort` `low`, `medium` and `xhigh`, its default when a request names none, and answers 400 to `high` or `minimal`. Through `/v1/messages` (Claude Code) the effort and the thinking switch are ignored: always `xhigh` |
-| `logprobs`, `n` above 1, `response_format` (JSON mode and schemas), `ignore_eos`, `min_tokens`, a thinking budget, LoRA adapters, `cache_salt`, images | 400 `the oMLX backend does not support: ...` |
+| Images in `image_url` parts | Passed to oMLX while the model takes them, else 400 `the model on the Mac takes no images` |
+| `logprobs`, `n` above 1, `response_format` (JSON mode and schemas), `ignore_eos`, `min_tokens`, a thinking budget, LoRA adapters, `cache_salt`, video, audio | 400 `the oMLX backend does not support: ...` |
 
 - The prompt must leave room in the context, 262144 tokens for Qwen3.8; the proxy rejects a
   longer one.

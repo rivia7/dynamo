@@ -22,6 +22,9 @@ def main() -> None:
         problems = omlx_adapter.probe()
         for problem in problems:
             print(f"incompatible: {problem}")
+        # Image input is optional: the bridge turns it off and serves text.
+        for problem in omlx_adapter.probe_vision():
+            print(f"no image input: {problem}")
         print(
             "oMLX is compatible with the Dynamo bridge"
             if not problems

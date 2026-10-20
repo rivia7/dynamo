@@ -42,6 +42,14 @@ class ProxyConfig:
     mac_down_grace_s: float
     stats_interval_s: float
     generate_read_timeout_s: float
+    max_image_bytes: int
+    image_fetch_timeout_s: float
+    # DYN_MM_ALLOW_INTERNAL, which also lets the frontend reach internal hosts.
+    allow_internal_image_urls: bool
+    # The pixel range the frontend counts image tokens with; None where
+    # preprocessor_config.json names none.
+    image_min_pixels: int | None = None
+    image_max_pixels: int | None = None
 
 
 def _text_config(model_config: dict[str, Any]) -> dict[str, Any]:
@@ -60,6 +68,29 @@ def _read_model_config(model_path: Path) -> dict[str, Any]:
         raise SystemExit(f"--model-path {model_path} has no config.json")
     with config_file.open() as f:
         return json.load(f)
+
+
+def _image_pixel_limits(model_path: Path) -> tuple[int | None, int | None]:
+    """The pixel range the Dynamo frontend counts image tokens with.
+
+    Read from preprocessor_config.json as the frontend's Qwen-VL processors
+    do: ``min_pixels`` or ``size.shortest_edge``, ``max_pixels`` or
+    ``size.longest_edge``.
+    """
+    config_file = model_path / "preprocessor_config.json"
+    if not config_file.is_file():
+        return None, None
+    with config_file.open() as f:
+        config = json.load(f)
+    size = config.get("size") if isinstance(config.get("size"), dict) else {}
+
+    def limit(key: str, edge: str) -> int | None:
+        value = config.get(key)
+        value = size.get(edge) if value is None else value
+        valid = isinstance(value, int) and not isinstance(value, bool) and value > 0
+        return value if valid else None
+
+    return limit("min_pixels", "shortest_edge"), limit("max_pixels", "longest_edge")
 
 
 def parse_args(argv: list[str] | None = None) -> tuple[ProxyConfig, RuntimeConfig]:
@@ -147,6 +178,21 @@ def parse_args(argv: list[str] | None = None) -> tuple[ProxyConfig, RuntimeConfi
         default=60.0,
         help="Fail a generation after this many seconds without any frame (the bridge sends heartbeats).",
     )
+    group.add_argument(
+        "--max-image-bytes",
+        type=int,
+        default=50 * 1024 * 1024,
+        help="Largest image file a request may carry or link to (oMLX's own limit applies too).",
+    )
+    group.add_argument(
+        "--image-fetch-timeout",
+        type=float,
+        default=30.0,
+        help=(
+            "Seconds to fetch an http(s) image. Only public addresses are fetched\n"
+            "unless DYN_MM_ALLOW_INTERNAL=1, as for the frontend."
+        ),
+    )
 
     args = parser.parse_args(argv)
     # Values read from files or Secrets often end in a newline, which would make
@@ -177,6 +223,7 @@ def parse_args(argv: list[str] | None = None) -> tuple[ProxyConfig, RuntimeConfi
 
     model_path = Path(args.model_path).expanduser()
     model_config = _read_model_config(model_path)
+    image_min_pixels, image_max_pixels = _image_pixel_limits(model_path)
     bos_token_id = _config_value(model_config, "bos_token_id")
     if isinstance(bos_token_id, list):
         bos_token_id = bos_token_id[0] if bos_token_id else None
@@ -197,5 +244,10 @@ def parse_args(argv: list[str] | None = None) -> tuple[ProxyConfig, RuntimeConfi
         mac_down_grace_s=args.mac_down_grace,
         stats_interval_s=args.stats_interval,
         generate_read_timeout_s=args.generate_read_timeout,
+        max_image_bytes=args.max_image_bytes,
+        image_fetch_timeout_s=args.image_fetch_timeout,
+        allow_internal_image_urls=os.environ.get("DYN_MM_ALLOW_INTERNAL") == "1",
+        image_min_pixels=image_min_pixels,
+        image_max_pixels=image_max_pixels,
     )
     return proxy_cfg, runtime_cfg

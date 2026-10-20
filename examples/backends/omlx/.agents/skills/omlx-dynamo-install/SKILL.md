@@ -219,6 +219,12 @@ kubectl -n dynamo-omlx exec "$P" -c main -- curl -s localhost:9090/metrics |
 - The Anthropic Messages API answers the same prompt: the same `printf ... | curl -s -K -` with
   `http://$NODE/v1/messages -H 'Content-Type: application/json' -H 'anthropic-version: 2023-06-01' -d '{"model": "<SERVED_MODEL_NAME>", "max_tokens": 64, "messages": [{"role": "user", "content": "Hello"}]}'`.
   It passes `omlx-anthropic-fix`, so its `Server` header names aiohttp.
+- For a vision-language model, the proxies report `omlx_model_vision 1` and
+  `kubectl -n dynamo-omlx logs deploy/omlx-frontend | grep 'MM-aware KV routing'` says
+  `enabled`. Send an image as `omlx-status` shows, twice: the answer describes it, and the second
+  answer's `cached_tokens` includes the image's tokens. A warning `not supported for MM-aware KV
+  routing` instead means the router knows no image processor by the model's path: see
+  `OMLX_MODEL_DIR` in `profile.env`.
 - In Grafana: the Dynamo dashboard (frontend) and "oMLX on Dynamo" (proxies and Macs).
 
 Then run both coding agents once, with the settings of `omlx-status`'s Coding Agents section
@@ -303,7 +309,10 @@ kubectl -n dynamo-omlx logs -f job/omlx-aiperf
 
 Give the new model its own overlay: copy `deploy/overlays/qwen3.8-flash-next` and set every
 value in its `profile.env`, with `OMLX_MODEL_REVISION` the `sha` in `.dynamo-omlx-download.json`
-of the model's directory on a Mac. The overlays share the names, so delete the old one first:
+of the model's directory on a Mac. For a vision-language model, `OMLX_MODEL_DIR` must contain
+the one name of the frontend's image processor registry that fits the model's processor (the
+list is in `tests/test_omlx_deploy.py`), and `OMLX_IMAGE_MAX_PIXELS` caps its images; empty
+keeps the model's own range. The overlays share the names, so delete the old one first:
 `kubectl kustomize --load-restrictor=LoadRestrictionsNone deploy/overlays/<old> | kubectl delete -f -`.
 Recreate each Mac's Secret with the URL and key of the new service, apply the new overlay, and
 point `deploy/benchmark/kustomization.yaml` at its `profile.env`.

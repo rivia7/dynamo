@@ -18,7 +18,7 @@ import threading
 import time
 from array import array
 from collections import Counter, deque
-from collections.abc import Callable, Iterable
+from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass
 from typing import Any
 
@@ -27,8 +27,9 @@ from dynamo_omlx.protocol import KvState
 
 logger = logging.getLogger(__name__)
 
-# (parent oMLX hash or None, block tokens, oMLX hash, model name) -> matches oMLX?
-VerifyBlock = Callable[[bytes | None, array, bytes, str], bool]
+# (parent oMLX hash or None, block tokens, oMLX hash, model name, the block's
+# oMLX extra keys or None) -> matches oMLX?
+VerifyBlock = Callable[[bytes | None, array, bytes, str, tuple[Any, ...] | None], bool]
 # Returns the served model's current PagedSSDCacheManager, or None while unloaded.
 SsdProvider = Callable[[], Any]
 
@@ -44,6 +45,8 @@ class _StoreJob:
     block_size: int
     bids: tuple[bytes, ...]
     tokens: array  # len(bids) * block_size tokens, block i at [i * B, (i + 1) * B)
+    routing_tokens: array  # tokens as Dynamo's router sees them, same layout
+    extra_keys: tuple[tuple[Any, ...] | None, ...]  # oMLX's keys of each block
 
 
 @dataclass(frozen=True)
@@ -92,20 +95,32 @@ class KvTracker:
     # -- hook side: any thread, cheap, never touches oMLX locks --------------------
 
     def on_store(
-        self, paged_cache: Any, table: Any, tokens: Any, *, exclude_last: bool = False
+        self,
+        paged_cache: Any,
+        table: Any,
+        tokens: Any,
+        *,
+        exclude_last: bool = False,
+        routing_tokens: Any = None,
+        extra_keys: Sequence[tuple[Any, ...] | None] | None = None,
+        max_blocks: int | None = None,
     ) -> None:
         """Called after ``BlockAwarePrefixCache.store_cache`` returned ``table``.
 
         The table covers the whole stored sequence from its first block, restored
         prefix blocks included, and block i holds ``tokens[i * B:(i + 1) * B]``.
         Only full blocks are announceable; a partial tail ends the chain.
+        ``routing_tokens`` (default ``tokens``) are what the router sees,
+        ``extra_keys[i]`` is the oMLX key block i was hashed with, and only the
+        first ``max_blocks`` blocks may be announced.
         """
         if self.state != KvState.LIVE:
             return
         block_size = paged_cache.block_size
         allocated = paged_cache.allocated_blocks
+        limit = len(table.block_ids) if max_blocks is None else max_blocks
         bids: list[bytes] = []
-        for index, block_id in enumerate(table.block_ids):
+        for index, block_id in enumerate(table.block_ids[:limit]):
             block = allocated.get(block_id)
             if (
                 block is None
@@ -119,12 +134,20 @@ class KvTracker:
             # An exact-prefix terminal block is keyed in a separate hash domain.
             bids.pop()
         if bids:
+            end = len(bids) * block_size
+            routing = tokens if routing_tokens is None else routing_tokens
             self._queue.put(
                 _StoreJob(
                     model_name=paged_cache.model_name,
                     block_size=block_size,
                     bids=tuple(bids),
-                    tokens=array("I", tokens[: len(bids) * block_size]),
+                    tokens=array("I", tokens[:end]),
+                    routing_tokens=array("I", routing[:end]),
+                    extra_keys=(
+                        tuple(extra_keys[: len(bids)])
+                        if extra_keys is not None
+                        else (None,) * len(bids)
+                    ),
                 )
             )
 
@@ -218,7 +241,7 @@ class KvTracker:
             tokens = job.tokens[index * size : (index + 1) * size]
             omlx_parent = job.bids[index - 1] if index else None
             if self._verify_block is not None and not self._verify_block(
-                omlx_parent, tokens, bid, job.model_name
+                omlx_parent, tokens, bid, job.model_name, job.extra_keys[index]
             ):
                 logger.error(
                     "oMLX block %s does not hash from its tokens; not announcing it or its descendants",
@@ -228,7 +251,12 @@ class KvTracker:
                 break
             if not ssd.has_block(bid):
                 break  # not persisted; its descendants are unreachable too
-            new_blocks.append(NewBlock(bid=bid, tokens=tokens))
+            new_blocks.append(
+                NewBlock(
+                    bid=bid,
+                    tokens=job.routing_tokens[index * size : (index + 1) * size],
+                )
+            )
         if new_blocks and self.state == KvState.LIVE:
             self._counters["blocks_stored"] += self._log.store_chain(
                 parent_bid, new_blocks

@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import json
+from pathlib import Path
 
 import pytest
 
@@ -44,3 +45,33 @@ def test_blank_bridge_url_is_an_error(model_path, monkeypatch):
     monkeypatch.delenv("OMLX_API_KEY", raising=False)
     with pytest.raises(SystemExit):
         parse(model_path, "--bridge-url", "\n")
+
+
+@pytest.mark.parametrize(
+    "preprocessor, limits",
+    [
+        (None, (None, None)),
+        (
+            {"size": {"shortest_edge": 65536, "longest_edge": 16777216}},
+            (65536, 16777216),
+        ),
+        # Top-level pixel limits win over the size edges, as in the frontend.
+        (
+            {
+                "size": {"shortest_edge": 65536, "longest_edge": 16777216},
+                "max_pixels": 4194304,
+            },
+            (65536, 4194304),
+        ),
+        ({"size": {"height": 384, "width": 384}, "min_pixels": 3136}, (3136, None)),
+    ],
+)
+def test_image_pixel_limits_follow_the_frontends_reading(
+    model_path, preprocessor, limits
+):
+    if preprocessor is not None:
+        (Path(model_path) / "preprocessor_config.json").write_text(
+            json.dumps(preprocessor)
+        )
+    cfg = parse(model_path, "--bridge-url", "http://mac-1:8000")
+    assert (cfg.image_min_pixels, cfg.image_max_pixels) == limits
