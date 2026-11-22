@@ -28,6 +28,7 @@ configMapGenerator:
   - dynamo_omlx--proxy--args.py=../../dynamo_omlx/proxy/args.py
   - dynamo_omlx--proxy--bridge_client.py=../../dynamo_omlx/proxy/bridge_client.py
   - dynamo_omlx--proxy--engine.py=../../dynamo_omlx/proxy/engine.py
+  - dynamo_omlx--proxy--images.py=../../dynamo_omlx/proxy/images.py
   - dynamo_omlx--proxy--kv_reconciler.py=../../dynamo_omlx/proxy/kv_reconciler.py
   - dynamo_omlx--proxy--kv_sink.py=../../dynamo_omlx/proxy/kv_sink.py
   - dynamo_omlx--proxy--kv_sync.py=../../dynamo_omlx/proxy/kv_sync.py

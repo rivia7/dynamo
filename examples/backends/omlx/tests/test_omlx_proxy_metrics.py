@@ -48,6 +48,29 @@ def test_mac_values_drop_out_while_the_bridge_is_down():
     assert not by_label(metrics, "omlx_bridge_kv_state", "state")
 
 
+def test_image_counts_and_the_models_vision_are_exported():
+    metrics = ProxyMetrics()
+    metrics.bridge_stats = {
+        **STATS,
+        "model": {"vision": True},
+        "images": {
+            "requests": 2,
+            "images": 3,
+            "vision_cache_hits": 1,
+            "vision_cache_misses": 2,
+            "token_count_mismatches": 0,
+        },
+    }
+    metrics.bridge_up = True
+    metrics.images = 3
+    values = samples(metrics)
+    assert values[("omlx_model_vision", ())] == 1.0
+    assert values[("omlx_bridge_images", ())] == 3.0
+    assert values[("omlx_bridge_vision_cache_hits", ())] == 1.0
+    assert values[("omlx_bridge_image_token_mismatches", ())] == 0.0
+    assert values[("omlx_proxy_images_total", ())] == 3.0
+
+
 def test_kv_sync_state_reports_every_state():
     metrics = ProxyMetrics()
     metrics.kv_sync_state = lambda: "connecting"

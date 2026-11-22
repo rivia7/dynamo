@@ -57,6 +57,14 @@ async def env(tmp_path, monkeypatch):
     (tmp_path / "config.json").write_text(
         json.dumps({"max_position_embeddings": 64, "bos_token_id": 0})
     )
+    (tmp_path / "preprocessor_config.json").write_text(
+        json.dumps(
+            {
+                "size": {"shortest_edge": 65536, "longest_edge": 16777216},
+                "max_pixels": 4194304,
+            }
+        )
+    )
     async with FakeBridge(block_size=B) as bridge:
         argv = [
             "--bridge-url",
@@ -111,6 +119,34 @@ async def test_unsupported_requests_are_rejected(env):
     request = {"token_ids": [1], "output_options": {"logprobs": 1}}
     with pytest.raises(InvalidArgument, match="logprobs"):
         await drain(env.engine.generate(request, Context("r")))
+
+
+IMAGE_REQUEST = {
+    "token_ids": [1, 9, 2],
+    "multi_modal_data": {"image_url": [{"Url": "data:image/png;base64,aW1n"}]},
+    "extra_args": {"mm_hashes": ["00000000000000ff"]},
+    "mm_routing_info": {"expanded_prompt_len": 20},
+}
+
+
+async def test_image_requests_carry_the_images_and_their_router_identity(env):
+    env.bridge.model["vision"] = True
+    await eventually(lambda: env.engine._vision)  # learned from the stats poll
+    chunks = await drain(env.engine.generate(IMAGE_REQUEST, Context("r")))
+    assert chunks[-1]["finish_reason"] == "stop"
+    [spec] = env.bridge.specs
+    assert spec.token_ids == [1, 9, 2] and spec.expanded_prompt_len == 20
+    assert [(image.data, image.mm_hash) for image in spec.images] == [("aW1n", 0xFF)]
+    assert spec.max_tokens == 64 - 20  # budgeted with the expanded prompt
+    # The range the frontend counted the image tokens with, from the model files.
+    assert (spec.min_pixels, spec.max_pixels) == (65536, 4194304)
+
+
+async def test_image_requests_need_a_model_that_takes_images(env):
+    assert env.bridge.model["vision"] is False
+    with pytest.raises(InvalidArgument, match="takes no images"):
+        await drain(env.engine.generate(IMAGE_REQUEST, Context("r")))
+    assert env.bridge.specs == []
 
 
 async def test_abort_ends_the_stream_as_cancelled(env):

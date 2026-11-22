@@ -31,7 +31,8 @@ _MAX_HASHES_PER_FRAME = 4096
 
 @dataclass(frozen=True, slots=True)
 class NewBlock:
-    """A block oMLX persisted: its oMLX block hash and exactly block_size tokens."""
+    """A block oMLX persisted: its oMLX block hash and exactly block_size tokens,
+    as Dynamo's router sees them (image tokens carry the image's pad value)."""
 
     bid: bytes
     tokens: array

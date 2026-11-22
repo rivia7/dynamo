@@ -19,6 +19,8 @@ class BridgeConfig:
     # example to 8192 for Qwen3.8-Flash-Next); /info reports the value in effect.
     kv_block_size: int | None = None
     kv_events: bool = True
+    # Accept images in generate requests when the model is a vision-language model.
+    images: bool = True
     pin_model: bool = True
     preload: bool = True
     verify_hashes: bool = True
@@ -83,6 +85,12 @@ def build_parser() -> argparse.ArgumentParser:
         dest="kv_events",
         action="store_false",
         help="Serve tokens only; publish no KV cache state.",
+    )
+    parser.add_argument(
+        "--no-images",
+        dest="images",
+        action="store_false",
+        help="Refuse images, even when the model is a vision-language model.",
     )
     parser.add_argument(
         "--no-pin",

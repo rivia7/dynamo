@@ -33,6 +33,7 @@ from dynamo_omlx.protocol import (
     ResetReason,
     encode_frame,
     error_payload,
+    parse_mm_hash,
     tokens_to_array,
 )
 
@@ -77,8 +78,36 @@ def _optional_number(body: dict[str, Any], key: str, kind: type) -> Any:
 
 
 @dataclass(frozen=True)
+class ImageInput:
+    # Base64 of the image file, decoded off the event loop.
+    data: str
+    # The image's identity in Dynamo's router; None when the proxy had none.
+    mm_hash: int | None = None
+
+
+def _images(body: dict[str, Any]) -> tuple[ImageInput, ...]:
+    items = body.get("images") or []
+    if not isinstance(items, list):
+        raise BridgeError(ErrorCode.INVALID_REQUEST, "'images' must be a list")
+    images = []
+    for item in items:
+        data = item.get("data") if isinstance(item, dict) else None
+        if not isinstance(data, str) or not data:
+            raise BridgeError(
+                ErrorCode.INVALID_REQUEST, "each image needs base64 'data'"
+            )
+        try:
+            mm_hash = parse_mm_hash(item.get("mm_hash"))
+        except ProtocolError as e:
+            raise BridgeError(ErrorCode.INVALID_REQUEST, str(e)) from e
+        images.append(ImageInput(data=data, mm_hash=mm_hash))
+    return tuple(images)
+
+
+@dataclass(frozen=True)
 class GenerateSpec:
     request_id: str
+    # One placeholder token per image in images.
     token_ids: list[int]
     max_tokens: int | None = None
     temperature: float | None = None
@@ -91,6 +120,13 @@ class GenerateSpec:
     seed: int | None = None
     stop_token_ids: tuple[int, ...] = ()
     skip_cache_store: bool = False
+    images: tuple[ImageInput, ...] = ()
+    # The prompt length Dynamo's frontend routed with after expanding images.
+    expanded_prompt_len: int | None = None
+    # The pixel range the frontend counted image tokens with; None leaves the
+    # model's image processor defaults.
+    min_pixels: int | None = None
+    max_pixels: int | None = None
 
     @classmethod
     def from_body(cls, body: Any) -> GenerateSpec:
@@ -133,6 +169,21 @@ class GenerateSpec:
             raise BridgeError(
                 ErrorCode.INVALID_REQUEST, "'skip_cache_store' must be a boolean"
             )
+        expanded_prompt_len = _optional_number(body, "expanded_prompt_len", int)
+        if expanded_prompt_len is not None and expanded_prompt_len < len(token_ids):
+            raise BridgeError(
+                ErrorCode.INVALID_REQUEST,
+                "'expanded_prompt_len' is shorter than 'token_ids'",
+            )
+        min_pixels = _optional_number(body, "min_pixels", int)
+        max_pixels = _optional_number(body, "max_pixels", int)
+        if any(p is not None and p <= 0 for p in (min_pixels, max_pixels)) or (
+            None not in (min_pixels, max_pixels) and min_pixels > max_pixels
+        ):
+            raise BridgeError(
+                ErrorCode.INVALID_REQUEST,
+                "'min_pixels' and 'max_pixels' must be positive, min at most max",
+            )
         return cls(
             request_id=request_id,
             token_ids=token_ids,
@@ -147,6 +198,10 @@ class GenerateSpec:
             seed=_optional_number(body, "seed", int),
             stop_token_ids=tuple(stop_token_ids),
             skip_cache_store=skip_cache_store,
+            images=_images(body),
+            expanded_prompt_len=expanded_prompt_len,
+            min_pixels=min_pixels,
+            max_pixels=max_pixels,
         )
 
 
@@ -182,6 +237,8 @@ class ModelInfo:
     # Most draft tokens per verify cycle while the loaded model runs oMLX's
     # multi-token prediction; None without it.
     mtp_depth: int | None = None
+    # The loaded engine accepts images in generate requests.
+    vision: bool = False
 
 
 class EngineFacade(Protocol):
@@ -189,6 +246,9 @@ class EngineFacade(Protocol):
         ...
 
     def engine_stats(self) -> dict[str, Any]:
+        ...
+
+    def image_stats(self) -> dict[str, int]:
         ...
 
     def open(self, spec: GenerateSpec) -> AbstractAsyncContextManager[EngineRequest]:
@@ -551,6 +611,7 @@ class BridgeRuntime:
                 "max_num_batched_tokens": info.max_num_batched_tokens,
                 "context_length": info.context_length,
                 "mtp_depth": info.mtp_depth,
+                "vision": info.vision,
             },
             "kv": {
                 "state": self.kv_state(),
@@ -567,5 +628,6 @@ class BridgeRuntime:
             # The effective state from info() wins over the tracker's own state,
             # which knows nothing about --no-kv-events or a missing SSD cache.
             "kv": {**self.tracker.stats(), **info["kv"]},
+            "images": self.facade.image_stats(),
             "bridge": {"active_requests": self.generate.active_count},
         }

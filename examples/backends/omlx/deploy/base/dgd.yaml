@@ -85,7 +85,7 @@ spec:
           # The model card's checksum covers the --model-path string and the files
           # there, so every proxy of a model uses the same path and the same files.
           args:
-          - --model-path=/models/$(SERVED_MODEL_NAME)
+          - --model-path=/models/$(OMLX_MODEL_DIR)
           - --served-model-name=$(SERVED_MODEL_NAME)
           - --expect-block-size=$(EXPECT_BLOCK_SIZE)
           envFrom:
@@ -105,6 +105,11 @@ spec:
           # by itself when its Mac stays unreachable.
           - name: DYN_HEALTH_CHECK_ENABLED
             value: "false"
+          # The largest request the proxy reads from the frontend, 32 MiB by
+          # default. Image files travel inside it as base64, and Dynamo 1.5.1
+          # sends each one twice, so a few photos would exceed the default.
+          - name: DYN_TCP_MAX_MESSAGE_SIZE
+            value: "134217728"
           # No ports: they would replace the operator's named ports, which the
           # probes, Services and PodMonitors use.
           resources:

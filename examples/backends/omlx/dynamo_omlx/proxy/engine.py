@@ -4,9 +4,9 @@
 """Dynamo ``LLMEngine`` that serves a remote oMLX bridge.
 
 The Dynamo frontend tokenizes and applies the chat template; this worker
-forwards token ids to the Mac, streams token ids back, mirrors oMLX's prefix
-cache into the KV router, and exits (deregistering) when the Mac stays
-unreachable so the frontend stops routing to it.
+forwards token ids and any image files to the Mac, streams token ids back,
+mirrors oMLX's prefix cache into the KV router, and exits (deregistering)
+when the Mac stays unreachable so the frontend stops routing to it.
 """
 
 from __future__ import annotations
@@ -34,6 +34,7 @@ from dynamo_omlx.proxy.bridge_client import (
     BridgeRequestError,
     BridgeUnavailable,
 )
+from dynamo_omlx.proxy.images import ImageLoader
 from dynamo_omlx.proxy.kv_reconciler import KvReconciler
 from dynamo_omlx.proxy.kv_sink import KvPublishSink
 from dynamo_omlx.proxy.kv_sync import KvSync, KvSyncFatal
@@ -123,6 +124,13 @@ class OmlxProxyEngine(LLMEngine):
     def __init__(self, cfg: ProxyConfig) -> None:
         self.cfg = cfg
         self._client = BridgeClient(cfg.bridge_url, cfg.bridge_api_key)
+        self._images = ImageLoader(
+            max_bytes=cfg.max_image_bytes,
+            timeout_s=cfg.image_fetch_timeout_s,
+            allow_internal=cfg.allow_internal_image_urls,
+        )
+        # The Mac's loaded model takes images; refreshed by every stats poll.
+        self._vision = False
         self._metrics = ProxyMetrics()
         self._loop: asyncio.AbstractEventLoop | None = None
         self._block_size: int | None = None
@@ -158,8 +166,10 @@ class OmlxProxyEngine(LLMEngine):
         del worker_id
         self._loop = asyncio.get_running_loop()
         await self._client.start()
+        await self._images.start()
         info = await self._wait_for_bridge()
         model = info["model"]
+        self._vision = bool(model.get("vision"))
         self._block_size = model.get("block_size")
         if (
             self.cfg.expect_block_size is not None
@@ -196,11 +206,15 @@ class OmlxProxyEngine(LLMEngine):
             )
         self._tasks.append(asyncio.ensure_future(self._stats_loop()))
         logger.info(
-            "oMLX bridge %s ready: block size %s, context %s, max_num_seqs %s",
+            "oMLX bridge %s ready: block size %s, context %s, max_num_seqs %s, "
+            "images %s (%s to %s pixels)",
             self.cfg.bridge_url,
             self._block_size,
             self._context_length,
             max_num_seqs,
+            "on" if self._vision else "off",
+            self.cfg.image_min_pixels,
+            self.cfg.image_max_pixels,
         )
         return EngineConfig(
             model=self.cfg.model_path,
@@ -270,6 +284,7 @@ class OmlxProxyEngine(LLMEngine):
         sink, self._sink = self._sink, None
         if sink is not None:
             sink.stop()
+        await self._images.close()
         await self._client.close()
 
     def _shutdown_worker(self, reason: str) -> None:
@@ -288,16 +303,29 @@ class OmlxProxyEngine(LLMEngine):
         request_id = context.id() or uuid.uuid4().hex
         probe = is_probe(request)
         try:
-            body = build_generate_body(
+            body, images = build_generate_body(
                 request,
                 request_id=request_id,
                 context_length=self._context_length,
                 max_output_tokens=self.cfg.max_output_tokens,
                 probe=probe,
             )
+            if images:
+                # A bridge without image support would take the placeholders for text.
+                if not self._vision:
+                    raise RequestRejected("the model on the Mac takes no images")
+                body["images"] = await self._images.load(images)
+                # The Mac sizes images within the range the frontend counted with.
+                for key, value in (
+                    ("min_pixels", self.cfg.image_min_pixels),
+                    ("max_pixels", self.cfg.image_max_pixels),
+                ):
+                    if value is not None:
+                        body[key] = value
         except RequestRejected as e:
             raise InvalidArgument(str(e)) from e
-        prompt_len = len(body["token_ids"])
+        prompt_len = body.get("expanded_prompt_len") or len(body["token_ids"])
+        self._metrics.images += len(images)
         self._inflight[request_id] = prompt_len
         outcome, usage, started = "error", None, False
         try:
@@ -460,6 +488,7 @@ class OmlxProxyEngine(LLMEngine):
                 self._metrics.bridge_up = True
                 self._metrics.bridge_rtt_s = last_ok - started
                 self._metrics.bridge_stats = stats
+                self._vision = bool((stats.get("model") or {}).get("vision"))
                 block_size = (stats.get("model") or {}).get("block_size")
                 if (
                     self._kv_enabled

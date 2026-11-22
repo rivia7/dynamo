@@ -137,6 +137,23 @@ def test_generate_spec_validation():
     assert (
         parsed.temperature == 0.0 and parsed.top_k == 5 and parsed.stop_token_ids == ()
     )
+    assert parsed.images == () and parsed.expanded_prompt_len is None
+    images = [{"data": "aW1n", "mm_hash": "00000000000000ff"}, {"data": "aW1n"}]
+    parsed = GenerateSpec.from_body(
+        {
+            **body,
+            "images": images,
+            "expanded_prompt_len": 9,
+            "min_pixels": 65536,
+            "max_pixels": 4194304,
+        }
+    )
+    assert [(image.data, image.mm_hash) for image in parsed.images] == [
+        ("aW1n", 0xFF),
+        ("aW1n", None),
+    ]
+    assert parsed.expanded_prompt_len == 9
+    assert (parsed.min_pixels, parsed.max_pixels) == (65536, 4194304)
     for bad in (
         {**body, "v": 99},
         {**body, "request_id": ""},
@@ -147,6 +164,12 @@ def test_generate_spec_validation():
         {**body, "top_k": 1.5},
         {**body, "temperature": True},
         {**body, "skip_cache_store": "yes"},
+        {**body, "images": {"data": "aW1n"}},
+        {**body, "images": [{"data": ""}]},
+        {**body, "images": [{"data": "aW1n", "mm_hash": 255}]},
+        {**body, "expanded_prompt_len": 1},
+        {**body, "max_pixels": 0},
+        {**body, "min_pixels": 100, "max_pixels": 99},
     ):
         with pytest.raises(BridgeError) as info:
             GenerateSpec.from_body(bad)
@@ -266,4 +289,7 @@ def test_info_and_stats_report_the_effective_kv_state():
     assert bridge.tracker.state == KvState.LIVE
     assert stats["kv"]["state"] == KvState.DISABLED
     assert stats["engine"] == {"loaded": True}
+    assert stats["images"] == {"requests": 0}
     assert stats["bridge"] == {"active_requests": 0}
+    assert info["model"]["vision"] is False
+    assert make_runtime(FakeFacade(vision=True)).info()["model"]["vision"] is True
