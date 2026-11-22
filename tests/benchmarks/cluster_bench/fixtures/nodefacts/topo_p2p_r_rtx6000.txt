@@ -1,0 +1,21 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+ 	GPU0	GPU1	GPU2	GPU3	GPU4	GPU5	GPU6	GPU7
+ GPU0	X	OK	OK	OK	CNS	CNS	CNS	CNS
+ GPU1	OK	X	OK	OK	CNS	CNS	CNS	CNS
+ GPU2	OK	OK	X	OK	CNS	CNS	CNS	CNS
+ GPU3	OK	OK	OK	X	CNS	CNS	CNS	CNS
+ GPU4	CNS	CNS	CNS	CNS	X	OK	OK	OK
+ GPU5	CNS	CNS	CNS	CNS	OK	X	OK	OK
+ GPU6	CNS	CNS	CNS	CNS	OK	OK	X	OK
+ GPU7	CNS	CNS	CNS	CNS	OK	OK	OK	X
+
+Legend:
+
+  X    = Self
+  OK   = Status Ok
+  CNS  = Chipset not supported
+  GNS  = GPU not supported
+  TNS  = Topology not supported
+  NS   = Not supported
+  U    = Unknown

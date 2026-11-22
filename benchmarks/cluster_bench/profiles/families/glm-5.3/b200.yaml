@@ -1,0 +1,231 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+#
+# GLM-5.3 (NVFP4) topology families, written for 4 nodes x 8 B200. Every family
+# uses all GPUs so tok/s/GPU compares directly. On 2 or 8 nodes instance counts
+# scale by the exact factor (ids/titles are templates: pd-{prefill}p{decode}d is
+# pd-4p2d on 4 nodes, pd-8p4d on 8); `nodes:` limits a family to those sizes.
+# Engine configs come verbatim from the repo recipes (base:) with only the
+# overrides listed here.
+gpu: b200
+model: glm-5.3
+served_context: 500000
+default_grid: {start: 64, max: 1024, min: 8}
+
+families:
+  - id: agg-dtp4
+    title: "聚合 DTP4 x{agg}（配方基线）"
+    priority: 0
+    roles:
+      - role: agg
+        gpus_per_instance: 4
+        instances: 8
+        base: {path: recipes/glm-5.3/sglang/agg-b200-agentic/deploy.yaml, key: agg.yaml}
+    notes: Recipe baseline. No cross-node data-plane traffic.
+
+  - id: agg-dtp8
+    title: "聚合 DTP8 x{agg}"
+    priority: 10
+    roles:
+      - role: agg
+        gpus_per_instance: 8
+        instances: 4
+        base: {path: recipes/glm-5.3/sglang/agg-b200-agentic/deploy.yaml, key: agg.yaml}
+        sglang:
+          tensor-parallel-size: 8
+          data-parallel-size: 8
+          max-running-requests: 256
+          cuda-graph-max-bs-decode: 256
+    notes: Fewer, larger replicas; doubles per-replica KV capacity for long agentic contexts.
+
+  - id: pd-{prefill}p{decode}d
+    title: "PD 分离 {prefill}P(DEP4) + {decode}D(DTP8)"
+    priority: 20
+    group: pd-ratio
+    transport: mooncake
+    cross_node: [kv]
+    roles:
+      - role: prefill
+        gpus_per_instance: 4
+        instances: 4
+        base: {path: recipes/glm-5.3/sglang/disagg-b200-agentic/deploy.yaml, key: prefill.yaml}
+        extra_args: [--dsa-prefill-backend, trtllm, --dsa-decode-backend, trtllm, --cuda-graph-backend-prefill, disabled]
+        env: {MC_FORCE_HCA: "1"}
+      - role: decode
+        gpus_per_instance: 8
+        instances: 2
+        base: {path: recipes/glm-5.3/sglang/disagg-b200-agentic/deploy.yaml, key: decode.yaml}
+        env: {MC_FORCE_HCA: "1", SGLANG_DISAGGREGATION_WAITING_TIMEOUT: "3600"}
+    notes: 1:1 prefill:decode GPUs; prefill and decode land on different nodes, so KV moves over the fabric.
+
+  - id: pd-{prefill}p{decode}d
+    title: "PD 分离 {prefill}P(DEP4) + {decode}D(DTP8)"
+    priority: 21
+    group: pd-ratio
+    transport: mooncake
+    cross_node: [kv]
+    roles:
+      - role: prefill
+        gpus_per_instance: 4
+        instances: 6
+        base: {path: recipes/glm-5.3/sglang/disagg-b200-agentic/deploy.yaml, key: prefill.yaml}
+        extra_args: [--dsa-prefill-backend, trtllm, --dsa-decode-backend, trtllm, --cuda-graph-backend-prefill, disabled]
+        env: {MC_FORCE_HCA: "1"}
+      - role: decode
+        gpus_per_instance: 8
+        instances: 1
+        base: {path: recipes/glm-5.3/sglang/disagg-b200-agentic/deploy.yaml, key: decode.yaml}
+        env: {MC_FORCE_HCA: "1", SGLANG_DISAGGREGATION_WAITING_TIMEOUT: "3600"}
+    notes: Prefill-heavy alternative (3:1 GPUs), chosen when the 1:1 split is prefill-bound (high TTFT).
+
+  - id: pd-{prefill}p{decode}d
+    title: "PD 分离 {prefill}P(DEP4) + {decode}D(DTP8)"
+    priority: 22
+    group: pd-ratio
+    transport: mooncake
+    cross_node: [kv]
+    roles:
+      - role: prefill
+        gpus_per_instance: 4
+        instances: 2
+        base: {path: recipes/glm-5.3/sglang/disagg-b200-agentic/deploy.yaml, key: prefill.yaml}
+        extra_args: [--dsa-prefill-backend, trtllm, --dsa-decode-backend, trtllm, --cuda-graph-backend-prefill, disabled]
+        env: {MC_FORCE_HCA: "1"}
+      - role: decode
+        gpus_per_instance: 8
+        instances: 3
+        base: {path: recipes/glm-5.3/sglang/disagg-b200-agentic/deploy.yaml, key: decode.yaml}
+        env: {MC_FORCE_HCA: "1", SGLANG_DISAGGREGATION_WAITING_TIMEOUT: "3600"}
+    notes: Decode-heavy alternative (1:3 GPUs), chosen when the 1:1 split is decode-bound (low per-user tok/s, fine TTFT).
+
+  # Two nodes cannot hold the 3:1 / 1:3 splits above with DTP8 decode; these
+  # use DTP4 decode instances instead (UNVERIFIED for GLM-5.3 decode).
+  - id: pd-{prefill}p{decode}d-dtp4
+    title: "PD 分离 {prefill}P(DEP4) + {decode}D(DTP4)"
+    priority: 23
+    group: pd-ratio
+    nodes: [2]
+    transport: mooncake
+    cross_node: [kv]
+    roles:
+      - role: prefill
+        gpus_per_instance: 4
+        instances: 3
+        base: {path: recipes/glm-5.3/sglang/disagg-b200-agentic/deploy.yaml, key: prefill.yaml}
+        extra_args: [--dsa-prefill-backend, trtllm, --dsa-decode-backend, trtllm, --cuda-graph-backend-prefill, disabled]
+        env: {MC_FORCE_HCA: "1"}
+      - role: decode
+        gpus_per_instance: 4
+        instances: 1
+        base: {path: recipes/glm-5.3/sglang/disagg-b200-agentic/deploy.yaml, key: decode.yaml}
+        sglang: {tensor-parallel-size: 4, data-parallel-size: 4}
+        env: {MC_FORCE_HCA: "1", SGLANG_DISAGGREGATION_WAITING_TIMEOUT: "3600"}
+    notes: 2-node prefill-heavy alternative (3:1 GPUs).
+
+  - id: pd-{prefill}p{decode}d-dtp4
+    title: "PD 分离 {prefill}P(DEP4) + {decode}D(DTP4)"
+    priority: 24
+    group: pd-ratio
+    nodes: [2]
+    transport: mooncake
+    cross_node: [kv]
+    roles:
+      - role: prefill
+        gpus_per_instance: 4
+        instances: 1
+        base: {path: recipes/glm-5.3/sglang/disagg-b200-agentic/deploy.yaml, key: prefill.yaml}
+        extra_args: [--dsa-prefill-backend, trtllm, --dsa-decode-backend, trtllm, --cuda-graph-backend-prefill, disabled]
+        env: {MC_FORCE_HCA: "1"}
+      - role: decode
+        gpus_per_instance: 4
+        instances: 3
+        base: {path: recipes/glm-5.3/sglang/disagg-b200-agentic/deploy.yaml, key: decode.yaml}
+        sglang: {tensor-parallel-size: 4, data-parallel-size: 4}
+        env: {MC_FORCE_HCA: "1", SGLANG_DISAGGREGATION_WAITING_TIMEOUT: "3600"}
+    notes: 2-node decode-heavy alternative (1:3 GPUs).
+
+  - id: wide-ep-dep32
+    title: "跨机 wide EP（DeepEP，32 卡）x{agg}"
+    priority: 90
+    enabled: false
+    nodes: [4, 8]
+    transport: deepep
+    cross_node: [collective]
+    roles:
+      - role: agg
+        gpus_per_instance: 32
+        nodes_per_instance: 4
+        instances: 1
+        base: {path: recipes/glm-5.3/sglang/agg-b200-agentic/deploy.yaml, key: agg.yaml}
+        sglang:
+          tensor-parallel-size: 32
+          data-parallel-size: 32
+          ep-size: 32
+          moe-a2a-backend: deepep
+          moe-runner-backend: null
+    notes: Opt-in (--families wide-ep-dep32). DeepEP across nodes is the heaviest IB consumer but has known hang risks.
+
+  - id: wide-ep-dep16
+    title: "跨机 wide EP（DeepEP，16 卡）"
+    priority: 91
+    enabled: false
+    nodes: [2]
+    transport: deepep
+    cross_node: [collective]
+    roles:
+      - role: agg
+        gpus_per_instance: 16
+        nodes_per_instance: 2
+        instances: 1
+        base: {path: recipes/glm-5.3/sglang/agg-b200-agentic/deploy.yaml, key: agg.yaml}
+        sglang:
+          tensor-parallel-size: 16
+          data-parallel-size: 16
+          ep-size: 16
+          moe-a2a-backend: deepep
+          moe-runner-backend: null
+    notes: 2-node opt-in (--families wide-ep-dep16).
+
+  - id: wide-ep-dep64
+    title: "跨机 wide EP（DeepEP，64 卡）"
+    priority: 92
+    enabled: false
+    nodes: [8]
+    transport: deepep
+    cross_node: [collective]
+    roles:
+      - role: agg
+        gpus_per_instance: 64
+        nodes_per_instance: 8
+        instances: 1
+        base: {path: recipes/glm-5.3/sglang/agg-b200-agentic/deploy.yaml, key: agg.yaml}
+        sglang:
+          tensor-parallel-size: 64
+          data-parallel-size: 64
+          ep-size: 64
+          moe-a2a-backend: deepep
+          moe-runner-backend: null
+    notes: 8-node opt-in (--families wide-ep-dep64); one EP group over the whole fabric.
+
+# Fallbacks applied in order when a deployment fails with the given class.
+ladder:
+  - id: oom-mem-0.03
+    when: oom
+    mem_fraction_delta: -0.03
+    halve_cuda_graph_bs: true
+  - id: oom-no-hicache
+    when: oom
+    sglang: {enable-hierarchical-cache: null, hicache-size: null}
+  - id: kernel-cutlass-moe
+    when: kernel_unsupported
+    sglang: {moe-runner-backend: flashinfer_cutlass, fp4-gemm-backend: flashinfer_cutlass}
+  - id: kernel-no-spec
+    when: kernel_unsupported
+    sglang:
+      speculative-algorithm: null
+      speculative-num-steps: null
+      speculative-eagle-topk: null
+      speculative-num-draft-tokens: null
+      speculative-attention-mode: null
+      speculative-moe-runner-backend: null
+      speculative-moe-a2a-backend: null

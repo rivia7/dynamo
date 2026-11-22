@@ -1,0 +1,26 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+# NVIDIA B300 (HGX, NVLink5). Nominal rates are per GPU, per direction.
+# Dense Tensor Core peaks: HGX product page 8-GPU totals / 8 (FP4 108 PFLOPS is
+# dense; FP8 72 and BF16 36 PFLOPS are sparse, dense = 1/2):
+# https://www.nvidia.com/en-us/data-center/hgx/ . GB300 (NVL72, up to 1.4 kW) is
+# faster (15 PF FP4 dense) and is not this profile.
+# HBM 8 TB/s: HGX AI Factory reference architecture (components).
+# PCIe: each GPU's own link is Gen6 x16, 128 GB/s per direction (Blackwell Ultra
+# technical blog), and goes to its ConnectX-8; the baseboard's host links are Gen5
+# x16, so host-bound traffic tops out at 64 GB/s per direction.
+name: b300
+match: ['\bB300\b']
+arch: sm103
+hbm_gb: 288
+nvlink: true
+weights_variant: nvfp4
+nominal_nvlink_gbs: 900
+nominal_pcie_gbs: 128
+peak_dense_tflops: {fp4: 13500, fp8: 4500, bf16: 2250}
+hbm_tbs: 8.0
+lane_cap: 1024
+notes: >-
+  SM103 kernel coverage in the pinned sglang-runtime image is verified by the preflight smoke
+  ladder. hbm_gb 288 follows the reference architecture; the product pages list
+  2.1 TB per 8 GPUs (UNVERIFIED which one is usable; the inventory reads nvidia-smi).
