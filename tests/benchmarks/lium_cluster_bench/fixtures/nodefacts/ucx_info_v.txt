@@ -1,0 +1,7 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+# Library version: 1.19.0
+# Library path: /usr/local/ucx/lib/libucs.so.0
+# API headers version: 1.19.0
+# Git branch '', revision 2a0a4e4
+# Configured with: --disable-logging --disable-debug --disable-assertions --disable-params-check --prefix=/usr/local/ucx --enable-shared --disable-static --disable-doxygen-doc --enable-optimizations --enable-cma --enable-devel-headers --with-cuda=/usr/local/cuda --with-verbs --with-dm --with-gdrcopy=/usr/local --with-efa --enable-mt

@@ -1,0 +1,15 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
++ exec python3 -m dynamo.sglang --config /bench/experiments/h200-001/deployments/3f9a1c2b7d4e/cb-3f9a1c2b7d4e-decode0-r1.yaml
+[2026-11-05 09:12:20 DP8 TP8 EP8] Init torch distributed begin.
+[2026-11-05 09:12:24 DP8 TP8 EP8] Init torch distributed ends. mem usage=1.20 GB
+[2026-11-05 09:12:25 DP8 TP8 EP8] Load weight begin. avail mem=138.61 GB
+[2026-11-05 09:12:25 DP9 TP9 EP9] Load weight begin. avail mem=138.62 GB
+[2026-11-05 09:14:50 DP8 TP8 EP8] Load weight end. type=GlmMoeDsaForCausalLM, dtype=torch.bfloat16, avail mem=49.22 GB, mem usage=89.39 GB.
+[2026-11-05 09:14:52 DP9 TP9 EP9] Load weight end. type=GlmMoeDsaForCausalLM, dtype=torch.bfloat16, avail mem=49.20 GB, mem usage=89.42 GB.
+[2026-11-05 09:14:53 DP8 TP8 EP8] KV Cache is allocated. #tokens: 731264, KV size: 23.71 GB
+[2026-11-05 09:14:53 DP8 TP8 EP8] Memory pool end. avail mem=24.81 GB
+[2026-11-05 09:14:55 DP8 TP8 EP8] Capture cuda graph begin. This can take up to several minutes. avail mem=24.22 GB
+[2026-11-05 09:15:51 DP8 TP8 EP8] Capture cuda graph end. Time elapsed: 56.02 s. mem usage=1.63 GB. avail mem=22.59 GB.
+[2026-11-05 09:15:52 DP8 TP8 EP8] max_total_num_tokens=731264, chunked_prefill_size=16384, max_prefill_tokens=16384, max_running_requests=128, context_len=262144, available_gpu_mem=22.59 GB
+[2026-11-05 09:15:53 DP9 TP9 EP9] max_total_num_tokens=731264, chunked_prefill_size=16384, max_prefill_tokens=16384, max_running_requests=128, context_len=262144, available_gpu_mem=22.55 GB

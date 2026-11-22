@@ -1,0 +1,10 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
++ exec python3 -m dynamo.frontend --router-mode kv --trust-remote-code
+2026-11-05T09:11:58.211043Z  INFO dynamo_runtime::distributed: Initializing DistributedRuntime discovery="etcd" request_plane="tcp"
+2026-11-05T09:11:58.640022Z  INFO dynamo_llm::http::service::service_v2: Starting HTTP(S) service protocol="http" address="0.0.0.0:8000"
+2026-11-05T09:14:31.118842Z  INFO dynamo_llm::discovery::watcher: Prefill worker detected, registering and activating prefill router model_name="glm-5.3"
+2026-11-05T09:16:03.990117Z  INFO dynamo_llm::discovery::watcher: Committed discovered model group model_name="glm-5.3" group="glm-5.3" members=1
+2026-11-05T09:16:04.012003Z  INFO dynamo_llm::discovery::watcher: Chat completions is ready
+2026-11-05T09:16:04.012221Z  INFO dynamo_llm::discovery::watcher: Completions is ready
+2026-11-05T09:16:09.501223Z  WARN dynamo_llm::kv_router::scheduler: no KV events received from worker 7587889421 yet; routing on load only

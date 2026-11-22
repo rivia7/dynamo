@@ -1,0 +1,63 @@
+{
+ "kind": "nccl",
+ "mode": "collective",
+ "world_size": 32,
+ "nnodes": 4,
+ "local_world_size": 8,
+ "results": [
+  {
+   "op": "all_reduce",
+   "size_bytes": 67108864,
+   "time_us": 4088.787,
+   "algbw_gbs": 16.4129,
+   "busbw_gbs": 31.8
+  },
+  {
+   "op": "all_reduce",
+   "size_bytes": 268435456,
+   "time_us": 11956.177,
+   "algbw_gbs": 22.4516,
+   "busbw_gbs": 43.5
+  },
+  {
+   "op": "all_reduce",
+   "size_bytes": 1073741824,
+   "time_us": 44075.737,
+   "algbw_gbs": 24.3613,
+   "busbw_gbs": 47.2
+  },
+  {
+   "op": "all_gather",
+   "size_bytes": 67108864,
+   "time_us": 2211.283,
+   "algbw_gbs": 30.3484,
+   "busbw_gbs": 29.4
+  },
+  {
+   "op": "all_gather",
+   "size_bytes": 268435456,
+   "time_us": 6327.174,
+   "algbw_gbs": 42.4258,
+   "busbw_gbs": 41.1
+  },
+  {
+   "op": "all_gather",
+   "size_bytes": 1073741824,
+   "time_us": 22811.127,
+   "algbw_gbs": 47.071,
+   "busbw_gbs": 45.6
+  }
+ ],
+ "pairs": null,
+ "env": {
+  "NCCL_DEBUG": "WARN",
+  "NCCL_IB_HCA": null,
+  "NCCL_NET": "IB",
+  "NCCL_SOCKET_IFNAME": "wg0"
+ },
+ "torch": "2.9.1+cu130",
+ "nccl": "2.27.7",
+ "hostname": "h100-node-0",
+ "iters": 20,
+ "warmup": 5
+}

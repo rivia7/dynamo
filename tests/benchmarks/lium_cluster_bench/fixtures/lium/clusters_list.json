@@ -1,0 +1,158 @@
+[
+  {
+    "fabric_id": "ib-sjc1-b200-a7f3",
+    "fabric_type": "infiniband",
+    "link_rate": "400 Gb/sec (4X NDR)",
+    "fabric_measured": true,
+    "node_count": 8,
+    "free_count": 5,
+    "gpu_type": "B200",
+    "gpus_per_node": 8,
+    "price_per_node_hour": 38.4,
+    "nodes": [
+      {
+        "id": "e100c3d2-aa00-4b00-8c00-000000000000",
+        "huid": "exec-sjc-0",
+        "gpu_type": "B200",
+        "gpu_count": 8,
+        "price_per_hour": 38.4,
+        "country": "United States",
+        "tier": "secure"
+      },
+      {
+        "id": "e110c3d2-aa00-4b00-8c00-000000000001",
+        "huid": "exec-sjc-1",
+        "gpu_type": "B200",
+        "gpu_count": 8,
+        "price_per_hour": 38.8,
+        "country": "United States",
+        "tier": "secure"
+      },
+      {
+        "id": "e120c3d2-aa00-4b00-8c00-000000000002",
+        "huid": "exec-sjc-2",
+        "gpu_type": "B200",
+        "gpu_count": 8,
+        "price_per_hour": 39.199999999999996,
+        "country": "United States",
+        "tier": "secure"
+      },
+      {
+        "id": "e130c3d2-aa00-4b00-8c00-000000000003",
+        "huid": "exec-sjc-3",
+        "gpu_type": "B200",
+        "gpu_count": 8,
+        "price_per_hour": 39.6,
+        "country": "United States",
+        "tier": "secure"
+      },
+      {
+        "id": "e140c3d2-aa00-4b00-8c00-000000000004",
+        "huid": "exec-sjc-4",
+        "gpu_type": "B200",
+        "gpu_count": 8,
+        "price_per_hour": 40.0,
+        "country": "United States",
+        "tier": "secure"
+      }
+    ]
+  },
+  {
+    "fabric_id": "roce-dfw2-b200-11c0",
+    "fabric_type": "roce",
+    "link_rate": "400 Gb/sec (4X NDR)",
+    "fabric_measured": true,
+    "node_count": 6,
+    "free_count": 6,
+    "gpu_type": "B200",
+    "gpus_per_node": 8,
+    "price_per_node_hour": 31.5,
+    "nodes": [
+      {
+        "id": "f201d4e3-bb00-4c00-9d00-000000000000",
+        "huid": "exec-dfw-0",
+        "gpu_type": "B200",
+        "gpu_count": 8,
+        "price_per_hour": 31.5,
+        "country": "United States",
+        "tier": "spot"
+      },
+      {
+        "id": "f211d4e3-bb00-4c00-9d00-000000000001",
+        "huid": "exec-dfw-1",
+        "gpu_type": "B200",
+        "gpu_count": 8,
+        "price_per_hour": 31.5,
+        "country": "United States",
+        "tier": "spot"
+      },
+      {
+        "id": "f221d4e3-bb00-4c00-9d00-000000000002",
+        "huid": "exec-dfw-2",
+        "gpu_type": "B200",
+        "gpu_count": 8,
+        "price_per_hour": 31.5,
+        "country": "United States",
+        "tier": "spot"
+      },
+      {
+        "id": "f231d4e3-bb00-4c00-9d00-000000000003",
+        "huid": "exec-dfw-3",
+        "gpu_type": "B200",
+        "gpu_count": 8,
+        "price_per_hour": 31.5,
+        "country": "United States",
+        "tier": "spot"
+      },
+      {
+        "id": "f241d4e3-bb00-4c00-9d00-000000000004",
+        "huid": "exec-dfw-4",
+        "gpu_type": "B200",
+        "gpu_count": 8,
+        "price_per_hour": 31.5,
+        "country": "United States",
+        "tier": "spot"
+      },
+      {
+        "id": "f251d4e3-bb00-4c00-9d00-000000000005",
+        "huid": "exec-dfw-5",
+        "gpu_type": "B200",
+        "gpu_count": 8,
+        "price_per_hour": 31.5,
+        "country": "United States",
+        "tier": "spot"
+      }
+    ]
+  },
+  {
+    "fabric_id": "ib-ams3-h200-5e2d",
+    "fabric_type": "infiniband",
+    "link_rate": "400 Gb/sec (4X NDR)",
+    "fabric_measured": false,
+    "node_count": 4,
+    "free_count": 2,
+    "gpu_type": "H200",
+    "gpus_per_node": 8,
+    "price_per_node_hour": 25.6,
+    "nodes": [
+      {
+        "id": "a302e5f4-cc00-4d00-ae00-000000000000",
+        "huid": "exec-ams-0",
+        "gpu_type": "H200",
+        "gpu_count": 8,
+        "price_per_hour": 25.6,
+        "country": "Netherlands",
+        "tier": "secure"
+      },
+      {
+        "id": "a312e5f4-cc00-4d00-ae00-000000000001",
+        "huid": "exec-ams-1",
+        "gpu_type": "H200",
+        "gpu_count": 8,
+        "price_per_hour": 25.6,
+        "country": "Netherlands",
+        "tier": "secure"
+      }
+    ]
+  }
+]

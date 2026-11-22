@@ -1,0 +1,3 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+{"error": {"code": "ssh_host_key_changed", "exit_code": 4, "hint": "Do not retry blindly; if the pod was rebooted or re-templated and you trust the new key, delete the known_hosts file named in the message and reconnect", "message": "The host key of brave-otter-3c changed"}, "ok": false}

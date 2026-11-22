@@ -1,0 +1,9 @@
+{
+  "exp_id": "exp42",
+  "error": "preflight failed:\n  node2: no ACTIVE RDMA HCA; the fabric is unusable\nTraceback (most recent call last):\n  ...",
+  "heartbeat_ts": 1762190500.0,
+  "phase": "preflight",
+  "pid": 4242,
+  "state": "failed",
+  "step": "probing hardware"
+}

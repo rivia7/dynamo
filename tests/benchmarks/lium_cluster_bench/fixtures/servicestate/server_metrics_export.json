@@ -1,0 +1,3573 @@
+{
+  "schema_version": "1.1",
+  "aiperf_version": "0.13.0",
+  "benchmark_id": "6c1f0f4e-8d2b-4a57-9a51-0f3e2d9c7b11",
+  "summary": {
+    "endpoints_configured": [
+      "http://10.42.0.1:8000/metrics",
+      "http://10.42.0.1:8081/metrics",
+      "http://10.42.0.2:8081/metrics",
+      "http://10.42.0.3:8081/metrics",
+      "http://127.0.0.1:8000/metrics"
+    ],
+    "endpoints_successful": [
+      "http://10.42.0.1:8000/metrics",
+      "http://10.42.0.1:8081/metrics",
+      "http://10.42.0.2:8081/metrics",
+      "http://10.42.0.3:8081/metrics",
+      "http://127.0.0.1:8000/metrics"
+    ],
+    "start_time": "2026-11-03T01:21:40",
+    "end_time": "2026-11-03T01:31:40.600000",
+    "endpoint_info": {
+      "http://10.42.0.1:8000/metrics": {
+        "total_fetches": 1812,
+        "first_fetch_ns": 1793700059000000000,
+        "last_fetch_ns": 1793700700600000000,
+        "avg_fetch_latency_ms": 4.31,
+        "unique_updates": 1804,
+        "first_update_ns": 1793700060000000000,
+        "last_update_ns": 1793700700600000000,
+        "duration_seconds": 641.2,
+        "avg_update_interval_ms": 355.4,
+        "median_update_interval_ms": 333.6
+      },
+      "http://10.42.0.1:8081/metrics": {
+        "total_fetches": 1812,
+        "first_fetch_ns": 1793700059000000000,
+        "last_fetch_ns": 1793700700600000000,
+        "avg_fetch_latency_ms": 6.87,
+        "unique_updates": 1804,
+        "first_update_ns": 1793700060000000000,
+        "last_update_ns": 1793700700600000000,
+        "duration_seconds": 641.2,
+        "avg_update_interval_ms": 355.4,
+        "median_update_interval_ms": 333.6
+      },
+      "http://10.42.0.2:8081/metrics": {
+        "total_fetches": 1812,
+        "first_fetch_ns": 1793700059000000000,
+        "last_fetch_ns": 1793700700600000000,
+        "avg_fetch_latency_ms": 6.87,
+        "unique_updates": 1804,
+        "first_update_ns": 1793700060000000000,
+        "last_update_ns": 1793700700600000000,
+        "duration_seconds": 641.2,
+        "avg_update_interval_ms": 355.4,
+        "median_update_interval_ms": 333.6
+      },
+      "http://10.42.0.3:8081/metrics": {
+        "total_fetches": 1812,
+        "first_fetch_ns": 1793700059000000000,
+        "last_fetch_ns": 1793700700600000000,
+        "avg_fetch_latency_ms": 6.87,
+        "unique_updates": 1804,
+        "first_update_ns": 1793700060000000000,
+        "last_update_ns": 1793700700600000000,
+        "duration_seconds": 641.2,
+        "avg_update_interval_ms": 355.4,
+        "median_update_interval_ms": 333.6
+      },
+      "http://127.0.0.1:8000/metrics": {
+        "total_fetches": 1812,
+        "first_fetch_ns": 1793700059000000000,
+        "last_fetch_ns": 1793700700600000000,
+        "avg_fetch_latency_ms": 4.31,
+        "unique_updates": 1804,
+        "first_update_ns": 1793700060000000000,
+        "last_update_ns": 1793700700600000000,
+        "duration_seconds": 641.2,
+        "avg_update_interval_ms": 355.4,
+        "median_update_interval_ms": 333.6
+      }
+    },
+    "phase_time_ranges": {
+      "profiling": {
+        "start_ns": 1793700100000000000,
+        "end_ns": 1793700700000000000
+      },
+      "warmup": {
+        "start_ns": 1793700070000000000,
+        "end_ns": 1793700099600000000
+      }
+    }
+  },
+  "metrics_phase": "profiling",
+  "metrics": {
+    "dynamo_component_gpu_cache_usage_percent": {
+      "type": "gauge",
+      "description": "Current value of dynamo_component_gpu_cache_usage_percent",
+      "series": [
+        {
+          "endpoint_url": "http://10.42.0.1:8081/metrics",
+          "labels": {
+            "dynamo_component": "prefill",
+            "dynamo_endpoint": "generate",
+            "dynamo_namespace": "cb-h200-001-3f9a1c2b7d4e",
+            "model": "glm-5.3",
+            "model_name": "glm-5.3"
+          },
+          "stats": {
+            "avg": 0.49000000000000005,
+            "min": 0.41,
+            "max": 0.55,
+            "std": 0.05338539126015659,
+            "p1": 0.4124,
+            "p5": 0.422,
+            "p10": 0.434,
+            "p25": 0.47,
+            "p50": 0.5,
+            "p75": 0.52,
+            "p90": 0.538,
+            "p95": 0.544,
+            "p99": 0.5488000000000001
+          }
+        },
+        {
+          "endpoint_url": "http://10.42.0.2:8081/metrics",
+          "labels": {
+            "dynamo_component": "prefill",
+            "dynamo_endpoint": "generate",
+            "dynamo_namespace": "cb-h200-001-3f9a1c2b7d4e",
+            "model": "glm-5.3",
+            "model_name": "glm-5.3"
+          },
+          "stats": {
+            "avg": 0.49000000000000005,
+            "min": 0.41,
+            "max": 0.55,
+            "std": 0.05338539126015659,
+            "p1": 0.4124,
+            "p5": 0.422,
+            "p10": 0.434,
+            "p25": 0.47,
+            "p50": 0.5,
+            "p75": 0.52,
+            "p90": 0.538,
+            "p95": 0.544,
+            "p99": 0.5488000000000001
+          }
+        },
+        {
+          "endpoint_url": "http://10.42.0.3:8081/metrics",
+          "labels": {
+            "dynamo_component": "backend",
+            "dynamo_endpoint": "generate",
+            "dynamo_namespace": "cb-h200-001-3f9a1c2b7d4e",
+            "model": "glm-5.3",
+            "model_name": "glm-5.3"
+          },
+          "stats": {
+            "avg": 0.958,
+            "min": 0.93,
+            "max": 0.98,
+            "std": 0.019235384061671322,
+            "p1": 0.9308000000000001,
+            "p5": 0.934,
+            "p10": 0.9380000000000001,
+            "p25": 0.95,
+            "p50": 0.96,
+            "p75": 0.97,
+            "p90": 0.976,
+            "p95": 0.978,
+            "p99": 0.9796
+          }
+        }
+      ]
+    },
+    "dynamo_component_inflight_requests": {
+      "type": "gauge",
+      "description": "Current value of dynamo_component_inflight_requests",
+      "series": [
+        {
+          "endpoint_url": "http://10.42.0.1:8081/metrics",
+          "labels": {
+            "dynamo_component": "prefill",
+            "dynamo_endpoint": "generate",
+            "dynamo_namespace": "cb-h200-001-3f9a1c2b7d4e",
+            "model": "glm-5.3",
+            "model_name": "glm-5.3"
+          },
+          "stats": {
+            "avg": 7.2,
+            "min": 6.0,
+            "max": 8.0,
+            "std": 0.8366600265340756,
+            "p1": 6.04,
+            "p5": 6.2,
+            "p10": 6.4,
+            "p25": 7.0,
+            "p50": 7.0,
+            "p75": 8.0,
+            "p90": 8.0,
+            "p95": 8.0,
+            "p99": 8.0
+          }
+        },
+        {
+          "endpoint_url": "http://10.42.0.2:8081/metrics",
+          "labels": {
+            "dynamo_component": "prefill",
+            "dynamo_endpoint": "generate",
+            "dynamo_namespace": "cb-h200-001-3f9a1c2b7d4e",
+            "model": "glm-5.3",
+            "model_name": "glm-5.3"
+          },
+          "stats": {
+            "avg": 7.2,
+            "min": 6.0,
+            "max": 8.0,
+            "std": 0.8366600265340756,
+            "p1": 6.04,
+            "p5": 6.2,
+            "p10": 6.4,
+            "p25": 7.0,
+            "p50": 7.0,
+            "p75": 8.0,
+            "p90": 8.0,
+            "p95": 8.0,
+            "p99": 8.0
+          }
+        },
+        {
+          "endpoint_url": "http://10.42.0.3:8081/metrics",
+          "labels": {
+            "dynamo_component": "backend",
+            "dynamo_endpoint": "generate",
+            "dynamo_namespace": "cb-h200-001-3f9a1c2b7d4e",
+            "model": "glm-5.3",
+            "model_name": "glm-5.3"
+          },
+          "stats": {
+            "avg": 255.4,
+            "min": 250.0,
+            "max": 262.0,
+            "std": 4.774934554525329,
+            "p1": 250.08,
+            "p5": 250.4,
+            "p10": 250.8,
+            "p25": 252.0,
+            "p50": 255.0,
+            "p75": 258.0,
+            "p90": 260.4,
+            "p95": 261.2,
+            "p99": 261.84
+          }
+        }
+      ]
+    },
+    "dynamo_component_model_load_time_seconds": {
+      "type": "gauge",
+      "description": "Current value of dynamo_component_model_load_time_seconds",
+      "series": [
+        {
+          "endpoint_url": "http://10.42.0.1:8081/metrics",
+          "labels": {
+            "dynamo_component": "prefill",
+            "dynamo_endpoint": "generate",
+            "dynamo_namespace": "cb-h200-001-3f9a1c2b7d4e",
+            "model": "glm-5.3",
+            "model_name": "glm-5.3"
+          },
+          "stats": {
+            "avg": 412.7,
+            "min": 412.7,
+            "max": 412.7,
+            "std": 0.0,
+            "p1": 412.7,
+            "p5": 412.7,
+            "p10": 412.7,
+            "p25": 412.7,
+            "p50": 412.7,
+            "p75": 412.7,
+            "p90": 412.7,
+            "p95": 412.7,
+            "p99": 412.7
+          }
+        },
+        {
+          "endpoint_url": "http://10.42.0.2:8081/metrics",
+          "labels": {
+            "dynamo_component": "prefill",
+            "dynamo_endpoint": "generate",
+            "dynamo_namespace": "cb-h200-001-3f9a1c2b7d4e",
+            "model": "glm-5.3",
+            "model_name": "glm-5.3"
+          },
+          "stats": {
+            "avg": 412.7,
+            "min": 412.7,
+            "max": 412.7,
+            "std": 0.0,
+            "p1": 412.7,
+            "p5": 412.7,
+            "p10": 412.7,
+            "p25": 412.7,
+            "p50": 412.7,
+            "p75": 412.7,
+            "p90": 412.7,
+            "p95": 412.7,
+            "p99": 412.7
+          }
+        }
+      ],
+      "unit": "seconds"
+    },
+    "dynamo_component_request_bytes": {
+      "type": "counter",
+      "description": "Total count of dynamo_component_request_bytes",
+      "series": [
+        {
+          "endpoint_url": "http://10.42.0.1:8081/metrics",
+          "labels": {
+            "model": "glm-5.3"
+          },
+          "stats": {
+            "total": 91245600.0,
+            "rate": 152000.0
+          }
+        },
+        {
+          "endpoint_url": "http://10.42.0.2:8081/metrics",
+          "labels": {
+            "model": "glm-5.3"
+          },
+          "stats": {
+            "total": 95807880.0,
+            "rate": 159600.0
+          }
+        }
+      ]
+    },
+    "dynamo_component_request_duration_seconds": {
+      "type": "histogram",
+      "description": "Distribution of dynamo_component_request_duration_seconds",
+      "series": [
+        {
+          "endpoint_url": "http://10.42.0.1:8081/metrics",
+          "labels": {
+            "model": "glm-5.3"
+          },
+          "stats": {
+            "count": 1140,
+            "sum": 3306.0,
+            "avg": 2.9,
+            "count_rate": 1.899050474762619,
+            "sum_rate": 5.507246376811595,
+            "p1_estimate": 0.2425,
+            "p5_estimate": 0.45089285714285715,
+            "p10_estimate": 0.6004366812227074,
+            "p25_estimate": 0.9737991266375545,
+            "p50_estimate": 2.028894472361809,
+            "p75_estimate": 3.95985401459854,
+            "p90_estimate": 7.261904761904762,
+            "p95_estimate": 9.523809523809524,
+            "p99_estimate": 17.466666666666647
+          },
+          "buckets": {
+            "0.1": 0,
+            "0.25": 12,
+            "0.5": 68,
+            "1.0": 297,
+            "2.5": 695,
+            "5.0": 969,
+            "10.0": 1095,
+            "20.0": 1140,
+            "40.0": 1140,
+            "+Inf": 1140
+          }
+        },
+        {
+          "endpoint_url": "http://10.42.0.2:8081/metrics",
+          "labels": {
+            "model": "glm-5.3"
+          },
+          "stats": {
+            "count": 1198,
+            "sum": 3474.2000000000007,
+            "avg": 2.900000000000001,
+            "count_rate": 1.9956688322505416,
+            "sum_rate": 5.787439613526572,
+            "p1_estimate": 0.24975,
+            "p5_estimate": 0.45296610169491525,
+            "p10_estimate": 0.6012448132780084,
+            "p25_estimate": 0.9740663900414938,
+            "p50_estimate": 2.02744630071599,
+            "p75_estimate": 3.9590592334494774,
+            "p90_estimate": 7.280303030303032,
+            "p95_estimate": 9.549242424242422,
+            "p99_estimate": 17.504166666666663
+          },
+          "buckets": {
+            "0.1": 0,
+            "0.25": 12,
+            "0.5": 71,
+            "1.0": 312,
+            "2.5": 731,
+            "5.0": 1018,
+            "10.0": 1150,
+            "20.0": 1198,
+            "40.0": 1198,
+            "+Inf": 1198
+          }
+        }
+      ],
+      "unit": "seconds"
+    },
+    "dynamo_component_requests": {
+      "type": "counter",
+      "description": "Total count of dynamo_component_requests",
+      "series": [
+        {
+          "endpoint_url": "http://10.42.0.1:8081/metrics",
+          "labels": {
+            "model": "glm-5.3"
+          },
+          "stats": {
+            "total": 1141.0,
+            "rate": 1.9007163085124106
+          }
+        },
+        {
+          "endpoint_url": "http://10.42.0.2:8081/metrics",
+          "labels": {
+            "model": "glm-5.3"
+          },
+          "stats": {
+            "total": 1197.0,
+            "rate": 1.9940029985007497
+          }
+        },
+        {
+          "endpoint_url": "http://10.42.0.3:8081/metrics",
+          "labels": {
+            "model": "glm-5.3"
+          },
+          "stats": {
+            "total": 2281.0,
+            "rate": 3.7997667832750293
+          }
+        }
+      ]
+    },
+    "dynamo_component_router_kv_hit_rate": {
+      "type": "histogram",
+      "description": "Distribution of dynamo_component_router_kv_hit_rate",
+      "series": [
+        {
+          "endpoint_url": "http://10.42.0.1:8000/metrics",
+          "labels": {
+            "model": "glm-5.3"
+          },
+          "stats": {
+            "count": 2275,
+            "sum": 1797.25,
+            "avg": 0.79,
+            "count_rate": 3.7897717807762787,
+            "sum_rate": 2.9939197068132604,
+            "p1_estimate": 0.024999999999999998,
+            "p5_estimate": 0.14945652173913043,
+            "p10_estimate": 0.375,
+            "p25_estimate": 0.6763853092783505,
+            "p50_estimate": 0.8249175824175824,
+            "p75_estimate": 0.9166055718475073,
+            "p90_estimate": 0.966642228739003,
+            "p95_estimate": 0.9833211143695014,
+            "p99_estimate": 0.9966642228739003
+          },
+          "buckets": {
+            "0.1": 91,
+            "0.25": 160,
+            "0.5": 295,
+            "0.75": 683,
+            "0.9": 1593,
+            "1.0": 2275,
+            "+Inf": 2275
+          }
+        },
+        {
+          "endpoint_url": "http://127.0.0.1:8000/metrics",
+          "labels": {
+            "model": "glm-5.3"
+          },
+          "stats": {
+            "count": 2275,
+            "sum": 1797.25,
+            "avg": 0.79,
+            "count_rate": 3.7897717807762787,
+            "sum_rate": 2.9939197068132604,
+            "p1_estimate": 0.024999999999999998,
+            "p5_estimate": 0.14945652173913043,
+            "p10_estimate": 0.375,
+            "p25_estimate": 0.6763853092783505,
+            "p50_estimate": 0.8249175824175824,
+            "p75_estimate": 0.9166055718475073,
+            "p90_estimate": 0.966642228739003,
+            "p95_estimate": 0.9833211143695014,
+            "p99_estimate": 0.9966642228739003
+          },
+          "buckets": {
+            "0.1": 91,
+            "0.25": 160,
+            "0.5": 295,
+            "0.75": 683,
+            "0.9": 1593,
+            "1.0": 2275,
+            "+Inf": 2275
+          }
+        }
+      ]
+    },
+    "dynamo_component_total_blocks": {
+      "type": "gauge",
+      "description": "Current value of dynamo_component_total_blocks",
+      "series": [
+        {
+          "endpoint_url": "http://10.42.0.1:8081/metrics",
+          "labels": {
+            "dynamo_component": "prefill",
+            "dynamo_endpoint": "generate",
+            "dynamo_namespace": "cb-h200-001-3f9a1c2b7d4e",
+            "model": "glm-5.3",
+            "model_name": "glm-5.3"
+          },
+          "stats": {
+            "avg": 11426.0,
+            "min": 11426.0,
+            "max": 11426.0,
+            "std": 0.0,
+            "p1": 11426.0,
+            "p5": 11426.0,
+            "p10": 11426.0,
+            "p25": 11426.0,
+            "p50": 11426.0,
+            "p75": 11426.0,
+            "p90": 11426.0,
+            "p95": 11426.0,
+            "p99": 11426.0
+          }
+        },
+        {
+          "endpoint_url": "http://10.42.0.2:8081/metrics",
+          "labels": {
+            "dynamo_component": "prefill",
+            "dynamo_endpoint": "generate",
+            "dynamo_namespace": "cb-h200-001-3f9a1c2b7d4e",
+            "model": "glm-5.3",
+            "model_name": "glm-5.3"
+          },
+          "stats": {
+            "avg": 11426.0,
+            "min": 11426.0,
+            "max": 11426.0,
+            "std": 0.0,
+            "p1": 11426.0,
+            "p5": 11426.0,
+            "p10": 11426.0,
+            "p25": 11426.0,
+            "p50": 11426.0,
+            "p75": 11426.0,
+            "p90": 11426.0,
+            "p95": 11426.0,
+            "p99": 11426.0
+          }
+        }
+      ]
+    },
+    "dynamo_frontend_active_requests": {
+      "type": "gauge",
+      "description": "Current value of dynamo_frontend_active_requests",
+      "series": [
+        {
+          "endpoint_url": "http://10.42.0.1:8000/metrics",
+          "labels": {
+            "model": "glm-5.3"
+          },
+          "stats": {
+            "avg": 256.0,
+            "min": 256.0,
+            "max": 256.0,
+            "std": 0.0,
+            "p1": 256.0,
+            "p5": 256.0,
+            "p10": 256.0,
+            "p25": 256.0,
+            "p50": 256.0,
+            "p75": 256.0,
+            "p90": 256.0,
+            "p95": 256.0,
+            "p99": 256.0
+          }
+        },
+        {
+          "endpoint_url": "http://127.0.0.1:8000/metrics",
+          "labels": {
+            "model": "glm-5.3"
+          },
+          "stats": {
+            "avg": 256.0,
+            "min": 256.0,
+            "max": 256.0,
+            "std": 0.0,
+            "p1": 256.0,
+            "p5": 256.0,
+            "p10": 256.0,
+            "p25": 256.0,
+            "p50": 256.0,
+            "p75": 256.0,
+            "p90": 256.0,
+            "p95": 256.0,
+            "p99": 256.0
+          }
+        }
+      ]
+    },
+    "dynamo_frontend_disconnected_clients": {
+      "type": "gauge",
+      "description": "Current value of dynamo_frontend_disconnected_clients",
+      "series": [
+        {
+          "endpoint_url": "http://10.42.0.1:8000/metrics",
+          "stats": {
+            "avg": 0.0,
+            "min": 0.0,
+            "max": 0.0,
+            "std": 0.0,
+            "p1": 0.0,
+            "p5": 0.0,
+            "p10": 0.0,
+            "p25": 0.0,
+            "p50": 0.0,
+            "p75": 0.0,
+            "p90": 0.0,
+            "p95": 0.0,
+            "p99": 0.0
+          }
+        },
+        {
+          "endpoint_url": "http://127.0.0.1:8000/metrics",
+          "stats": {
+            "avg": 0.0,
+            "min": 0.0,
+            "max": 0.0,
+            "std": 0.0,
+            "p1": 0.0,
+            "p5": 0.0,
+            "p10": 0.0,
+            "p25": 0.0,
+            "p50": 0.0,
+            "p75": 0.0,
+            "p90": 0.0,
+            "p95": 0.0,
+            "p99": 0.0
+          }
+        }
+      ]
+    },
+    "dynamo_frontend_inflight_requests": {
+      "type": "gauge",
+      "description": "Current value of dynamo_frontend_inflight_requests",
+      "series": [
+        {
+          "endpoint_url": "http://10.42.0.1:8000/metrics",
+          "labels": {
+            "model": "glm-5.3"
+          },
+          "stats": {
+            "avg": 256.4,
+            "min": 252.0,
+            "max": 261.0,
+            "std": 3.361547262794322,
+            "p1": 252.12,
+            "p5": 252.6,
+            "p10": 253.2,
+            "p25": 255.0,
+            "p50": 256.0,
+            "p75": 258.0,
+            "p90": 259.8,
+            "p95": 260.4,
+            "p99": 260.88
+          }
+        },
+        {
+          "endpoint_url": "http://127.0.0.1:8000/metrics",
+          "labels": {
+            "model": "glm-5.3"
+          },
+          "stats": {
+            "avg": 256.4,
+            "min": 252.0,
+            "max": 261.0,
+            "std": 3.361547262794322,
+            "p1": 252.12,
+            "p5": 252.6,
+            "p10": 253.2,
+            "p25": 255.0,
+            "p50": 256.0,
+            "p75": 258.0,
+            "p90": 259.8,
+            "p95": 260.4,
+            "p99": 260.88
+          }
+        }
+      ]
+    },
+    "dynamo_frontend_input_sequence_tokens": {
+      "type": "histogram",
+      "description": "Distribution of dynamo_frontend_input_sequence_tokens",
+      "series": [
+        {
+          "endpoint_url": "http://10.42.0.1:8000/metrics",
+          "labels": {
+            "model": "glm-5.3"
+          },
+          "stats": {
+            "count": 2275,
+            "sum": 161525000.0,
+            "avg": 71000.0,
+            "count_rate": 3.7897717807762787,
+            "sum_rate": 269073.7964351158,
+            "p1_estimate": 505.55555555555554,
+            "p5_estimate": 4003.640776699029,
+            "p10_estimate": 8973.300970873786,
+            "p25_estimate": 28663.729809104258,
+            "p50_estimate": 61012.86173633441,
+            "p75_estimate": 91492.4973204716,
+            "p90_estimate": 144512.19512195123,
+            "p95_estimate": 172256.0975609756,
+            "p99_estimate": 194451.21951219512
+          },
+          "buckets": {
+            "1000.0": 45,
+            "10000.0": 251,
+            "50000.0": 932,
+            "100000.0": 1865,
+            "200000.0": 2275,
+            "+Inf": 2275
+          }
+        },
+        {
+          "endpoint_url": "http://127.0.0.1:8000/metrics",
+          "labels": {
+            "model": "glm-5.3"
+          },
+          "stats": {
+            "count": 2275,
+            "sum": 161525000.0,
+            "avg": 71000.0,
+            "count_rate": 3.7897717807762787,
+            "sum_rate": 269073.7964351158,
+            "p1_estimate": 505.55555555555554,
+            "p5_estimate": 4003.640776699029,
+            "p10_estimate": 8973.300970873786,
+            "p25_estimate": 28663.729809104258,
+            "p50_estimate": 61012.86173633441,
+            "p75_estimate": 91492.4973204716,
+            "p90_estimate": 144512.19512195123,
+            "p95_estimate": 172256.0975609756,
+            "p99_estimate": 194451.21951219512
+          },
+          "buckets": {
+            "1000.0": 45,
+            "10000.0": 251,
+            "50000.0": 932,
+            "100000.0": 1865,
+            "200000.0": 2275,
+            "+Inf": 2275
+          }
+        }
+      ]
+    },
+    "dynamo_frontend_inter_token_latency_seconds": {
+      "type": "histogram",
+      "description": "Distribution of dynamo_frontend_inter_token_latency_seconds",
+      "series": [
+        {
+          "endpoint_url": "http://10.42.0.1:8000/metrics",
+          "labels": {
+            "model": "glm-5.3"
+          },
+          "stats": {
+            "count": 2275,
+            "sum": 97.82500000000005,
+            "avg": 0.04300000000000002,
+            "count_rate": 3.7897717807762787,
+            "sum_rate": 0.16296018657338007,
+            "p1_estimate": 0.006648550724637681,
+            "p5_estimate": 0.011316176470588236,
+            "p10_estimate": 0.014661764705882353,
+            "p25_estimate": 0.02351098901098901,
+            "p50_estimate": 0.03601098901098901,
+            "p75_estimate": 0.053587719298245615,
+            "p90_estimate": 0.07402654867256638,
+            "p95_estimate": 0.09016483516483517,
+            "p99_estimate": 0.20054347826086957
+          },
+          "buckets": {
+            "0.005": 0,
+            "0.01": 69,
+            "0.02": 409,
+            "0.04": 1319,
+            "0.06": 1889,
+            "0.08": 2115,
+            "0.1": 2206,
+            "0.25": 2275,
+            "+Inf": 2275
+          }
+        },
+        {
+          "endpoint_url": "http://127.0.0.1:8000/metrics",
+          "labels": {
+            "model": "glm-5.3"
+          },
+          "stats": {
+            "count": 2275,
+            "sum": 97.82500000000005,
+            "avg": 0.04300000000000002,
+            "count_rate": 3.7897717807762787,
+            "sum_rate": 0.16296018657338007,
+            "p1_estimate": 0.006648550724637681,
+            "p5_estimate": 0.011316176470588236,
+            "p10_estimate": 0.014661764705882353,
+            "p25_estimate": 0.02351098901098901,
+            "p50_estimate": 0.03601098901098901,
+            "p75_estimate": 0.053587719298245615,
+            "p90_estimate": 0.07402654867256638,
+            "p95_estimate": 0.09016483516483517,
+            "p99_estimate": 0.20054347826086957
+          },
+          "buckets": {
+            "0.005": 0,
+            "0.01": 69,
+            "0.02": 409,
+            "0.04": 1319,
+            "0.06": 1889,
+            "0.08": 2115,
+            "0.1": 2206,
+            "0.25": 2275,
+            "+Inf": 2275
+          }
+        }
+      ],
+      "unit": "seconds"
+    },
+    "dynamo_frontend_model_max_num_seqs": {
+      "type": "gauge",
+      "description": "Current value of dynamo_frontend_model_max_num_seqs",
+      "series": [
+        {
+          "endpoint_url": "http://10.42.0.1:8000/metrics",
+          "labels": {
+            "model": "glm-5.3"
+          },
+          "stats": {
+            "avg": 256.0,
+            "min": 256.0,
+            "max": 256.0,
+            "std": 0.0,
+            "p1": 256.0,
+            "p5": 256.0,
+            "p10": 256.0,
+            "p25": 256.0,
+            "p50": 256.0,
+            "p75": 256.0,
+            "p90": 256.0,
+            "p95": 256.0,
+            "p99": 256.0
+          }
+        },
+        {
+          "endpoint_url": "http://127.0.0.1:8000/metrics",
+          "labels": {
+            "model": "glm-5.3"
+          },
+          "stats": {
+            "avg": 256.0,
+            "min": 256.0,
+            "max": 256.0,
+            "std": 0.0,
+            "p1": 256.0,
+            "p5": 256.0,
+            "p10": 256.0,
+            "p25": 256.0,
+            "p50": 256.0,
+            "p75": 256.0,
+            "p90": 256.0,
+            "p95": 256.0,
+            "p99": 256.0
+          }
+        }
+      ]
+    },
+    "dynamo_frontend_model_total_kv_blocks": {
+      "type": "gauge",
+      "description": "Current value of dynamo_frontend_model_total_kv_blocks",
+      "series": [
+        {
+          "endpoint_url": "http://10.42.0.1:8000/metrics",
+          "labels": {
+            "model": "glm-5.3"
+          },
+          "stats": {
+            "avg": 11426.0,
+            "min": 11426.0,
+            "max": 11426.0,
+            "std": 0.0,
+            "p1": 11426.0,
+            "p5": 11426.0,
+            "p10": 11426.0,
+            "p25": 11426.0,
+            "p50": 11426.0,
+            "p75": 11426.0,
+            "p90": 11426.0,
+            "p95": 11426.0,
+            "p99": 11426.0
+          }
+        },
+        {
+          "endpoint_url": "http://127.0.0.1:8000/metrics",
+          "labels": {
+            "model": "glm-5.3"
+          },
+          "stats": {
+            "avg": 11426.0,
+            "min": 11426.0,
+            "max": 11426.0,
+            "std": 0.0,
+            "p1": 11426.0,
+            "p5": 11426.0,
+            "p10": 11426.0,
+            "p25": 11426.0,
+            "p50": 11426.0,
+            "p75": 11426.0,
+            "p90": 11426.0,
+            "p95": 11426.0,
+            "p99": 11426.0
+          }
+        }
+      ]
+    },
+    "dynamo_frontend_output_sequence_tokens": {
+      "type": "histogram",
+      "description": "Distribution of dynamo_frontend_output_sequence_tokens",
+      "series": [
+        {
+          "endpoint_url": "http://10.42.0.1:8000/metrics",
+          "labels": {
+            "model": "glm-5.3"
+          },
+          "stats": {
+            "count": 2275,
+            "sum": 2707250.0,
+            "avg": 1190.0,
+            "count_rate": 3.7897717807762787,
+            "sum_rate": 4509.828419123772,
+            "p1_estimate": 10.022026431718063,
+            "p5_estimate": 50.11013215859031,
+            "p10_estimate": 100.28368794326241,
+            "p25_estimate": 293.9007092198582,
+            "p50_estimate": 650.219298245614,
+            "p75_estimate": 1198.3516483516482,
+            "p90_estimate": 1948.3516483516482,
+            "p95_estimate": 4654.411764705883,
+            "p99_estimate": 7330.882352941177
+          },
+          "buckets": {
+            "100.0": 227,
+            "500.0": 932,
+            "1000.0": 1616,
+            "2000.0": 2071,
+            "8000.0": 2275,
+            "+Inf": 2275
+          }
+        },
+        {
+          "endpoint_url": "http://127.0.0.1:8000/metrics",
+          "labels": {
+            "model": "glm-5.3"
+          },
+          "stats": {
+            "count": 2275,
+            "sum": 2707250.0,
+            "avg": 1190.0,
+            "count_rate": 3.7897717807762787,
+            "sum_rate": 4509.828419123772,
+            "p1_estimate": 10.022026431718063,
+            "p5_estimate": 50.11013215859031,
+            "p10_estimate": 100.28368794326241,
+            "p25_estimate": 293.9007092198582,
+            "p50_estimate": 650.219298245614,
+            "p75_estimate": 1198.3516483516482,
+            "p90_estimate": 1948.3516483516482,
+            "p95_estimate": 4654.411764705883,
+            "p99_estimate": 7330.882352941177
+          },
+          "buckets": {
+            "100.0": 227,
+            "500.0": 932,
+            "1000.0": 1616,
+            "2000.0": 2071,
+            "8000.0": 2275,
+            "+Inf": 2275
+          }
+        }
+      ]
+    },
+    "dynamo_frontend_output_tokens": {
+      "type": "counter",
+      "description": "Total count of dynamo_frontend_output_tokens",
+      "series": [
+        {
+          "endpoint_url": "http://10.42.0.1:8000/metrics",
+          "labels": {
+            "model": "glm-5.3"
+          },
+          "stats": {
+            "total": 2704351.0,
+            "rate": 4504.999167083125
+          }
+        },
+        {
+          "endpoint_url": "http://127.0.0.1:8000/metrics",
+          "labels": {
+            "model": "glm-5.3"
+          },
+          "stats": {
+            "total": 2704351.0,
+            "rate": 4504.999167083125
+          }
+        }
+      ]
+    },
+    "dynamo_frontend_queued_requests": {
+      "type": "gauge",
+      "description": "Current value of dynamo_frontend_queued_requests",
+      "series": [
+        {
+          "endpoint_url": "http://10.42.0.1:8000/metrics",
+          "labels": {
+            "model": "glm-5.3"
+          },
+          "stats": {
+            "avg": 11.0,
+            "min": 9.0,
+            "max": 13.0,
+            "std": 1.5811388300841898,
+            "p1": 9.04,
+            "p5": 9.2,
+            "p10": 9.4,
+            "p25": 10.0,
+            "p50": 11.0,
+            "p75": 12.0,
+            "p90": 12.6,
+            "p95": 12.8,
+            "p99": 12.96
+          }
+        },
+        {
+          "endpoint_url": "http://127.0.0.1:8000/metrics",
+          "labels": {
+            "model": "glm-5.3"
+          },
+          "stats": {
+            "avg": 11.0,
+            "min": 9.0,
+            "max": 13.0,
+            "std": 1.5811388300841898,
+            "p1": 9.04,
+            "p5": 9.2,
+            "p10": 9.4,
+            "p25": 10.0,
+            "p50": 11.0,
+            "p75": 12.0,
+            "p90": 12.6,
+            "p95": 12.8,
+            "p99": 12.96
+          }
+        }
+      ]
+    },
+    "dynamo_frontend_request_duration_seconds": {
+      "type": "histogram",
+      "description": "Distribution of dynamo_frontend_request_duration_seconds",
+      "series": [
+        {
+          "endpoint_url": "http://10.42.0.1:8000/metrics",
+          "labels": {
+            "model": "glm-5.3"
+          },
+          "stats": {
+            "count": 2275,
+            "sum": 131950.0,
+            "avg": 58.0,
+            "count_rate": 3.7897717807762787,
+            "sum_rate": 219.80676328502418,
+            "p1_estimate": 1.9891304347826086,
+            "p5_estimate": 4.788546255506608,
+            "p10_estimate": 6.79295154185022,
+            "p25_estimate": 12.806167400881057,
+            "p50_estimate": 31.722738799661876,
+            "p75_estimate": 54.799661876584956,
+            "p90_estimate": 128.28070175438597,
+            "p95_estimate": 192.140350877193,
+            "p99_estimate": 243.2280701754386
+          },
+          "buckets": {
+            "1.0": 0,
+            "4.0": 69,
+            "16.0": 750,
+            "64.0": 1933,
+            "256.0": 2275,
+            "+Inf": 2275
+          }
+        },
+        {
+          "endpoint_url": "http://127.0.0.1:8000/metrics",
+          "labels": {
+            "model": "glm-5.3"
+          },
+          "stats": {
+            "count": 2275,
+            "sum": 131950.0,
+            "avg": 58.0,
+            "count_rate": 3.7897717807762787,
+            "sum_rate": 219.80676328502418,
+            "p1_estimate": 1.9891304347826086,
+            "p5_estimate": 4.788546255506608,
+            "p10_estimate": 6.79295154185022,
+            "p25_estimate": 12.806167400881057,
+            "p50_estimate": 31.722738799661876,
+            "p75_estimate": 54.799661876584956,
+            "p90_estimate": 128.28070175438597,
+            "p95_estimate": 192.140350877193,
+            "p99_estimate": 243.2280701754386
+          },
+          "buckets": {
+            "1.0": 0,
+            "4.0": 69,
+            "16.0": 750,
+            "64.0": 1933,
+            "256.0": 2275,
+            "+Inf": 2275
+          }
+        }
+      ],
+      "unit": "seconds"
+    },
+    "dynamo_frontend_requests": {
+      "type": "counter",
+      "description": "Total count of dynamo_frontend_requests",
+      "series": [
+        {
+          "endpoint_url": "http://10.42.0.1:8000/metrics",
+          "labels": {
+            "endpoint": "chat_completions",
+            "error_type": "",
+            "model": "glm-5.3",
+            "request_type": "stream",
+            "status": "success"
+          },
+          "stats": {
+            "total": 2275.0,
+            "rate": 3.7897717807762787
+          }
+        },
+        {
+          "endpoint_url": "http://10.42.0.1:8000/metrics",
+          "labels": {
+            "endpoint": "chat_completions",
+            "error_type": "internal",
+            "model": "glm-5.3",
+            "request_type": "stream",
+            "status": "error"
+          },
+          "stats": {
+            "total": 3.0,
+            "rate": 0.004997501249375313
+          }
+        },
+        {
+          "endpoint_url": "http://127.0.0.1:8000/metrics",
+          "labels": {
+            "endpoint": "chat_completions",
+            "error_type": "",
+            "model": "glm-5.3",
+            "request_type": "stream",
+            "status": "success"
+          },
+          "stats": {
+            "total": 2275.0,
+            "rate": 3.7897717807762787
+          }
+        },
+        {
+          "endpoint_url": "http://127.0.0.1:8000/metrics",
+          "labels": {
+            "endpoint": "chat_completions",
+            "error_type": "internal",
+            "model": "glm-5.3",
+            "request_type": "stream",
+            "status": "error"
+          },
+          "stats": {
+            "total": 3.0,
+            "rate": 0.004997501249375313
+          }
+        }
+      ]
+    },
+    "dynamo_frontend_router_queue_pending_requests": {
+      "type": "gauge",
+      "description": "Current value of dynamo_frontend_router_queue_pending_requests",
+      "series": [
+        {
+          "endpoint_url": "http://10.42.0.1:8000/metrics",
+          "labels": {
+            "model": "glm-5.3",
+            "policy_class": "default",
+            "worker_type": "prefill"
+          },
+          "stats": {
+            "avg": 0.2,
+            "min": 0.0,
+            "max": 1.0,
+            "std": 0.447213595499958,
+            "p1": 0.0,
+            "p5": 0.0,
+            "p10": 0.0,
+            "p25": 0.0,
+            "p50": 0.0,
+            "p75": 0.0,
+            "p90": 0.6000000000000001,
+            "p95": 0.7999999999999998,
+            "p99": 0.96
+          }
+        },
+        {
+          "endpoint_url": "http://127.0.0.1:8000/metrics",
+          "labels": {
+            "model": "glm-5.3",
+            "policy_class": "default",
+            "worker_type": "prefill"
+          },
+          "stats": {
+            "avg": 0.2,
+            "min": 0.0,
+            "max": 1.0,
+            "std": 0.447213595499958,
+            "p1": 0.0,
+            "p5": 0.0,
+            "p10": 0.0,
+            "p25": 0.0,
+            "p50": 0.0,
+            "p75": 0.0,
+            "p90": 0.6000000000000001,
+            "p95": 0.7999999999999998,
+            "p99": 0.96
+          }
+        }
+      ]
+    },
+    "dynamo_frontend_stage_duration_seconds": {
+      "type": "histogram",
+      "description": "Distribution of dynamo_frontend_stage_duration_seconds",
+      "series": [
+        {
+          "endpoint_url": "http://10.42.0.1:8000/metrics",
+          "labels": {
+            "stage": "decode_forward"
+          },
+          "stats": {
+            "count": 2101,
+            "sum": 5042.4000000000015,
+            "avg": 2.400000000000001,
+            "count_rate": 3.4999167083125107,
+            "sum_rate": 8.399800099950028,
+            "p1_estimate": 0.002000952380952381,
+            "p5_estimate": 0.010005357142857144,
+            "p10_estimate": 0.02126071428571429,
+            "p25_estimate": 0.05502678571428572,
+            "p50_estimate": 0.20036997885835095,
+            "p75_estimate": 0.7000792811839324,
+            "p90_estimate": 0.9999048625792812,
+            "p95_estimate": 5.497857142857135,
+            "p99_estimate": 9.09957142857142
+          },
+          "buckets": {
+            "0.01": 105,
+            "0.1": 945,
+            "1.0": 1891,
+            "10.0": 2101,
+            "+Inf": 2101
+          }
+        },
+        {
+          "endpoint_url": "http://10.42.0.1:8000/metrics",
+          "labels": {
+            "stage": "prefill_bootstrap"
+          },
+          "stats": {
+            "count": 1501,
+            "sum": 2101.399999999998,
+            "avg": 1.3999999999999986,
+            "count_rate": 2.500416458437448,
+            "sum_rate": 3.500583041812424,
+            "p1_estimate": 0.0020013333333333337,
+            "p5_estimate": 0.010007499999999999,
+            "p10_estimate": 0.021265,
+            "p25_estimate": 0.05503750000000001,
+            "p50_estimate": 0.20051775147928996,
+            "p75_estimate": 0.7001109467455622,
+            "p90_estimate": 0.9998668639053255,
+            "p95_estimate": 5.4970000000000026,
+            "p99_estimate": 9.099400000000001
+          },
+          "buckets": {
+            "0.01": 75,
+            "0.1": 675,
+            "1.0": 1351,
+            "10.0": 1501,
+            "+Inf": 1501
+          }
+        },
+        {
+          "endpoint_url": "http://10.42.0.1:8000/metrics",
+          "labels": {
+            "stage": "prefill_forward"
+          },
+          "stats": {
+            "count": 900,
+            "sum": 360.0,
+            "avg": 0.4,
+            "count_rate": 1.4992503748125938,
+            "sum_rate": 0.5997001499250375,
+            "p1_estimate": 0.002,
+            "p5_estimate": 0.01,
+            "p10_estimate": 0.02125,
+            "p25_estimate": 0.05500000000000001,
+            "p50_estimate": 0.2,
+            "p75_estimate": 0.7,
+            "p90_estimate": 1.0,
+            "p95_estimate": 5.5,
+            "p99_estimate": 9.1
+          },
+          "buckets": {
+            "0.01": 45,
+            "0.1": 405,
+            "1.0": 810,
+            "10.0": 900,
+            "+Inf": 900
+          }
+        },
+        {
+          "endpoint_url": "http://127.0.0.1:8000/metrics",
+          "labels": {
+            "stage": "decode_forward"
+          },
+          "stats": {
+            "count": 2101,
+            "sum": 5042.4000000000015,
+            "avg": 2.400000000000001,
+            "count_rate": 3.4999167083125107,
+            "sum_rate": 8.399800099950028,
+            "p1_estimate": 0.002000952380952381,
+            "p5_estimate": 0.010005357142857144,
+            "p10_estimate": 0.02126071428571429,
+            "p25_estimate": 0.05502678571428572,
+            "p50_estimate": 0.20036997885835095,
+            "p75_estimate": 0.7000792811839324,
+            "p90_estimate": 0.9999048625792812,
+            "p95_estimate": 5.497857142857135,
+            "p99_estimate": 9.09957142857142
+          },
+          "buckets": {
+            "0.01": 105,
+            "0.1": 945,
+            "1.0": 1891,
+            "10.0": 2101,
+            "+Inf": 2101
+          }
+        },
+        {
+          "endpoint_url": "http://127.0.0.1:8000/metrics",
+          "labels": {
+            "stage": "prefill_bootstrap"
+          },
+          "stats": {
+            "count": 1501,
+            "sum": 2101.399999999998,
+            "avg": 1.3999999999999986,
+            "count_rate": 2.500416458437448,
+            "sum_rate": 3.500583041812424,
+            "p1_estimate": 0.0020013333333333337,
+            "p5_estimate": 0.010007499999999999,
+            "p10_estimate": 0.021265,
+            "p25_estimate": 0.05503750000000001,
+            "p50_estimate": 0.20051775147928996,
+            "p75_estimate": 0.7001109467455622,
+            "p90_estimate": 0.9998668639053255,
+            "p95_estimate": 5.4970000000000026,
+            "p99_estimate": 9.099400000000001
+          },
+          "buckets": {
+            "0.01": 75,
+            "0.1": 675,
+            "1.0": 1351,
+            "10.0": 1501,
+            "+Inf": 1501
+          }
+        },
+        {
+          "endpoint_url": "http://127.0.0.1:8000/metrics",
+          "labels": {
+            "stage": "prefill_forward"
+          },
+          "stats": {
+            "count": 900,
+            "sum": 360.0,
+            "avg": 0.4,
+            "count_rate": 1.4992503748125938,
+            "sum_rate": 0.5997001499250375,
+            "p1_estimate": 0.002,
+            "p5_estimate": 0.01,
+            "p10_estimate": 0.02125,
+            "p25_estimate": 0.05500000000000001,
+            "p50_estimate": 0.2,
+            "p75_estimate": 0.7,
+            "p90_estimate": 1.0,
+            "p95_estimate": 5.5,
+            "p99_estimate": 9.1
+          },
+          "buckets": {
+            "0.01": 45,
+            "0.1": 405,
+            "1.0": 810,
+            "10.0": 900,
+            "+Inf": 900
+          }
+        }
+      ],
+      "unit": "seconds"
+    },
+    "dynamo_frontend_time_to_first_token_seconds": {
+      "type": "histogram",
+      "description": "Distribution of dynamo_frontend_time_to_first_token_seconds",
+      "series": [
+        {
+          "endpoint_url": "http://10.42.0.1:8000/metrics",
+          "labels": {
+            "model": "glm-5.3"
+          },
+          "stats": {
+            "count": 2275,
+            "sum": 10920.0,
+            "avg": 4.8,
+            "count_rate": 3.7897717807762787,
+            "sum_rate": 18.190904547726138,
+            "p1_estimate": 0.33242753623188404,
+            "p5_estimate": 0.5895,
+            "p10_estimate": 0.817,
+            "p25_estimate": 1.6338832487309645,
+            "p50_estimate": 3.332723279648609,
+            "p75_estimate": 6.384474327628362,
+            "p90_estimate": 12.230392156862745,
+            "p95_estimate": 17.806372549019606,
+            "p99_estimate": 33.405797101449274
+          },
+          "buckets": {
+            "0.1": 0,
+            "0.25": 0,
+            "0.5": 69,
+            "1.0": 319,
+            "2.5": 910,
+            "5.0": 1593,
+            "10.0": 2002,
+            "20.0": 2206,
+            "40.0": 2275,
+            "+Inf": 2275
+          }
+        },
+        {
+          "endpoint_url": "http://127.0.0.1:8000/metrics",
+          "labels": {
+            "model": "glm-5.3"
+          },
+          "stats": {
+            "count": 2275,
+            "sum": 10920.0,
+            "avg": 4.8,
+            "count_rate": 3.7897717807762787,
+            "sum_rate": 18.190904547726138,
+            "p1_estimate": 0.33242753623188404,
+            "p5_estimate": 0.5895,
+            "p10_estimate": 0.817,
+            "p25_estimate": 1.6338832487309645,
+            "p50_estimate": 3.332723279648609,
+            "p75_estimate": 6.384474327628362,
+            "p90_estimate": 12.230392156862745,
+            "p95_estimate": 17.806372549019606,
+            "p99_estimate": 33.405797101449274
+          },
+          "buckets": {
+            "0.1": 0,
+            "0.25": 0,
+            "0.5": 69,
+            "1.0": 319,
+            "2.5": 910,
+            "5.0": 1593,
+            "10.0": 2002,
+            "20.0": 2206,
+            "40.0": 2275,
+            "+Inf": 2275
+          }
+        }
+      ],
+      "unit": "seconds"
+    },
+    "dynamo_frontend_worker_active_decode_blocks": {
+      "type": "gauge",
+      "description": "Current value of dynamo_frontend_worker_active_decode_blocks",
+      "series": [
+        {
+          "endpoint_url": "http://10.42.0.1:8000/metrics",
+          "labels": {
+            "dp_rank": "0",
+            "worker_id": "7587889421",
+            "worker_type": "decode"
+          },
+          "stats": {
+            "avg": 5542.0,
+            "min": 5410.0,
+            "max": 5650.0,
+            "std": 94.18067742376883,
+            "p1": 5413.2,
+            "p5": 5426.0,
+            "p10": 5442.0,
+            "p25": 5490.0,
+            "p50": 5560.0,
+            "p75": 5600.0,
+            "p90": 5630.0,
+            "p95": 5640.0,
+            "p99": 5648.0
+          }
+        },
+        {
+          "endpoint_url": "http://127.0.0.1:8000/metrics",
+          "labels": {
+            "dp_rank": "0",
+            "worker_id": "7587889421",
+            "worker_type": "decode"
+          },
+          "stats": {
+            "avg": 5542.0,
+            "min": 5410.0,
+            "max": 5650.0,
+            "std": 94.18067742376883,
+            "p1": 5413.2,
+            "p5": 5426.0,
+            "p10": 5442.0,
+            "p25": 5490.0,
+            "p50": 5560.0,
+            "p75": 5600.0,
+            "p90": 5630.0,
+            "p95": 5640.0,
+            "p99": 5648.0
+          }
+        }
+      ]
+    },
+    "dynamo_router_overhead_total_ms": {
+      "type": "histogram",
+      "description": "Distribution of dynamo_router_overhead_total_ms",
+      "series": [
+        {
+          "endpoint_url": "http://10.42.0.1:8000/metrics",
+          "labels": {
+            "model": "glm-5.3"
+          },
+          "stats": {
+            "count": 2275,
+            "sum": 1410.5,
+            "avg": 0.62,
+            "count_rate": 3.7897717807762787,
+            "sum_rate": 2.349658504081293,
+            "p1_estimate": 0.01002202643171806,
+            "p5_estimate": 0.05011013215859031,
+            "p10_estimate": 0.10017574692442882,
+            "p25_estimate": 0.2201230228471002,
+            "p50_estimate": 0.42003514938488584,
+            "p75_estimate": 0.7501832844574781,
+            "p90_estimate": 1.0097087378640777,
+            "p95_estimate": 3.2184466019417477,
+            "p99_estimate": 4.985436893203883
+          },
+          "buckets": {
+            "0.1": 227,
+            "0.5": 1365,
+            "1.0": 2047,
+            "5.0": 2253,
+            "10.0": 2275,
+            "+Inf": 2275
+          }
+        },
+        {
+          "endpoint_url": "http://127.0.0.1:8000/metrics",
+          "labels": {
+            "model": "glm-5.3"
+          },
+          "stats": {
+            "count": 2275,
+            "sum": 1410.5,
+            "avg": 0.62,
+            "count_rate": 3.7897717807762787,
+            "sum_rate": 2.349658504081293,
+            "p1_estimate": 0.01002202643171806,
+            "p5_estimate": 0.05011013215859031,
+            "p10_estimate": 0.10017574692442882,
+            "p25_estimate": 0.2201230228471002,
+            "p50_estimate": 0.42003514938488584,
+            "p75_estimate": 0.7501832844574781,
+            "p90_estimate": 1.0097087378640777,
+            "p95_estimate": 3.2184466019417477,
+            "p99_estimate": 4.985436893203883
+          },
+          "buckets": {
+            "0.1": 227,
+            "0.5": 1365,
+            "1.0": 2047,
+            "5.0": 2253,
+            "10.0": 2275,
+            "+Inf": 2275
+          }
+        }
+      ]
+    },
+    "dynamo_tokio_worker_busy_ratio": {
+      "type": "gauge",
+      "description": "Current value of dynamo_tokio_worker_busy_ratio",
+      "series": [
+        {
+          "endpoint_url": "http://10.42.0.1:8000/metrics",
+          "labels": {
+            "worker": "0"
+          },
+          "stats": {
+            "avg": 0.33799999999999997,
+            "min": 0.31,
+            "max": 0.36,
+            "std": 0.019235384061671336,
+            "p1": 0.3108,
+            "p5": 0.314,
+            "p10": 0.318,
+            "p25": 0.33,
+            "p50": 0.34,
+            "p75": 0.35,
+            "p90": 0.356,
+            "p95": 0.358,
+            "p99": 0.3596
+          }
+        },
+        {
+          "endpoint_url": "http://127.0.0.1:8000/metrics",
+          "labels": {
+            "worker": "0"
+          },
+          "stats": {
+            "avg": 0.33799999999999997,
+            "min": 0.31,
+            "max": 0.36,
+            "std": 0.019235384061671336,
+            "p1": 0.3108,
+            "p5": 0.314,
+            "p10": 0.318,
+            "p25": 0.33,
+            "p50": 0.34,
+            "p75": 0.35,
+            "p90": 0.356,
+            "p95": 0.358,
+            "p99": 0.3596
+          }
+        }
+      ]
+    },
+    "sglang:cache_hit_rate": {
+      "type": "gauge",
+      "description": "Current value of sglang:cache_hit_rate",
+      "series": [
+        {
+          "endpoint_url": "http://10.42.0.1:8081/metrics",
+          "labels": {
+            "dynamo_component": "prefill",
+            "dynamo_endpoint": "generate",
+            "dynamo_namespace": "cb-h200-001-3f9a1c2b7d4e",
+            "engine_type": "unified",
+            "model": "glm-5.3",
+            "model_name": "glm-5.3",
+            "pp_rank": "0",
+            "tp_rank": "0"
+          },
+          "stats": {
+            "avg": 0.8300000000000001,
+            "min": 0.81,
+            "max": 0.85,
+            "std": 0.015811388300841875,
+            "p1": 0.8104,
+            "p5": 0.812,
+            "p10": 0.8140000000000001,
+            "p25": 0.82,
+            "p50": 0.83,
+            "p75": 0.84,
+            "p90": 0.846,
+            "p95": 0.848,
+            "p99": 0.8496
+          }
+        },
+        {
+          "endpoint_url": "http://10.42.0.2:8081/metrics",
+          "labels": {
+            "dynamo_component": "prefill",
+            "dynamo_endpoint": "generate",
+            "dynamo_namespace": "cb-h200-001-3f9a1c2b7d4e",
+            "engine_type": "unified",
+            "model": "glm-5.3",
+            "model_name": "glm-5.3",
+            "pp_rank": "0",
+            "tp_rank": "0"
+          },
+          "stats": {
+            "avg": 0.8300000000000001,
+            "min": 0.81,
+            "max": 0.85,
+            "std": 0.015811388300841875,
+            "p1": 0.8104,
+            "p5": 0.812,
+            "p10": 0.8140000000000001,
+            "p25": 0.82,
+            "p50": 0.83,
+            "p75": 0.84,
+            "p90": 0.846,
+            "p95": 0.848,
+            "p99": 0.8496
+          }
+        }
+      ]
+    },
+    "sglang:cached_tokens": {
+      "type": "counter",
+      "description": "Total count of sglang:cached_tokens",
+      "series": [
+        {
+          "endpoint_url": "http://10.42.0.1:8081/metrics",
+          "labels": {
+            "model": "glm-5.3"
+          },
+          "stats": {
+            "total": 30075030.0,
+            "rate": 50100.00000000001
+          }
+        },
+        {
+          "endpoint_url": "http://10.42.0.2:8081/metrics",
+          "labels": {
+            "model": "glm-5.3"
+          },
+          "stats": {
+            "total": 31578781.0,
+            "rate": 52604.99916708313
+          }
+        }
+      ]
+    },
+    "sglang:context_len": {
+      "type": "gauge",
+      "description": "Current value of sglang:context_len",
+      "series": [
+        {
+          "endpoint_url": "http://10.42.0.1:8081/metrics",
+          "labels": {
+            "dynamo_component": "prefill",
+            "dynamo_endpoint": "generate",
+            "dynamo_namespace": "cb-h200-001-3f9a1c2b7d4e",
+            "engine_type": "unified",
+            "model": "glm-5.3",
+            "model_name": "glm-5.3",
+            "pp_rank": "0",
+            "tp_rank": "0"
+          },
+          "stats": {
+            "avg": 262144.0,
+            "min": 262144.0,
+            "max": 262144.0,
+            "std": 0.0,
+            "p1": 262144.0,
+            "p5": 262144.0,
+            "p10": 262144.0,
+            "p25": 262144.0,
+            "p50": 262144.0,
+            "p75": 262144.0,
+            "p90": 262144.0,
+            "p95": 262144.0,
+            "p99": 262144.0
+          }
+        },
+        {
+          "endpoint_url": "http://10.42.0.2:8081/metrics",
+          "labels": {
+            "dynamo_component": "prefill",
+            "dynamo_endpoint": "generate",
+            "dynamo_namespace": "cb-h200-001-3f9a1c2b7d4e",
+            "engine_type": "unified",
+            "model": "glm-5.3",
+            "model_name": "glm-5.3",
+            "pp_rank": "0",
+            "tp_rank": "0"
+          },
+          "stats": {
+            "avg": 262144.0,
+            "min": 262144.0,
+            "max": 262144.0,
+            "std": 0.0,
+            "p1": 262144.0,
+            "p5": 262144.0,
+            "p10": 262144.0,
+            "p25": 262144.0,
+            "p50": 262144.0,
+            "p75": 262144.0,
+            "p90": 262144.0,
+            "p95": 262144.0,
+            "p99": 262144.0
+          }
+        }
+      ]
+    },
+    "sglang:gen_throughput": {
+      "type": "gauge",
+      "description": "Current value of sglang:gen_throughput",
+      "series": [
+        {
+          "endpoint_url": "http://10.42.0.3:8081/metrics",
+          "labels": {
+            "dp_rank": "0",
+            "dynamo_component": "backend",
+            "dynamo_endpoint": "generate",
+            "dynamo_namespace": "cb-h200-001-3f9a1c2b7d4e",
+            "engine_type": "unified",
+            "model": "glm-5.3",
+            "model_name": "glm-5.3",
+            "pp_rank": "0",
+            "tp_rank": "0"
+          },
+          "stats": {
+            "avg": 2275.6,
+            "min": 2210.4,
+            "max": 2320.7,
+            "std": 44.756284474920335,
+            "p1": 2212.024,
+            "p5": 2218.52,
+            "p10": 2226.64,
+            "p25": 2251.0,
+            "p50": 2290.1,
+            "p75": 2305.8,
+            "p90": 2314.74,
+            "p95": 2317.72,
+            "p99": 2320.104
+          }
+        },
+        {
+          "endpoint_url": "http://10.42.0.3:8081/metrics",
+          "labels": {
+            "dp_rank": "1",
+            "dynamo_component": "backend",
+            "dynamo_endpoint": "generate",
+            "dynamo_namespace": "cb-h200-001-3f9a1c2b7d4e",
+            "engine_type": "unified",
+            "model": "glm-5.3",
+            "model_name": "glm-5.3",
+            "pp_rank": "0",
+            "tp_rank": "0"
+          },
+          "stats": {
+            "avg": 2270.7200000000003,
+            "min": 2201.2,
+            "max": 2310.1,
+            "std": 42.29310818561346,
+            "p1": 2203.768,
+            "p5": 2214.04,
+            "p10": 2226.88,
+            "p25": 2265.4,
+            "p50": 2280.9,
+            "p75": 2296.0,
+            "p90": 2304.46,
+            "p95": 2307.2799999999997,
+            "p99": 2309.536
+          }
+        }
+      ]
+    },
+    "sglang:generation_tokens": {
+      "type": "counter",
+      "description": "Total count of sglang:generation_tokens",
+      "series": [
+        {
+          "endpoint_url": "http://10.42.0.3:8081/metrics",
+          "labels": {
+            "model": "glm-5.3"
+          },
+          "stats": {
+            "total": 2707353.0,
+            "rate": 4510.0
+          }
+        }
+      ]
+    },
+    "sglang:inter_token_latency_seconds": {
+      "type": "histogram",
+      "description": "Distribution of sglang:inter_token_latency_seconds",
+      "series": [
+        {
+          "endpoint_url": "http://10.42.0.3:8081/metrics",
+          "labels": {
+            "model": "glm-5.3"
+          },
+          "stats": {
+            "count": 2707353,
+            "sum": 111001.473,
+            "avg": 0.041,
+            "count_rate": 4510.0,
+            "sum_rate": 184.91000000000003,
+            "p1_estimate": 0.0062500013851182895,
+            "p5_estimate": 0.010555557493577169,
+            "p10_estimate": 0.013333332649325706,
+            "p25_estimate": 0.021463408152142087,
+            "p50_estimate": 0.03365852713702067,
+            "p75_estimate": 0.050909082514434614,
+            "p90_estimate": 0.07111110472703994,
+            "p95_estimate": 0.08499997229763424,
+            "p99_estimate": 0.17499991689290323
+          },
+          "buckets": {
+            "0.005": 0,
+            "0.01": 108294,
+            "0.02": 595618,
+            "0.04": 1705633,
+            "0.06": 2301250,
+            "0.08": 2544912,
+            "0.1": 2653206,
+            "0.25": 2707353,
+            "+Inf": 2707353
+          }
+        }
+      ],
+      "unit": "seconds"
+    },
+    "sglang:kv_transfer_speed_gb_s": {
+      "type": "gauge",
+      "description": "Current value of sglang:kv_transfer_speed_gb_s",
+      "series": [
+        {
+          "endpoint_url": "http://10.42.0.3:8081/metrics",
+          "labels": {
+            "dp_rank": "0",
+            "dynamo_component": "backend",
+            "dynamo_endpoint": "generate",
+            "dynamo_namespace": "cb-h200-001-3f9a1c2b7d4e",
+            "engine_type": "unified",
+            "model": "glm-5.3",
+            "model_name": "glm-5.3",
+            "pp_rank": "0",
+            "tp_rank": "0"
+          },
+          "stats": {
+            "avg": 18.06,
+            "min": 17.6,
+            "max": 18.5,
+            "std": 0.3361547262794319,
+            "p1": 17.612000000000002,
+            "p5": 17.66,
+            "p10": 17.72,
+            "p25": 17.9,
+            "p50": 18.1,
+            "p75": 18.2,
+            "p90": 18.38,
+            "p95": 18.44,
+            "p99": 18.488
+          }
+        }
+      ]
+    },
+    "sglang:kv_transfer_total_mb": {
+      "type": "histogram",
+      "description": "Distribution of sglang:kv_transfer_total_mb",
+      "series": [
+        {
+          "endpoint_url": "http://10.42.0.1:8081/metrics",
+          "labels": {
+            "model": "glm-5.3"
+          },
+          "stats": {
+            "count": 1140,
+            "sum": 934800.0,
+            "avg": 820.0,
+            "count_rate": 1.899050474762619,
+            "sum_rate": 1557.2213893053474,
+            "p1_estimate": 23.02857142857143,
+            "p5_estimate": 60.89108910891089,
+            "p10_estimate": 89.10891089108911,
+            "p25_estimate": 227.35042735042737,
+            "p50_estimate": 470.94017094017096,
+            "p75_estimate": 866.9590643274854,
+            "p90_estimate": 2649.4845360824743,
+            "p95_estimate": 3824.742268041237,
+            "p99_estimate": 4764.9484536082455
+          },
+          "buckets": {
+            "10.0": 0,
+            "50.0": 35,
+            "100.0": 136,
+            "500.0": 604,
+            "1000.0": 946,
+            "5000.0": 1140,
+            "+Inf": 1140
+          }
+        },
+        {
+          "endpoint_url": "http://10.42.0.2:8081/metrics",
+          "labels": {
+            "model": "glm-5.3"
+          },
+          "stats": {
+            "count": 1198,
+            "sum": 982360.0,
+            "avg": 820.0,
+            "count_rate": 1.9956688322505416,
+            "sum_rate": 1636.448442445444,
+            "p1_estimate": 23.31111111111111,
+            "p5_estimate": 61.06481481481482,
+            "p10_estimate": 88.7962962962963,
+            "p25_estimate": 226.68024439918534,
+            "p50_estimate": 470.67209775967416,
+            "p75_estimate": 865.9722222222222,
+            "p90_estimate": 2639.4088669950747,
+            "p95_estimate": 3819.7044334975353,
+            "p99_estimate": 4763.940886699507
+          },
+          "buckets": {
+            "10.0": 0,
+            "50.0": 36,
+            "100.0": 144,
+            "500.0": 635,
+            "1000.0": 995,
+            "5000.0": 1198,
+            "+Inf": 1198
+          }
+        }
+      ]
+    },
+    "sglang:max_total_num_tokens": {
+      "type": "gauge",
+      "description": "Current value of sglang:max_total_num_tokens",
+      "series": [
+        {
+          "endpoint_url": "http://10.42.0.1:8081/metrics",
+          "labels": {
+            "dynamo_component": "prefill",
+            "dynamo_endpoint": "generate",
+            "dynamo_namespace": "cb-h200-001-3f9a1c2b7d4e",
+            "engine_type": "unified",
+            "model": "glm-5.3",
+            "model_name": "glm-5.3",
+            "pp_rank": "0",
+            "tp_rank": "0"
+          },
+          "stats": {
+            "avg": 731264.0,
+            "min": 731264.0,
+            "max": 731264.0,
+            "std": 0.0,
+            "p1": 731264.0,
+            "p5": 731264.0,
+            "p10": 731264.0,
+            "p25": 731264.0,
+            "p50": 731264.0,
+            "p75": 731264.0,
+            "p90": 731264.0,
+            "p95": 731264.0,
+            "p99": 731264.0
+          }
+        },
+        {
+          "endpoint_url": "http://10.42.0.2:8081/metrics",
+          "labels": {
+            "dynamo_component": "prefill",
+            "dynamo_endpoint": "generate",
+            "dynamo_namespace": "cb-h200-001-3f9a1c2b7d4e",
+            "engine_type": "unified",
+            "model": "glm-5.3",
+            "model_name": "glm-5.3",
+            "pp_rank": "0",
+            "tp_rank": "0"
+          },
+          "stats": {
+            "avg": 731264.0,
+            "min": 731264.0,
+            "max": 731264.0,
+            "std": 0.0,
+            "p1": 731264.0,
+            "p5": 731264.0,
+            "p10": 731264.0,
+            "p25": 731264.0,
+            "p50": 731264.0,
+            "p75": 731264.0,
+            "p90": 731264.0,
+            "p95": 731264.0,
+            "p99": 731264.0
+          }
+        },
+        {
+          "endpoint_url": "http://10.42.0.3:8081/metrics",
+          "labels": {
+            "dp_rank": "0",
+            "dynamo_component": "backend",
+            "dynamo_endpoint": "generate",
+            "dynamo_namespace": "cb-h200-001-3f9a1c2b7d4e",
+            "engine_type": "unified",
+            "model": "glm-5.3",
+            "model_name": "glm-5.3",
+            "pp_rank": "0",
+            "tp_rank": "0"
+          },
+          "stats": {
+            "avg": 731264.0,
+            "min": 731264.0,
+            "max": 731264.0,
+            "std": 0.0,
+            "p1": 731264.0,
+            "p5": 731264.0,
+            "p10": 731264.0,
+            "p25": 731264.0,
+            "p50": 731264.0,
+            "p75": 731264.0,
+            "p90": 731264.0,
+            "p95": 731264.0,
+            "p99": 731264.0
+          }
+        },
+        {
+          "endpoint_url": "http://10.42.0.3:8081/metrics",
+          "labels": {
+            "dp_rank": "1",
+            "dynamo_component": "backend",
+            "dynamo_endpoint": "generate",
+            "dynamo_namespace": "cb-h200-001-3f9a1c2b7d4e",
+            "engine_type": "unified",
+            "model": "glm-5.3",
+            "model_name": "glm-5.3",
+            "pp_rank": "0",
+            "tp_rank": "0"
+          },
+          "stats": {
+            "avg": 731264.0,
+            "min": 731264.0,
+            "max": 731264.0,
+            "std": 0.0,
+            "p1": 731264.0,
+            "p5": 731264.0,
+            "p10": 731264.0,
+            "p25": 731264.0,
+            "p50": 731264.0,
+            "p75": 731264.0,
+            "p90": 731264.0,
+            "p95": 731264.0,
+            "p99": 731264.0
+          }
+        }
+      ]
+    },
+    "sglang:num_decode_prealloc_queue_reqs": {
+      "type": "gauge",
+      "description": "Current value of sglang:num_decode_prealloc_queue_reqs",
+      "series": [
+        {
+          "endpoint_url": "http://10.42.0.3:8081/metrics",
+          "labels": {
+            "dp_rank": "0",
+            "dynamo_component": "backend",
+            "dynamo_endpoint": "generate",
+            "dynamo_namespace": "cb-h200-001-3f9a1c2b7d4e",
+            "engine_type": "unified",
+            "model": "glm-5.3",
+            "model_name": "glm-5.3",
+            "pp_rank": "0",
+            "tp_rank": "0"
+          },
+          "stats": {
+            "avg": 6.4,
+            "min": 5.0,
+            "max": 8.0,
+            "std": 1.140175425099138,
+            "p1": 5.04,
+            "p5": 5.2,
+            "p10": 5.4,
+            "p25": 6.0,
+            "p50": 6.0,
+            "p75": 7.0,
+            "p90": 7.6,
+            "p95": 7.8,
+            "p99": 7.96
+          }
+        },
+        {
+          "endpoint_url": "http://10.42.0.3:8081/metrics",
+          "labels": {
+            "dp_rank": "1",
+            "dynamo_component": "backend",
+            "dynamo_endpoint": "generate",
+            "dynamo_namespace": "cb-h200-001-3f9a1c2b7d4e",
+            "engine_type": "unified",
+            "model": "glm-5.3",
+            "model_name": "glm-5.3",
+            "pp_rank": "0",
+            "tp_rank": "0"
+          },
+          "stats": {
+            "avg": 6.4,
+            "min": 6.0,
+            "max": 7.0,
+            "std": 0.5477225575051661,
+            "p1": 6.0,
+            "p5": 6.0,
+            "p10": 6.0,
+            "p25": 6.0,
+            "p50": 6.0,
+            "p75": 7.0,
+            "p90": 7.0,
+            "p95": 7.0,
+            "p99": 7.0
+          }
+        }
+      ]
+    },
+    "sglang:num_decode_transfer_queue_reqs": {
+      "type": "gauge",
+      "description": "Current value of sglang:num_decode_transfer_queue_reqs",
+      "series": [
+        {
+          "endpoint_url": "http://10.42.0.3:8081/metrics",
+          "labels": {
+            "dp_rank": "0",
+            "dynamo_component": "backend",
+            "dynamo_endpoint": "generate",
+            "dynamo_namespace": "cb-h200-001-3f9a1c2b7d4e",
+            "engine_type": "unified",
+            "model": "glm-5.3",
+            "model_name": "glm-5.3",
+            "pp_rank": "0",
+            "tp_rank": "0"
+          },
+          "stats": {
+            "avg": 0.4,
+            "min": 0.0,
+            "max": 1.0,
+            "std": 0.5477225575051662,
+            "p1": 0.0,
+            "p5": 0.0,
+            "p10": 0.0,
+            "p25": 0.0,
+            "p50": 0.0,
+            "p75": 1.0,
+            "p90": 1.0,
+            "p95": 1.0,
+            "p99": 1.0
+          }
+        },
+        {
+          "endpoint_url": "http://10.42.0.3:8081/metrics",
+          "labels": {
+            "dp_rank": "1",
+            "dynamo_component": "backend",
+            "dynamo_endpoint": "generate",
+            "dynamo_namespace": "cb-h200-001-3f9a1c2b7d4e",
+            "engine_type": "unified",
+            "model": "glm-5.3",
+            "model_name": "glm-5.3",
+            "pp_rank": "0",
+            "tp_rank": "0"
+          },
+          "stats": {
+            "avg": 0.2,
+            "min": 0.0,
+            "max": 1.0,
+            "std": 0.447213595499958,
+            "p1": 0.0,
+            "p5": 0.0,
+            "p10": 0.0,
+            "p25": 0.0,
+            "p50": 0.0,
+            "p75": 0.0,
+            "p90": 0.6000000000000001,
+            "p95": 0.7999999999999998,
+            "p99": 0.96
+          }
+        }
+      ]
+    },
+    "sglang:num_grammar_queue_reqs": {
+      "type": "gauge",
+      "description": "Current value of sglang:num_grammar_queue_reqs",
+      "series": [
+        {
+          "endpoint_url": "http://10.42.0.1:8081/metrics",
+          "labels": {
+            "dynamo_component": "prefill",
+            "dynamo_endpoint": "generate",
+            "dynamo_namespace": "cb-h200-001-3f9a1c2b7d4e",
+            "engine_type": "unified",
+            "model": "glm-5.3",
+            "model_name": "glm-5.3",
+            "pp_rank": "0",
+            "tp_rank": "0"
+          },
+          "stats": {
+            "avg": 0.0,
+            "min": 0.0,
+            "max": 0.0,
+            "std": 0.0,
+            "p1": 0.0,
+            "p5": 0.0,
+            "p10": 0.0,
+            "p25": 0.0,
+            "p50": 0.0,
+            "p75": 0.0,
+            "p90": 0.0,
+            "p95": 0.0,
+            "p99": 0.0
+          }
+        },
+        {
+          "endpoint_url": "http://10.42.0.2:8081/metrics",
+          "labels": {
+            "dynamo_component": "prefill",
+            "dynamo_endpoint": "generate",
+            "dynamo_namespace": "cb-h200-001-3f9a1c2b7d4e",
+            "engine_type": "unified",
+            "model": "glm-5.3",
+            "model_name": "glm-5.3",
+            "pp_rank": "0",
+            "tp_rank": "0"
+          },
+          "stats": {
+            "avg": 0.0,
+            "min": 0.0,
+            "max": 0.0,
+            "std": 0.0,
+            "p1": 0.0,
+            "p5": 0.0,
+            "p10": 0.0,
+            "p25": 0.0,
+            "p50": 0.0,
+            "p75": 0.0,
+            "p90": 0.0,
+            "p95": 0.0,
+            "p99": 0.0
+          }
+        }
+      ]
+    },
+    "sglang:num_paused_reqs": {
+      "type": "gauge",
+      "description": "Current value of sglang:num_paused_reqs",
+      "series": [
+        {
+          "endpoint_url": "http://10.42.0.3:8081/metrics",
+          "labels": {
+            "dp_rank": "0",
+            "dynamo_component": "backend",
+            "dynamo_endpoint": "generate",
+            "dynamo_namespace": "cb-h200-001-3f9a1c2b7d4e",
+            "engine_type": "unified",
+            "model": "glm-5.3",
+            "model_name": "glm-5.3",
+            "pp_rank": "0",
+            "tp_rank": "0"
+          },
+          "stats": {
+            "avg": 0.0,
+            "min": 0.0,
+            "max": 0.0,
+            "std": 0.0,
+            "p1": 0.0,
+            "p5": 0.0,
+            "p10": 0.0,
+            "p25": 0.0,
+            "p50": 0.0,
+            "p75": 0.0,
+            "p90": 0.0,
+            "p95": 0.0,
+            "p99": 0.0
+          }
+        }
+      ]
+    },
+    "sglang:num_prefill_inflight_queue_reqs": {
+      "type": "gauge",
+      "description": "Current value of sglang:num_prefill_inflight_queue_reqs",
+      "series": [
+        {
+          "endpoint_url": "http://10.42.0.1:8081/metrics",
+          "labels": {
+            "dynamo_component": "prefill",
+            "dynamo_endpoint": "generate",
+            "dynamo_namespace": "cb-h200-001-3f9a1c2b7d4e",
+            "engine_type": "unified",
+            "model": "glm-5.3",
+            "model_name": "glm-5.3",
+            "pp_rank": "0",
+            "tp_rank": "0"
+          },
+          "stats": {
+            "avg": 0.2,
+            "min": 0.0,
+            "max": 1.0,
+            "std": 0.447213595499958,
+            "p1": 0.0,
+            "p5": 0.0,
+            "p10": 0.0,
+            "p25": 0.0,
+            "p50": 0.0,
+            "p75": 0.0,
+            "p90": 0.6000000000000001,
+            "p95": 0.7999999999999998,
+            "p99": 0.96
+          }
+        },
+        {
+          "endpoint_url": "http://10.42.0.2:8081/metrics",
+          "labels": {
+            "dynamo_component": "prefill",
+            "dynamo_endpoint": "generate",
+            "dynamo_namespace": "cb-h200-001-3f9a1c2b7d4e",
+            "engine_type": "unified",
+            "model": "glm-5.3",
+            "model_name": "glm-5.3",
+            "pp_rank": "0",
+            "tp_rank": "0"
+          },
+          "stats": {
+            "avg": 0.2,
+            "min": 0.0,
+            "max": 1.0,
+            "std": 0.447213595499958,
+            "p1": 0.0,
+            "p5": 0.0,
+            "p10": 0.0,
+            "p25": 0.0,
+            "p50": 0.0,
+            "p75": 0.0,
+            "p90": 0.6000000000000001,
+            "p95": 0.7999999999999998,
+            "p99": 0.96
+          }
+        }
+      ]
+    },
+    "sglang:num_prefill_prealloc_queue_reqs": {
+      "type": "gauge",
+      "description": "Current value of sglang:num_prefill_prealloc_queue_reqs",
+      "series": [
+        {
+          "endpoint_url": "http://10.42.0.1:8081/metrics",
+          "labels": {
+            "dynamo_component": "prefill",
+            "dynamo_endpoint": "generate",
+            "dynamo_namespace": "cb-h200-001-3f9a1c2b7d4e",
+            "engine_type": "unified",
+            "model": "glm-5.3",
+            "model_name": "glm-5.3",
+            "pp_rank": "0",
+            "tp_rank": "0"
+          },
+          "stats": {
+            "avg": 3.8,
+            "min": 3.0,
+            "max": 5.0,
+            "std": 0.8366600265340756,
+            "p1": 3.0,
+            "p5": 3.0,
+            "p10": 3.0,
+            "p25": 3.0,
+            "p50": 4.0,
+            "p75": 4.0,
+            "p90": 4.6,
+            "p95": 4.8,
+            "p99": 4.96
+          }
+        },
+        {
+          "endpoint_url": "http://10.42.0.2:8081/metrics",
+          "labels": {
+            "dynamo_component": "prefill",
+            "dynamo_endpoint": "generate",
+            "dynamo_namespace": "cb-h200-001-3f9a1c2b7d4e",
+            "engine_type": "unified",
+            "model": "glm-5.3",
+            "model_name": "glm-5.3",
+            "pp_rank": "0",
+            "tp_rank": "0"
+          },
+          "stats": {
+            "avg": 3.8,
+            "min": 3.0,
+            "max": 5.0,
+            "std": 0.8366600265340756,
+            "p1": 3.0,
+            "p5": 3.0,
+            "p10": 3.0,
+            "p25": 3.0,
+            "p50": 4.0,
+            "p75": 4.0,
+            "p90": 4.6,
+            "p95": 4.8,
+            "p99": 4.96
+          }
+        }
+      ]
+    },
+    "sglang:num_queue_reqs": {
+      "type": "gauge",
+      "description": "Current value of sglang:num_queue_reqs",
+      "series": [
+        {
+          "endpoint_url": "http://10.42.0.1:8081/metrics",
+          "labels": {
+            "dynamo_component": "prefill",
+            "dynamo_endpoint": "generate",
+            "dynamo_namespace": "cb-h200-001-3f9a1c2b7d4e",
+            "engine_type": "unified",
+            "model": "glm-5.3",
+            "model_name": "glm-5.3",
+            "pp_rank": "0",
+            "tp_rank": "0"
+          },
+          "stats": {
+            "avg": 0.4,
+            "min": 0.0,
+            "max": 1.0,
+            "std": 0.5477225575051662,
+            "p1": 0.0,
+            "p5": 0.0,
+            "p10": 0.0,
+            "p25": 0.0,
+            "p50": 0.0,
+            "p75": 1.0,
+            "p90": 1.0,
+            "p95": 1.0,
+            "p99": 1.0
+          }
+        },
+        {
+          "endpoint_url": "http://10.42.0.2:8081/metrics",
+          "labels": {
+            "dynamo_component": "prefill",
+            "dynamo_endpoint": "generate",
+            "dynamo_namespace": "cb-h200-001-3f9a1c2b7d4e",
+            "engine_type": "unified",
+            "model": "glm-5.3",
+            "model_name": "glm-5.3",
+            "pp_rank": "0",
+            "tp_rank": "0"
+          },
+          "stats": {
+            "avg": 0.4,
+            "min": 0.0,
+            "max": 1.0,
+            "std": 0.5477225575051662,
+            "p1": 0.0,
+            "p5": 0.0,
+            "p10": 0.0,
+            "p25": 0.0,
+            "p50": 0.0,
+            "p75": 1.0,
+            "p90": 1.0,
+            "p95": 1.0,
+            "p99": 1.0
+          }
+        },
+        {
+          "endpoint_url": "http://10.42.0.3:8081/metrics",
+          "labels": {
+            "dp_rank": "0",
+            "dynamo_component": "backend",
+            "dynamo_endpoint": "generate",
+            "dynamo_namespace": "cb-h200-001-3f9a1c2b7d4e",
+            "engine_type": "unified",
+            "model": "glm-5.3",
+            "model_name": "glm-5.3",
+            "pp_rank": "0",
+            "tp_rank": "0"
+          },
+          "stats": {
+            "avg": 5.0,
+            "min": 3.0,
+            "max": 7.0,
+            "std": 1.5811388300841898,
+            "p1": 3.04,
+            "p5": 3.2,
+            "p10": 3.4,
+            "p25": 4.0,
+            "p50": 5.0,
+            "p75": 6.0,
+            "p90": 6.6,
+            "p95": 6.8,
+            "p99": 6.96
+          }
+        },
+        {
+          "endpoint_url": "http://10.42.0.3:8081/metrics",
+          "labels": {
+            "dp_rank": "1",
+            "dynamo_component": "backend",
+            "dynamo_endpoint": "generate",
+            "dynamo_namespace": "cb-h200-001-3f9a1c2b7d4e",
+            "engine_type": "unified",
+            "model": "glm-5.3",
+            "model_name": "glm-5.3",
+            "pp_rank": "0",
+            "tp_rank": "0"
+          },
+          "stats": {
+            "avg": 5.0,
+            "min": 4.0,
+            "max": 6.0,
+            "std": 1.0,
+            "p1": 4.0,
+            "p5": 4.0,
+            "p10": 4.0,
+            "p25": 4.0,
+            "p50": 5.0,
+            "p75": 6.0,
+            "p90": 6.0,
+            "p95": 6.0,
+            "p99": 6.0
+          }
+        }
+      ]
+    },
+    "sglang:num_retracted_reqs": {
+      "type": "gauge",
+      "description": "Current value of sglang:num_retracted_reqs",
+      "series": [
+        {
+          "endpoint_url": "http://10.42.0.3:8081/metrics",
+          "labels": {
+            "dp_rank": "0",
+            "dynamo_component": "backend",
+            "dynamo_endpoint": "generate",
+            "dynamo_namespace": "cb-h200-001-3f9a1c2b7d4e",
+            "engine_type": "unified",
+            "model": "glm-5.3",
+            "model_name": "glm-5.3",
+            "pp_rank": "0",
+            "tp_rank": "0"
+          },
+          "stats": {
+            "avg": 0.6,
+            "min": 0.0,
+            "max": 2.0,
+            "std": 0.8944271909999159,
+            "p1": 0.0,
+            "p5": 0.0,
+            "p10": 0.0,
+            "p25": 0.0,
+            "p50": 0.0,
+            "p75": 1.0,
+            "p90": 1.6,
+            "p95": 1.7999999999999998,
+            "p99": 1.96
+          }
+        },
+        {
+          "endpoint_url": "http://10.42.0.3:8081/metrics",
+          "labels": {
+            "dp_rank": "1",
+            "dynamo_component": "backend",
+            "dynamo_endpoint": "generate",
+            "dynamo_namespace": "cb-h200-001-3f9a1c2b7d4e",
+            "engine_type": "unified",
+            "model": "glm-5.3",
+            "model_name": "glm-5.3",
+            "pp_rank": "0",
+            "tp_rank": "0"
+          },
+          "stats": {
+            "avg": 0.6,
+            "min": 0.0,
+            "max": 3.0,
+            "std": 1.3416407864998738,
+            "p1": 0.0,
+            "p5": 0.0,
+            "p10": 0.0,
+            "p25": 0.0,
+            "p50": 0.0,
+            "p75": 0.0,
+            "p90": 1.8000000000000003,
+            "p95": 2.3999999999999995,
+            "p99": 2.88
+          }
+        }
+      ]
+    },
+    "sglang:num_running_reqs": {
+      "type": "gauge",
+      "description": "Current value of sglang:num_running_reqs",
+      "series": [
+        {
+          "endpoint_url": "http://10.42.0.1:8081/metrics",
+          "labels": {
+            "dynamo_component": "prefill",
+            "dynamo_endpoint": "generate",
+            "dynamo_namespace": "cb-h200-001-3f9a1c2b7d4e",
+            "engine_type": "unified",
+            "model": "glm-5.3",
+            "model_name": "glm-5.3",
+            "pp_rank": "0",
+            "tp_rank": "0"
+          },
+          "stats": {
+            "avg": 2.6,
+            "min": 2.0,
+            "max": 3.0,
+            "std": 0.5477225575051661,
+            "p1": 2.0,
+            "p5": 2.0,
+            "p10": 2.0,
+            "p25": 2.0,
+            "p50": 3.0,
+            "p75": 3.0,
+            "p90": 3.0,
+            "p95": 3.0,
+            "p99": 3.0
+          }
+        },
+        {
+          "endpoint_url": "http://10.42.0.2:8081/metrics",
+          "labels": {
+            "dynamo_component": "prefill",
+            "dynamo_endpoint": "generate",
+            "dynamo_namespace": "cb-h200-001-3f9a1c2b7d4e",
+            "engine_type": "unified",
+            "model": "glm-5.3",
+            "model_name": "glm-5.3",
+            "pp_rank": "0",
+            "tp_rank": "0"
+          },
+          "stats": {
+            "avg": 2.6,
+            "min": 2.0,
+            "max": 3.0,
+            "std": 0.5477225575051661,
+            "p1": 2.0,
+            "p5": 2.0,
+            "p10": 2.0,
+            "p25": 2.0,
+            "p50": 3.0,
+            "p75": 3.0,
+            "p90": 3.0,
+            "p95": 3.0,
+            "p99": 3.0
+          }
+        },
+        {
+          "endpoint_url": "http://10.42.0.3:8081/metrics",
+          "labels": {
+            "dp_rank": "0",
+            "dynamo_component": "backend",
+            "dynamo_endpoint": "generate",
+            "dynamo_namespace": "cb-h200-001-3f9a1c2b7d4e",
+            "engine_type": "unified",
+            "model": "glm-5.3",
+            "model_name": "glm-5.3",
+            "pp_rank": "0",
+            "tp_rank": "0"
+          },
+          "stats": {
+            "avg": 121.4,
+            "min": 118.0,
+            "max": 125.0,
+            "std": 3.049590136395381,
+            "p1": 118.04,
+            "p5": 118.2,
+            "p10": 118.4,
+            "p25": 119.0,
+            "p50": 121.0,
+            "p75": 124.0,
+            "p90": 124.6,
+            "p95": 124.8,
+            "p99": 124.96
+          }
+        },
+        {
+          "endpoint_url": "http://10.42.0.3:8081/metrics",
+          "labels": {
+            "dp_rank": "0",
+            "dynamo_component": "backend",
+            "dynamo_endpoint": "generate",
+            "dynamo_namespace": "cb-h200-001-3f9a1c2b7d4e",
+            "engine_type": "unified",
+            "model": "glm-5.3",
+            "model_name": "glm-5.3",
+            "pp_rank": "0",
+            "tp_rank": "1"
+          },
+          "stats": {
+            "avg": 121.4,
+            "min": 118.0,
+            "max": 125.0,
+            "std": 3.049590136395381,
+            "p1": 118.04,
+            "p5": 118.2,
+            "p10": 118.4,
+            "p25": 119.0,
+            "p50": 121.0,
+            "p75": 124.0,
+            "p90": 124.6,
+            "p95": 124.8,
+            "p99": 124.96
+          }
+        },
+        {
+          "endpoint_url": "http://10.42.0.3:8081/metrics",
+          "labels": {
+            "dp_rank": "1",
+            "dynamo_component": "backend",
+            "dynamo_endpoint": "generate",
+            "dynamo_namespace": "cb-h200-001-3f9a1c2b7d4e",
+            "engine_type": "unified",
+            "model": "glm-5.3",
+            "model_name": "glm-5.3",
+            "pp_rank": "0",
+            "tp_rank": "0"
+          },
+          "stats": {
+            "avg": 120.8,
+            "min": 117.0,
+            "max": 124.0,
+            "std": 2.588435821108957,
+            "p1": 117.12,
+            "p5": 117.6,
+            "p10": 118.2,
+            "p25": 120.0,
+            "p50": 121.0,
+            "p75": 122.0,
+            "p90": 123.2,
+            "p95": 123.6,
+            "p99": 123.92
+          }
+        }
+      ]
+    },
+    "sglang:num_used_tokens": {
+      "type": "gauge",
+      "description": "Current value of sglang:num_used_tokens",
+      "series": [
+        {
+          "endpoint_url": "http://10.42.0.1:8081/metrics",
+          "labels": {
+            "dynamo_component": "prefill",
+            "dynamo_endpoint": "generate",
+            "dynamo_namespace": "cb-h200-001-3f9a1c2b7d4e",
+            "engine_type": "unified",
+            "model": "glm-5.3",
+            "model_name": "glm-5.3",
+            "pp_rank": "0",
+            "tp_rank": "0"
+          },
+          "stats": {
+            "avg": 358700.0,
+            "min": 301000.0,
+            "max": 402000.0,
+            "std": 38564.23213289745,
+            "p1": 302720.0,
+            "p5": 309600.0,
+            "p10": 318200.0,
+            "p25": 344000.0,
+            "p50": 366000.0,
+            "p75": 380500.0,
+            "p90": 393400.0,
+            "p95": 397700.0,
+            "p99": 401140.0
+          }
+        },
+        {
+          "endpoint_url": "http://10.42.0.2:8081/metrics",
+          "labels": {
+            "dynamo_component": "prefill",
+            "dynamo_endpoint": "generate",
+            "dynamo_namespace": "cb-h200-001-3f9a1c2b7d4e",
+            "engine_type": "unified",
+            "model": "glm-5.3",
+            "model_name": "glm-5.3",
+            "pp_rank": "0",
+            "tp_rank": "0"
+          },
+          "stats": {
+            "avg": 358700.0,
+            "min": 301000.0,
+            "max": 402000.0,
+            "std": 38564.23213289745,
+            "p1": 302720.0,
+            "p5": 309600.0,
+            "p10": 318200.0,
+            "p25": 344000.0,
+            "p50": 366000.0,
+            "p75": 380500.0,
+            "p90": 393400.0,
+            "p95": 397700.0,
+            "p99": 401140.0
+          }
+        },
+        {
+          "endpoint_url": "http://10.42.0.3:8081/metrics",
+          "labels": {
+            "dp_rank": "0",
+            "dynamo_component": "backend",
+            "dynamo_endpoint": "generate",
+            "dynamo_namespace": "cb-h200-001-3f9a1c2b7d4e",
+            "engine_type": "unified",
+            "model": "glm-5.3",
+            "model_name": "glm-5.3",
+            "pp_rank": "0",
+            "tp_rank": "0"
+          },
+          "stats": {
+            "avg": 700400.0,
+            "min": 680000.0,
+            "max": 716000.0,
+            "std": 13831.124321616086,
+            "p1": 680600.0,
+            "p5": 683000.0,
+            "p10": 686000.0,
+            "p25": 695000.0,
+            "p50": 702000.0,
+            "p75": 709000.0,
+            "p90": 713200.0,
+            "p95": 714600.0,
+            "p99": 715720.0
+          }
+        },
+        {
+          "endpoint_url": "http://10.42.0.3:8081/metrics",
+          "labels": {
+            "dp_rank": "1",
+            "dynamo_component": "backend",
+            "dynamo_endpoint": "generate",
+            "dynamo_namespace": "cb-h200-001-3f9a1c2b7d4e",
+            "engine_type": "unified",
+            "model": "glm-5.3",
+            "model_name": "glm-5.3",
+            "pp_rank": "0",
+            "tp_rank": "0"
+          },
+          "stats": {
+            "avg": 699200.0,
+            "min": 673000.0,
+            "max": 724000.0,
+            "std": 18267.45740380965,
+            "p1": 673880.0,
+            "p5": 677400.0,
+            "p10": 681800.0,
+            "p25": 695000.0,
+            "p50": 702000.0,
+            "p75": 702000.0,
+            "p90": 715200.0,
+            "p95": 719600.0,
+            "p99": 723120.0
+          }
+        }
+      ]
+    },
+    "sglang:per_stage_req_latency_seconds": {
+      "type": "histogram",
+      "description": "Distribution of sglang:per_stage_req_latency_seconds",
+      "series": [
+        {
+          "endpoint_url": "http://10.42.0.1:8081/metrics",
+          "labels": {
+            "stage": "decode_forward"
+          },
+          "stats": {
+            "count": 2101,
+            "sum": 5042.4000000000015,
+            "avg": 2.400000000000001,
+            "count_rate": 3.4999167083125107,
+            "sum_rate": 8.399800099950028,
+            "p1_estimate": 0.002000952380952381,
+            "p5_estimate": 0.010005357142857144,
+            "p10_estimate": 0.02126071428571429,
+            "p25_estimate": 0.05502678571428572,
+            "p50_estimate": 0.20036997885835095,
+            "p75_estimate": 0.7000792811839324,
+            "p90_estimate": 0.9999048625792812,
+            "p95_estimate": 5.497857142857135,
+            "p99_estimate": 9.09957142857142
+          },
+          "buckets": {
+            "0.01": 105,
+            "0.1": 945,
+            "1.0": 1891,
+            "10.0": 2101,
+            "+Inf": 2101
+          }
+        },
+        {
+          "endpoint_url": "http://10.42.0.1:8081/metrics",
+          "labels": {
+            "stage": "prefill_bootstrap"
+          },
+          "stats": {
+            "count": 1501,
+            "sum": 2101.399999999998,
+            "avg": 1.3999999999999986,
+            "count_rate": 2.500416458437448,
+            "sum_rate": 3.500583041812424,
+            "p1_estimate": 0.0020013333333333337,
+            "p5_estimate": 0.010007499999999999,
+            "p10_estimate": 0.021265,
+            "p25_estimate": 0.05503750000000001,
+            "p50_estimate": 0.20051775147928996,
+            "p75_estimate": 0.7001109467455622,
+            "p90_estimate": 0.9998668639053255,
+            "p95_estimate": 5.4970000000000026,
+            "p99_estimate": 9.099400000000001
+          },
+          "buckets": {
+            "0.01": 75,
+            "0.1": 675,
+            "1.0": 1351,
+            "10.0": 1501,
+            "+Inf": 1501
+          }
+        },
+        {
+          "endpoint_url": "http://10.42.0.1:8081/metrics",
+          "labels": {
+            "stage": "prefill_forward"
+          },
+          "stats": {
+            "count": 900,
+            "sum": 360.0,
+            "avg": 0.4,
+            "count_rate": 1.4992503748125938,
+            "sum_rate": 0.5997001499250375,
+            "p1_estimate": 0.002,
+            "p5_estimate": 0.01,
+            "p10_estimate": 0.02125,
+            "p25_estimate": 0.05500000000000001,
+            "p50_estimate": 0.2,
+            "p75_estimate": 0.7,
+            "p90_estimate": 1.0,
+            "p95_estimate": 5.5,
+            "p99_estimate": 9.1
+          },
+          "buckets": {
+            "0.01": 45,
+            "0.1": 405,
+            "1.0": 810,
+            "10.0": 900,
+            "+Inf": 900
+          }
+        },
+        {
+          "endpoint_url": "http://10.42.0.2:8081/metrics",
+          "labels": {
+            "stage": "decode_forward"
+          },
+          "stats": {
+            "count": 2101,
+            "sum": 5042.4000000000015,
+            "avg": 2.400000000000001,
+            "count_rate": 3.4999167083125107,
+            "sum_rate": 8.399800099950028,
+            "p1_estimate": 0.002000952380952381,
+            "p5_estimate": 0.010005357142857144,
+            "p10_estimate": 0.02126071428571429,
+            "p25_estimate": 0.05502678571428572,
+            "p50_estimate": 0.20036997885835095,
+            "p75_estimate": 0.7000792811839324,
+            "p90_estimate": 0.9999048625792812,
+            "p95_estimate": 5.497857142857135,
+            "p99_estimate": 9.09957142857142
+          },
+          "buckets": {
+            "0.01": 105,
+            "0.1": 945,
+            "1.0": 1891,
+            "10.0": 2101,
+            "+Inf": 2101
+          }
+        },
+        {
+          "endpoint_url": "http://10.42.0.2:8081/metrics",
+          "labels": {
+            "stage": "prefill_bootstrap"
+          },
+          "stats": {
+            "count": 1501,
+            "sum": 2101.399999999998,
+            "avg": 1.3999999999999986,
+            "count_rate": 2.500416458437448,
+            "sum_rate": 3.500583041812424,
+            "p1_estimate": 0.0020013333333333337,
+            "p5_estimate": 0.010007499999999999,
+            "p10_estimate": 0.021265,
+            "p25_estimate": 0.05503750000000001,
+            "p50_estimate": 0.20051775147928996,
+            "p75_estimate": 0.7001109467455622,
+            "p90_estimate": 0.9998668639053255,
+            "p95_estimate": 5.4970000000000026,
+            "p99_estimate": 9.099400000000001
+          },
+          "buckets": {
+            "0.01": 75,
+            "0.1": 675,
+            "1.0": 1351,
+            "10.0": 1501,
+            "+Inf": 1501
+          }
+        },
+        {
+          "endpoint_url": "http://10.42.0.2:8081/metrics",
+          "labels": {
+            "stage": "prefill_forward"
+          },
+          "stats": {
+            "count": 900,
+            "sum": 360.0,
+            "avg": 0.4,
+            "count_rate": 1.4992503748125938,
+            "sum_rate": 0.5997001499250375,
+            "p1_estimate": 0.002,
+            "p5_estimate": 0.01,
+            "p10_estimate": 0.02125,
+            "p25_estimate": 0.05500000000000001,
+            "p50_estimate": 0.2,
+            "p75_estimate": 0.7,
+            "p90_estimate": 1.0,
+            "p95_estimate": 5.5,
+            "p99_estimate": 9.1
+          },
+          "buckets": {
+            "0.01": 45,
+            "0.1": 405,
+            "1.0": 810,
+            "10.0": 900,
+            "+Inf": 900
+          }
+        }
+      ],
+      "unit": "seconds"
+    },
+    "sglang:prompt_tokens": {
+      "type": "counter",
+      "description": "Total count of sglang:prompt_tokens",
+      "series": [
+        {
+          "endpoint_url": "http://10.42.0.1:8081/metrics",
+          "labels": {
+            "model": "glm-5.3"
+          },
+          "stats": {
+            "total": 36618300.0,
+            "rate": 61000.00000000001
+          }
+        },
+        {
+          "endpoint_url": "http://10.42.0.2:8081/metrics",
+          "labels": {
+            "model": "glm-5.3"
+          },
+          "stats": {
+            "total": 38449215.0,
+            "rate": 64050.00000000001
+          }
+        }
+      ]
+    },
+    "sglang:queue_time_seconds": {
+      "type": "histogram",
+      "description": "Distribution of sglang:queue_time_seconds",
+      "series": [
+        {
+          "endpoint_url": "http://10.42.0.1:8081/metrics",
+          "labels": {
+            "model": "glm-5.3"
+          },
+          "stats": {
+            "count": 1140,
+            "sum": 353.39999999999964,
+            "avg": 0.30999999999999966,
+            "count_rate": 1.899050474762619,
+            "sum_rate": 0.5887056471764113,
+            "p1_estimate": 0.0033333333333333335,
+            "p5_estimate": 0.016666666666666666,
+            "p10_estimate": 0.03333333333333333,
+            "p25_estimate": 0.08333333333333333,
+            "p50_estimate": 0.21999999999999997,
+            "p75_estimate": 0.5,
+            "p90_estimate": 1.3626373626373627,
+            "p95_estimate": 2.302197802197802,
+            "p99_estimate": 5.249999999999962
+          },
+          "buckets": {
+            "0.1": 342,
+            "0.25": 627,
+            "0.5": 855,
+            "1.0": 1004,
+            "2.5": 1095,
+            "5.0": 1128,
+            "10.0": 1140,
+            "20.0": 1140,
+            "40.0": 1140,
+            "+Inf": 1140
+          }
+        },
+        {
+          "endpoint_url": "http://10.42.0.2:8081/metrics",
+          "labels": {
+            "model": "glm-5.3"
+          },
+          "stats": {
+            "count": 1198,
+            "sum": 371.3800000000001,
+            "avg": 0.3100000000000001,
+            "count_rate": 1.9956688322505416,
+            "sum_rate": 0.6186573379976681,
+            "p1_estimate": 0.0033370473537604464,
+            "p5_estimate": 0.016685236768802233,
+            "p10_estimate": 0.033370473537604466,
+            "p25_estimate": 0.08342618384401115,
+            "p50_estimate": 0.22,
+            "p75_estimate": 0.5016025641025641,
+            "p90_estimate": 1.3781250000000007,
+            "p95_estimate": 2.3140624999999986,
+            "p99_estimate": 5.008333333333326
+          },
+          "buckets": {
+            "0.1": 359,
+            "0.25": 659,
+            "0.5": 898,
+            "1.0": 1054,
+            "2.5": 1150,
+            "5.0": 1186,
+            "10.0": 1198,
+            "20.0": 1198,
+            "40.0": 1198,
+            "+Inf": 1198
+          }
+        }
+      ],
+      "unit": "seconds"
+    },
+    "sglang:spec_accept_length": {
+      "type": "gauge",
+      "description": "Current value of sglang:spec_accept_length",
+      "series": [
+        {
+          "endpoint_url": "http://10.42.0.3:8081/metrics",
+          "labels": {
+            "dp_rank": "0",
+            "dynamo_component": "backend",
+            "dynamo_endpoint": "generate",
+            "dynamo_namespace": "cb-h200-001-3f9a1c2b7d4e",
+            "engine_type": "unified",
+            "model": "glm-5.3",
+            "model_name": "glm-5.3",
+            "pp_rank": "0",
+            "tp_rank": "0"
+          },
+          "stats": {
+            "avg": 2.722,
+            "min": 2.69,
+            "max": 2.75,
+            "std": 0.023874672772626702,
+            "p1": 2.6908,
+            "p5": 2.694,
+            "p10": 2.698,
+            "p25": 2.71,
+            "p50": 2.72,
+            "p75": 2.74,
+            "p90": 2.746,
+            "p95": 2.748,
+            "p99": 2.7496
+          }
+        },
+        {
+          "endpoint_url": "http://10.42.0.3:8081/metrics",
+          "labels": {
+            "dp_rank": "1",
+            "dynamo_component": "backend",
+            "dynamo_endpoint": "generate",
+            "dynamo_namespace": "cb-h200-001-3f9a1c2b7d4e",
+            "engine_type": "unified",
+            "model": "glm-5.3",
+            "model_name": "glm-5.3",
+            "pp_rank": "0",
+            "tp_rank": "0"
+          },
+          "stats": {
+            "avg": 2.714,
+            "min": 2.7,
+            "max": 2.74,
+            "std": 0.01673320053068154,
+            "p1": 2.7,
+            "p5": 2.7,
+            "p10": 2.7,
+            "p25": 2.7,
+            "p50": 2.71,
+            "p75": 2.72,
+            "p90": 2.732,
+            "p95": 2.736,
+            "p99": 2.7392000000000003
+          }
+        }
+      ]
+    },
+    "sglang:spec_verify_calls": {
+      "type": "counter",
+      "description": "Total count of sglang:spec_verify_calls",
+      "series": [
+        {
+          "endpoint_url": "http://10.42.0.3:8081/metrics",
+          "labels": {
+            "model": "glm-5.3"
+          },
+          "stats": {
+            "total": 996498.0,
+            "rate": 1660.0000000000002
+          }
+        }
+      ]
+    },
+    "sglang:time_to_first_token_seconds": {
+      "type": "histogram",
+      "description": "Distribution of sglang:time_to_first_token_seconds",
+      "series": [
+        {
+          "endpoint_url": "http://10.42.0.1:8081/metrics",
+          "labels": {
+            "model": "glm-5.3"
+          },
+          "stats": {
+            "count": 1140,
+            "sum": 2964.0,
+            "avg": 2.6,
+            "count_rate": 1.899050474762619,
+            "sum_rate": 4.937531234382809,
+            "p1_estimate": 0.17434782608695654,
+            "p5_estimate": 0.3325242718446602,
+            "p10_estimate": 0.470873786407767,
+            "p25_estimate": 0.8180000000000001,
+            "p50_estimate": 1.8220338983050848,
+            "p75_estimate": 3.8075313807531384,
+            "p90_estimate": 7.5,
+            "p95_estimate": 10.0,
+            "p99_estimate": 20.999999999999847
+          },
+          "buckets": {
+            "0.1": 0,
+            "0.25": 23,
+            "0.5": 126,
+            "1.0": 376,
+            "2.5": 730,
+            "5.0": 969,
+            "10.0": 1083,
+            "20.0": 1128,
+            "40.0": 1140,
+            "+Inf": 1140
+          }
+        },
+        {
+          "endpoint_url": "http://10.42.0.2:8081/metrics",
+          "labels": {
+            "model": "glm-5.3"
+          },
+          "stats": {
+            "count": 1198,
+            "sum": 3114.7999999999993,
+            "avg": 2.599999999999999,
+            "count_rate": 1.9956688322505416,
+            "sum_rate": 5.1887389638514065,
+            "p1_estimate": 0.174875,
+            "p5_estimate": 0.33310185185185187,
+            "p10_estimate": 0.4717592592592593,
+            "p25_estimate": 0.8184410646387832,
+            "p50_estimate": 1.8247978436657681,
+            "p75_estimate": 3.814484126984127,
+            "p90_estimate": 7.508333333333335,
+            "p95_estimate": 10.020833333333314,
+            "p99_estimate": 20.033333333333303
+          },
+          "buckets": {
+            "0.1": 0,
+            "0.25": 24,
+            "0.5": 132,
+            "1.0": 395,
+            "2.5": 766,
+            "5.0": 1018,
+            "10.0": 1138,
+            "20.0": 1186,
+            "40.0": 1198,
+            "+Inf": 1198
+          }
+        }
+      ],
+      "unit": "seconds"
+    },
+    "sglang:token_usage": {
+      "type": "gauge",
+      "description": "Current value of sglang:token_usage",
+      "series": [
+        {
+          "endpoint_url": "http://10.42.0.1:8081/metrics",
+          "labels": {
+            "dynamo_component": "prefill",
+            "dynamo_endpoint": "generate",
+            "dynamo_namespace": "cb-h200-001-3f9a1c2b7d4e",
+            "engine_type": "unified",
+            "model": "glm-5.3",
+            "model_name": "glm-5.3",
+            "pp_rank": "0",
+            "tp_rank": "0"
+          },
+          "stats": {
+            "avg": 0.49000000000000005,
+            "min": 0.41,
+            "max": 0.55,
+            "std": 0.05338539126015659,
+            "p1": 0.4124,
+            "p5": 0.422,
+            "p10": 0.434,
+            "p25": 0.47,
+            "p50": 0.5,
+            "p75": 0.52,
+            "p90": 0.538,
+            "p95": 0.544,
+            "p99": 0.5488000000000001
+          }
+        },
+        {
+          "endpoint_url": "http://10.42.0.2:8081/metrics",
+          "labels": {
+            "dynamo_component": "prefill",
+            "dynamo_endpoint": "generate",
+            "dynamo_namespace": "cb-h200-001-3f9a1c2b7d4e",
+            "engine_type": "unified",
+            "model": "glm-5.3",
+            "model_name": "glm-5.3",
+            "pp_rank": "0",
+            "tp_rank": "0"
+          },
+          "stats": {
+            "avg": 0.49000000000000005,
+            "min": 0.41,
+            "max": 0.55,
+            "std": 0.05338539126015659,
+            "p1": 0.4124,
+            "p5": 0.422,
+            "p10": 0.434,
+            "p25": 0.47,
+            "p50": 0.5,
+            "p75": 0.52,
+            "p90": 0.538,
+            "p95": 0.544,
+            "p99": 0.5488000000000001
+          }
+        },
+        {
+          "endpoint_url": "http://10.42.0.3:8081/metrics",
+          "labels": {
+            "dp_rank": "0",
+            "dynamo_component": "backend",
+            "dynamo_endpoint": "generate",
+            "dynamo_namespace": "cb-h200-001-3f9a1c2b7d4e",
+            "engine_type": "unified",
+            "model": "glm-5.3",
+            "model_name": "glm-5.3",
+            "pp_rank": "0",
+            "tp_rank": "0"
+          },
+          "stats": {
+            "avg": 0.958,
+            "min": 0.93,
+            "max": 0.98,
+            "std": 0.019235384061671322,
+            "p1": 0.9308000000000001,
+            "p5": 0.934,
+            "p10": 0.9380000000000001,
+            "p25": 0.95,
+            "p50": 0.96,
+            "p75": 0.97,
+            "p90": 0.976,
+            "p95": 0.978,
+            "p99": 0.9796
+          }
+        },
+        {
+          "endpoint_url": "http://10.42.0.3:8081/metrics",
+          "labels": {
+            "dp_rank": "1",
+            "dynamo_component": "backend",
+            "dynamo_endpoint": "generate",
+            "dynamo_namespace": "cb-h200-001-3f9a1c2b7d4e",
+            "engine_type": "unified",
+            "model": "glm-5.3",
+            "model_name": "glm-5.3",
+            "pp_rank": "0",
+            "tp_rank": "0"
+          },
+          "stats": {
+            "avg": 0.9560000000000001,
+            "min": 0.92,
+            "max": 0.99,
+            "std": 0.025099800796022247,
+            "p1": 0.9212,
+            "p5": 0.926,
+            "p10": 0.932,
+            "p25": 0.95,
+            "p50": 0.96,
+            "p75": 0.96,
+            "p90": 0.978,
+            "p95": 0.984,
+            "p99": 0.9888
+          }
+        }
+      ]
+    }
+  },
+  "input_config": {
+    "endpoint": {
+      "model_names": [
+        "glm-5.3"
+      ],
+      "streaming": true,
+      "urls": [
+        "http://127.0.0.1:8000"
+      ]
+    },
+    "loadgen": {
+      "concurrency": 256,
+      "benchmark_duration": 600.0
+    },
+    "server_metrics": {
+      "urls": [
+        "http://10.42.0.1:8000/metrics",
+        "http://10.42.0.1:8081/metrics",
+        "http://10.42.0.2:8081/metrics",
+        "http://10.42.0.3:8081/metrics"
+      ],
+      "formats": [
+        "json",
+        "jsonl"
+      ]
+    }
+  }
+}

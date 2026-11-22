@@ -1,0 +1,15 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+# Node info: DR path slid 0; dlid 0; 0,1
+BaseVers:........................1
+ClassVers:.......................1
+NodeType:........................Switch
+NumPorts:........................64
+SystemGuid:......................0xfc6a1c0300e7a1b0
+Guid:............................0xfc6a1c0300e7a1b0
+PortGuid:........................0xfc6a1c0300e7a1b0
+PartCap:.........................8
+DevId:...........................0xd2f2
+Revision:........................0x000000a1
+LocalPort:.......................17
+VendorId:........................0x0002c9

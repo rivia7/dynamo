@@ -1,0 +1,117 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+#
+# GLM-5.3 (FP8) topology families, written for 4 nodes x 8 H200 (instance counts
+# scale to 2/8 nodes; ids/titles are templates). Served context is
+# raised from the recipe's 250000 to 262144: AIPerf --max-context-length drops
+# every trace whose recorded peak exceeds the ceiling, and the 256K Claude Code
+# corpus peaks just under 256,000 tokens.
+gpu: h200
+model: glm-5.3
+served_context: 262144
+default_grid: {start: 64, max: 512, min: 8}
+
+families:
+  - id: agg-tp8
+    title: "聚合 TP8/EP8 x{agg}（配方基线）"
+    priority: 0
+    roles:
+      - role: agg
+        gpus_per_instance: 8
+        instances: 4
+        base: {path: recipes/glm-5.3/sglang/agg-h200-agentic/deploy.yaml, key: agg.yaml}
+        extra_args: [--dsa-prefill-backend, flashmla_kv]
+    notes: Recipe baseline (one replica per node). No cross-node data-plane traffic.
+
+  - id: pd-{prefill}p{decode}d
+    title: "PD 分离 {prefill}P(TP8/EP8) + {decode}D(TP8/DP8)"
+    priority: 10
+    group: pd-ratio
+    transport: mooncake
+    cross_node: [kv]
+    roles:
+      - role: prefill
+        gpus_per_instance: 8
+        instances: 2
+        base: {path: recipes/glm-5.3/sglang/disagg-h200-agentic/deploy.yaml, key: prefill.yaml}
+        extra_args: [--dsa-prefill-backend, flashmla_kv, --cuda-graph-backend-prefill, disabled]
+        env: {MC_FORCE_HCA: "1"}
+      - role: decode
+        gpus_per_instance: 8
+        instances: 2
+        base: {path: recipes/glm-5.3/sglang/disagg-h200-agentic/deploy.yaml, key: decode.yaml}
+        extra_args: [--dsa-prefill-backend, flashmla_kv, --dsa-decode-backend, flashmla_kv]
+        env: {MC_FORCE_HCA: "1", SGLANG_DISAGGREGATION_WAITING_TIMEOUT: "3600"}
+    notes: The recipe 1P1D doubled; prefill and decode on different nodes.
+
+  - id: pd-{prefill}p{decode}d
+    title: "PD 分离 {prefill}P + {decode}D"
+    priority: 11
+    group: pd-ratio
+    transport: mooncake
+    cross_node: [kv]
+    roles:
+      - role: prefill
+        gpus_per_instance: 8
+        instances: 1
+        base: {path: recipes/glm-5.3/sglang/disagg-h200-agentic/deploy.yaml, key: prefill.yaml}
+        extra_args: [--dsa-prefill-backend, flashmla_kv, --cuda-graph-backend-prefill, disabled]
+        env: {MC_FORCE_HCA: "1"}
+      - role: decode
+        gpus_per_instance: 8
+        instances: 3
+        base: {path: recipes/glm-5.3/sglang/disagg-h200-agentic/deploy.yaml, key: decode.yaml}
+        extra_args: [--dsa-prefill-backend, flashmla_kv, --dsa-decode-backend, flashmla_kv]
+        env: {MC_FORCE_HCA: "1", SGLANG_DISAGGREGATION_WAITING_TIMEOUT: "3600"}
+    notes: Decode-heavy; the ~90% prefix reuse of agentic traffic keeps prefill light.
+
+  - id: pd-{prefill}p{decode}d
+    title: "PD 分离 {prefill}P + {decode}D"
+    priority: 12
+    group: pd-ratio
+    transport: mooncake
+    cross_node: [kv]
+    roles:
+      - role: prefill
+        gpus_per_instance: 8
+        instances: 3
+        base: {path: recipes/glm-5.3/sglang/disagg-h200-agentic/deploy.yaml, key: prefill.yaml}
+        extra_args: [--dsa-prefill-backend, flashmla_kv, --cuda-graph-backend-prefill, disabled]
+        env: {MC_FORCE_HCA: "1"}
+      - role: decode
+        gpus_per_instance: 8
+        instances: 1
+        base: {path: recipes/glm-5.3/sglang/disagg-h200-agentic/deploy.yaml, key: decode.yaml}
+        extra_args: [--dsa-prefill-backend, flashmla_kv, --dsa-decode-backend, flashmla_kv]
+        env: {MC_FORCE_HCA: "1", SGLANG_DISAGGREGATION_WAITING_TIMEOUT: "3600"}
+    notes: Prefill-heavy; chosen when 2P2D shows high TTFT with idle decode.
+
+  - id: agg-dp8
+    title: "聚合 TP8/DP8（attention DP）x{agg}"
+    priority: 20
+    roles:
+      - role: agg
+        gpus_per_instance: 8
+        instances: 4
+        base: {path: recipes/glm-5.3/sglang/disagg-h200-agentic/deploy.yaml, key: decode.yaml}
+        sglang:
+          disaggregation-mode: null
+          disaggregation-transfer-backend: null
+          disaggregation-bootstrap-port: null
+          kv-events-config: {publisher: zmq, topic: kv-events, endpoint: "tcp://*:5557"}
+          model-loader-extra-config: {enable_multithread_load: true, num_threads: 32}
+        extra_args: [--dsa-prefill-backend, flashmla_kv, --dsa-decode-backend, flashmla_kv]
+    notes: Derived (not a recipe) - the decode recipe run aggregated; DP attention shards KV per rank.
+
+ladder:
+  - id: oom-mem-0.03
+    when: oom
+    mem_fraction_delta: -0.03
+    halve_cuda_graph_bs: true
+  - id: kernel-no-spec
+    when: kernel_unsupported
+    sglang:
+      speculative-algorithm: null
+      speculative-num-steps: null
+      speculative-eagle-topk: null
+      speculative-num-draft-tokens: null

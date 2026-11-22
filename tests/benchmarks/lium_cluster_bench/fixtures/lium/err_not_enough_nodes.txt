@@ -1,0 +1,3 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+{"error": {"code": "not_enough_nodes", "exit_code": 1, "hint": "Run 'lium clusters' for the free-node count per fabric, then lower --nodes or pick another fabric", "message": "Only 5 of 8 nodes on fabric ib-sjc1-b200-a7f3 are free; 6 requested"}, "ok": false}

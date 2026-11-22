@@ -1,0 +1,3 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+Node Description:......MF0;ib-spine-01:MQM9700/U1

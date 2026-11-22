@@ -1,0 +1,1540 @@
+{
+ "nodes": [
+  {
+   "name": "node0",
+   "hostname": "lium-rtx6000-00",
+   "address": "10.42.0.1",
+   "control_interface": "wg0",
+   "gpus": [
+    {
+     "index": 0,
+     "name": "NVIDIA RTX PRO 6000 Blackwell Server Edition",
+     "uuid": "GPU-00088bc9-e6b3-e0cf-5ddb-cc71ca9e525b",
+     "pci_bus_id": "0000:43:00.0",
+     "memory_mib": 97887,
+     "numa_node": 0,
+     "compute_cap": "12.0",
+     "pcie_gen_max": 5,
+     "pcie_width_max": 16
+    },
+    {
+     "index": 1,
+     "name": "NVIDIA RTX PRO 6000 Blackwell Server Edition",
+     "uuid": "GPU-ddeb4ee1-972d-a000-6a39-bd875d3227fd",
+     "pci_bus_id": "0000:44:00.0",
+     "memory_mib": 97887,
+     "numa_node": 0,
+     "compute_cap": "12.0",
+     "pcie_gen_max": 5,
+     "pcie_width_max": 16
+    },
+    {
+     "index": 2,
+     "name": "NVIDIA RTX PRO 6000 Blackwell Server Edition",
+     "uuid": "GPU-c36f4912-c5d2-ffec-4d84-68826e631b72",
+     "pci_bus_id": "0000:63:00.0",
+     "memory_mib": 97887,
+     "numa_node": 0,
+     "compute_cap": "12.0",
+     "pcie_gen_max": 5,
+     "pcie_width_max": 16
+    },
+    {
+     "index": 3,
+     "name": "NVIDIA RTX PRO 6000 Blackwell Server Edition",
+     "uuid": "GPU-3c30e3cd-9e94-1670-338d-b3ca90db302c",
+     "pci_bus_id": "0000:64:00.0",
+     "memory_mib": 97887,
+     "numa_node": 0,
+     "compute_cap": "12.0",
+     "pcie_gen_max": 5,
+     "pcie_width_max": 16
+    },
+    {
+     "index": 4,
+     "name": "NVIDIA RTX PRO 6000 Blackwell Server Edition",
+     "uuid": "GPU-640a1c6a-2393-a630-82df-d8c794e2945a",
+     "pci_bus_id": "0000:c3:00.0",
+     "memory_mib": 97887,
+     "numa_node": 1,
+     "compute_cap": "12.0",
+     "pcie_gen_max": 5,
+     "pcie_width_max": 16
+    },
+    {
+     "index": 5,
+     "name": "NVIDIA RTX PRO 6000 Blackwell Server Edition",
+     "uuid": "GPU-b2936eb8-4f55-f0b2-358b-1c0274c78f51",
+     "pci_bus_id": "0000:c4:00.0",
+     "memory_mib": 97887,
+     "numa_node": 1,
+     "compute_cap": "12.0",
+     "pcie_gen_max": 5,
+     "pcie_width_max": 16
+    },
+    {
+     "index": 6,
+     "name": "NVIDIA RTX PRO 6000 Blackwell Server Edition",
+     "uuid": "GPU-c32e4996-c829-7b35-4fd3-205a5db09588",
+     "pci_bus_id": "0000:e3:00.0",
+     "memory_mib": 97887,
+     "numa_node": 1,
+     "compute_cap": "12.0",
+     "pcie_gen_max": 5,
+     "pcie_width_max": 16
+    },
+    {
+     "index": 7,
+     "name": "NVIDIA RTX PRO 6000 Blackwell Server Edition",
+     "uuid": "GPU-f39334c6-9302-b9b5-8242-e3f9a6347622",
+     "pci_bus_id": "0000:e4:00.0",
+     "memory_mib": 97887,
+     "numa_node": 1,
+     "compute_cap": "12.0",
+     "pcie_gen_max": 5,
+     "pcie_width_max": 16
+    }
+   ],
+   "hcas": [
+    {
+     "name": "mlx5_0",
+     "pci_bus_id": "0000:47:00.0",
+     "numa_node": 0,
+     "netdev": "enp71s0np0",
+     "board_id": "MT_0000000879",
+     "fw_ver": "28.42.1000",
+     "ports": [
+      {
+       "port": 1,
+       "state": "4: ACTIVE",
+       "rate": "400 Gb/sec (4X NDR)",
+       "rate_gbps": 400.0,
+       "link_layer": "Ethernet"
+      }
+     ]
+    },
+    {
+     "name": "mlx5_1",
+     "pci_bus_id": "0000:67:00.0",
+     "numa_node": 0,
+     "netdev": "enp103s0np0",
+     "board_id": "MT_0000000879",
+     "fw_ver": "28.42.1000",
+     "ports": [
+      {
+       "port": 1,
+       "state": "4: ACTIVE",
+       "rate": "400 Gb/sec (4X NDR)",
+       "rate_gbps": 400.0,
+       "link_layer": "Ethernet"
+      }
+     ]
+    },
+    {
+     "name": "mlx5_2",
+     "pci_bus_id": "0000:c7:00.0",
+     "numa_node": 1,
+     "netdev": "enp199s0np0",
+     "board_id": "MT_0000000879",
+     "fw_ver": "28.42.1000",
+     "ports": [
+      {
+       "port": 1,
+       "state": "4: ACTIVE",
+       "rate": "400 Gb/sec (4X NDR)",
+       "rate_gbps": 400.0,
+       "link_layer": "Ethernet"
+      }
+     ]
+    },
+    {
+     "name": "mlx5_3",
+     "pci_bus_id": "0000:e7:00.0",
+     "numa_node": 1,
+     "netdev": "enp231s0np0",
+     "board_id": "MT_0000000879",
+     "fw_ver": "28.42.1000",
+     "ports": [
+      {
+       "port": 1,
+       "state": "4: ACTIVE",
+       "rate": "400 Gb/sec (4X NDR)",
+       "rate_gbps": 400.0,
+       "link_layer": "Ethernet"
+      }
+     ]
+    }
+   ],
+   "pci_paths": {
+    "0000:43:00.0": "/sys/devices/pci0000:40/0000:40:01.1/0000:41:00.0/0000:42:00.0/0000:43:00.0",
+    "0000:44:00.0": "/sys/devices/pci0000:40/0000:40:01.1/0000:41:00.0/0000:42:01.0/0000:44:00.0",
+    "0000:47:00.0": "/sys/devices/pci0000:40/0000:40:01.1/0000:41:00.0/0000:42:02.0/0000:45:00.0/0000:46:00.0/0000:47:00.0",
+    "0000:63:00.0": "/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.0/0000:62:00.0/0000:63:00.0",
+    "0000:64:00.0": "/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.0/0000:62:01.0/0000:64:00.0",
+    "0000:67:00.0": "/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.0/0000:62:02.0/0000:65:00.0/0000:66:00.0/0000:67:00.0",
+    "0000:c3:00.0": "/sys/devices/pci0000:c0/0000:c0:01.1/0000:c1:00.0/0000:c2:00.0/0000:c3:00.0",
+    "0000:c4:00.0": "/sys/devices/pci0000:c0/0000:c0:01.1/0000:c1:00.0/0000:c2:01.0/0000:c4:00.0",
+    "0000:c7:00.0": "/sys/devices/pci0000:c0/0000:c0:01.1/0000:c1:00.0/0000:c2:02.0/0000:c5:00.0/0000:c6:00.0/0000:c7:00.0",
+    "0000:e3:00.0": "/sys/devices/pci0000:e0/0000:e0:01.1/0000:e1:00.0/0000:e2:00.0/0000:e3:00.0",
+    "0000:e4:00.0": "/sys/devices/pci0000:e0/0000:e0:01.1/0000:e1:00.0/0000:e2:01.0/0000:e4:00.0",
+    "0000:e7:00.0": "/sys/devices/pci0000:e0/0000:e0:01.1/0000:e1:00.0/0000:e2:02.0/0000:e5:00.0/0000:e6:00.0/0000:e7:00.0"
+   },
+   "topo": {
+    "GPU0": {
+     "GPU0": "X",
+     "GPU1": "PIX",
+     "GPU2": "NODE",
+     "GPU3": "NODE",
+     "GPU4": "SYS",
+     "GPU5": "SYS",
+     "GPU6": "SYS",
+     "GPU7": "SYS",
+     "mlx5_0": "PXB",
+     "mlx5_1": "NODE",
+     "mlx5_2": "SYS",
+     "mlx5_3": "SYS"
+    },
+    "GPU1": {
+     "GPU0": "PIX",
+     "GPU1": "X",
+     "GPU2": "NODE",
+     "GPU3": "NODE",
+     "GPU4": "SYS",
+     "GPU5": "SYS",
+     "GPU6": "SYS",
+     "GPU7": "SYS",
+     "mlx5_0": "PXB",
+     "mlx5_1": "NODE",
+     "mlx5_2": "SYS",
+     "mlx5_3": "SYS"
+    },
+    "GPU2": {
+     "GPU0": "NODE",
+     "GPU1": "NODE",
+     "GPU2": "X",
+     "GPU3": "PIX",
+     "GPU4": "SYS",
+     "GPU5": "SYS",
+     "GPU6": "SYS",
+     "GPU7": "SYS",
+     "mlx5_0": "NODE",
+     "mlx5_1": "PXB",
+     "mlx5_2": "SYS",
+     "mlx5_3": "SYS"
+    },
+    "GPU3": {
+     "GPU0": "NODE",
+     "GPU1": "NODE",
+     "GPU2": "PIX",
+     "GPU3": "X",
+     "GPU4": "SYS",
+     "GPU5": "SYS",
+     "GPU6": "SYS",
+     "GPU7": "SYS",
+     "mlx5_0": "NODE",
+     "mlx5_1": "PXB",
+     "mlx5_2": "SYS",
+     "mlx5_3": "SYS"
+    },
+    "GPU4": {
+     "GPU0": "SYS",
+     "GPU1": "SYS",
+     "GPU2": "SYS",
+     "GPU3": "SYS",
+     "GPU4": "X",
+     "GPU5": "PIX",
+     "GPU6": "NODE",
+     "GPU7": "NODE",
+     "mlx5_0": "SYS",
+     "mlx5_1": "SYS",
+     "mlx5_2": "PXB",
+     "mlx5_3": "NODE"
+    },
+    "GPU5": {
+     "GPU0": "SYS",
+     "GPU1": "SYS",
+     "GPU2": "SYS",
+     "GPU3": "SYS",
+     "GPU4": "PIX",
+     "GPU5": "X",
+     "GPU6": "NODE",
+     "GPU7": "NODE",
+     "mlx5_0": "SYS",
+     "mlx5_1": "SYS",
+     "mlx5_2": "PXB",
+     "mlx5_3": "NODE"
+    },
+    "GPU6": {
+     "GPU0": "SYS",
+     "GPU1": "SYS",
+     "GPU2": "SYS",
+     "GPU3": "SYS",
+     "GPU4": "NODE",
+     "GPU5": "NODE",
+     "GPU6": "X",
+     "GPU7": "PIX",
+     "mlx5_0": "SYS",
+     "mlx5_1": "SYS",
+     "mlx5_2": "NODE",
+     "mlx5_3": "PXB"
+    },
+    "GPU7": {
+     "GPU0": "SYS",
+     "GPU1": "SYS",
+     "GPU2": "SYS",
+     "GPU3": "SYS",
+     "GPU4": "NODE",
+     "GPU5": "NODE",
+     "GPU6": "PIX",
+     "GPU7": "X",
+     "mlx5_0": "SYS",
+     "mlx5_1": "SYS",
+     "mlx5_2": "NODE",
+     "mlx5_3": "PXB"
+    },
+    "mlx5_0": {
+     "GPU0": "PXB",
+     "GPU1": "PXB",
+     "GPU2": "NODE",
+     "GPU3": "NODE",
+     "GPU4": "SYS",
+     "GPU5": "SYS",
+     "GPU6": "SYS",
+     "GPU7": "SYS",
+     "mlx5_0": "X",
+     "mlx5_1": "NODE",
+     "mlx5_2": "SYS",
+     "mlx5_3": "SYS"
+    },
+    "mlx5_1": {
+     "GPU0": "NODE",
+     "GPU1": "NODE",
+     "GPU2": "PXB",
+     "GPU3": "PXB",
+     "GPU4": "SYS",
+     "GPU5": "SYS",
+     "GPU6": "SYS",
+     "GPU7": "SYS",
+     "mlx5_0": "NODE",
+     "mlx5_1": "X",
+     "mlx5_2": "SYS",
+     "mlx5_3": "SYS"
+    },
+    "mlx5_2": {
+     "GPU0": "SYS",
+     "GPU1": "SYS",
+     "GPU2": "SYS",
+     "GPU3": "SYS",
+     "GPU4": "PXB",
+     "GPU5": "PXB",
+     "GPU6": "NODE",
+     "GPU7": "NODE",
+     "mlx5_0": "SYS",
+     "mlx5_1": "SYS",
+     "mlx5_2": "X",
+     "mlx5_3": "NODE"
+    },
+    "mlx5_3": {
+     "GPU0": "SYS",
+     "GPU1": "SYS",
+     "GPU2": "SYS",
+     "GPU3": "SYS",
+     "GPU4": "NODE",
+     "GPU5": "NODE",
+     "GPU6": "PXB",
+     "GPU7": "PXB",
+     "mlx5_0": "SYS",
+     "mlx5_1": "SYS",
+     "mlx5_2": "NODE",
+     "mlx5_3": "X"
+    }
+   },
+   "driver_version": "580.95.05",
+   "cuda_version": "13.0",
+   "cpu_model": "AMD EPYC 9535 64-Core Processor",
+   "cpu_count": 256,
+   "mem_total_bytes": 1584563421184,
+   "cgroup_mem_limit_bytes": null,
+   "disks": [
+    {
+     "path": "/",
+     "device": "overlay",
+     "fs_type": "overlay",
+     "total_bytes": 214748364800,
+     "free_bytes": 171798691840
+    },
+    {
+     "path": "/root",
+     "device": "/dev/nvme0n1p2",
+     "fs_type": "ext4",
+     "total_bytes": 5497558138880,
+     "free_bytes": 5364414152704
+    },
+    {
+     "path": "/workspace",
+     "device": "/dev/nvme1n1p1",
+     "fs_type": "ext4",
+     "total_bytes": 2748779069440,
+     "free_bytes": 2682207076352
+    }
+   ],
+   "docker_version": "27.5.1",
+   "kernel": "6.8.0-60-generic",
+   "ofed_version": "MLNX_OFED_LINUX-24.10-2.1.8.0",
+   "nvidia_peermem": true,
+   "nvlink_active": false
+  },
+  {
+   "name": "node1",
+   "hostname": "lium-rtx6000-01",
+   "address": "10.42.0.2",
+   "control_interface": "wg0",
+   "gpus": [
+    {
+     "index": 0,
+     "name": "NVIDIA RTX PRO 6000 Blackwell Server Edition",
+     "uuid": "GPU-778ee287-10c9-5ee0-4699-16697d8df7b4",
+     "pci_bus_id": "0000:43:00.0",
+     "memory_mib": 97887,
+     "numa_node": 0,
+     "compute_cap": "12.0",
+     "pcie_gen_max": 5,
+     "pcie_width_max": 16
+    },
+    {
+     "index": 1,
+     "name": "NVIDIA RTX PRO 6000 Blackwell Server Edition",
+     "uuid": "GPU-2f919eb8-217a-8603-8e00-7a6f369ab892",
+     "pci_bus_id": "0000:44:00.0",
+     "memory_mib": 97887,
+     "numa_node": 0,
+     "compute_cap": "12.0",
+     "pcie_gen_max": 5,
+     "pcie_width_max": 16
+    },
+    {
+     "index": 2,
+     "name": "NVIDIA RTX PRO 6000 Blackwell Server Edition",
+     "uuid": "GPU-2e902778-3b8e-66f8-3e0d-82fb8e842385",
+     "pci_bus_id": "0000:63:00.0",
+     "memory_mib": 97887,
+     "numa_node": 0,
+     "compute_cap": "12.0",
+     "pcie_gen_max": 5,
+     "pcie_width_max": 16
+    },
+    {
+     "index": 3,
+     "name": "NVIDIA RTX PRO 6000 Blackwell Server Edition",
+     "uuid": "GPU-04c3f105-f392-89c0-c3ee-88b7febfd346",
+     "pci_bus_id": "0000:64:00.0",
+     "memory_mib": 97887,
+     "numa_node": 0,
+     "compute_cap": "12.0",
+     "pcie_gen_max": 5,
+     "pcie_width_max": 16
+    },
+    {
+     "index": 4,
+     "name": "NVIDIA RTX PRO 6000 Blackwell Server Edition",
+     "uuid": "GPU-09a5596c-1516-0e4d-845d-1d42ae3eff30",
+     "pci_bus_id": "0000:c3:00.0",
+     "memory_mib": 97887,
+     "numa_node": 1,
+     "compute_cap": "12.0",
+     "pcie_gen_max": 5,
+     "pcie_width_max": 16
+    },
+    {
+     "index": 5,
+     "name": "NVIDIA RTX PRO 6000 Blackwell Server Edition",
+     "uuid": "GPU-816022c2-c454-34e2-e975-91344aa799b2",
+     "pci_bus_id": "0000:c4:00.0",
+     "memory_mib": 97887,
+     "numa_node": 1,
+     "compute_cap": "12.0",
+     "pcie_gen_max": 5,
+     "pcie_width_max": 16
+    },
+    {
+     "index": 6,
+     "name": "NVIDIA RTX PRO 6000 Blackwell Server Edition",
+     "uuid": "GPU-eb851514-fa5f-3ea1-7702-e68b64360221",
+     "pci_bus_id": "0000:e3:00.0",
+     "memory_mib": 97887,
+     "numa_node": 1,
+     "compute_cap": "12.0",
+     "pcie_gen_max": 5,
+     "pcie_width_max": 16
+    },
+    {
+     "index": 7,
+     "name": "NVIDIA RTX PRO 6000 Blackwell Server Edition",
+     "uuid": "GPU-9c47bf23-2759-8312-597e-8a6550df5a24",
+     "pci_bus_id": "0000:e4:00.0",
+     "memory_mib": 97887,
+     "numa_node": 1,
+     "compute_cap": "12.0",
+     "pcie_gen_max": 5,
+     "pcie_width_max": 16
+    }
+   ],
+   "hcas": [
+    {
+     "name": "mlx5_0",
+     "pci_bus_id": "0000:47:00.0",
+     "numa_node": 0,
+     "netdev": "enp71s0np0",
+     "board_id": "MT_0000000879",
+     "fw_ver": "28.42.1000",
+     "ports": [
+      {
+       "port": 1,
+       "state": "4: ACTIVE",
+       "rate": "400 Gb/sec (4X NDR)",
+       "rate_gbps": 400.0,
+       "link_layer": "Ethernet"
+      }
+     ]
+    },
+    {
+     "name": "mlx5_1",
+     "pci_bus_id": "0000:67:00.0",
+     "numa_node": 0,
+     "netdev": "enp103s0np0",
+     "board_id": "MT_0000000879",
+     "fw_ver": "28.42.1000",
+     "ports": [
+      {
+       "port": 1,
+       "state": "4: ACTIVE",
+       "rate": "400 Gb/sec (4X NDR)",
+       "rate_gbps": 400.0,
+       "link_layer": "Ethernet"
+      }
+     ]
+    },
+    {
+     "name": "mlx5_2",
+     "pci_bus_id": "0000:c7:00.0",
+     "numa_node": 1,
+     "netdev": "enp199s0np0",
+     "board_id": "MT_0000000879",
+     "fw_ver": "28.42.1000",
+     "ports": [
+      {
+       "port": 1,
+       "state": "4: ACTIVE",
+       "rate": "400 Gb/sec (4X NDR)",
+       "rate_gbps": 400.0,
+       "link_layer": "Ethernet"
+      }
+     ]
+    },
+    {
+     "name": "mlx5_3",
+     "pci_bus_id": "0000:e7:00.0",
+     "numa_node": 1,
+     "netdev": "enp231s0np0",
+     "board_id": "MT_0000000879",
+     "fw_ver": "28.42.1000",
+     "ports": [
+      {
+       "port": 1,
+       "state": "4: ACTIVE",
+       "rate": "400 Gb/sec (4X NDR)",
+       "rate_gbps": 400.0,
+       "link_layer": "Ethernet"
+      }
+     ]
+    }
+   ],
+   "pci_paths": {
+    "0000:43:00.0": "/sys/devices/pci0000:40/0000:40:01.1/0000:41:00.0/0000:42:00.0/0000:43:00.0",
+    "0000:44:00.0": "/sys/devices/pci0000:40/0000:40:01.1/0000:41:00.0/0000:42:01.0/0000:44:00.0",
+    "0000:47:00.0": "/sys/devices/pci0000:40/0000:40:01.1/0000:41:00.0/0000:42:02.0/0000:45:00.0/0000:46:00.0/0000:47:00.0",
+    "0000:63:00.0": "/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.0/0000:62:00.0/0000:63:00.0",
+    "0000:64:00.0": "/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.0/0000:62:01.0/0000:64:00.0",
+    "0000:67:00.0": "/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.0/0000:62:02.0/0000:65:00.0/0000:66:00.0/0000:67:00.0",
+    "0000:c3:00.0": "/sys/devices/pci0000:c0/0000:c0:01.1/0000:c1:00.0/0000:c2:00.0/0000:c3:00.0",
+    "0000:c4:00.0": "/sys/devices/pci0000:c0/0000:c0:01.1/0000:c1:00.0/0000:c2:01.0/0000:c4:00.0",
+    "0000:c7:00.0": "/sys/devices/pci0000:c0/0000:c0:01.1/0000:c1:00.0/0000:c2:02.0/0000:c5:00.0/0000:c6:00.0/0000:c7:00.0",
+    "0000:e3:00.0": "/sys/devices/pci0000:e0/0000:e0:01.1/0000:e1:00.0/0000:e2:00.0/0000:e3:00.0",
+    "0000:e4:00.0": "/sys/devices/pci0000:e0/0000:e0:01.1/0000:e1:00.0/0000:e2:01.0/0000:e4:00.0",
+    "0000:e7:00.0": "/sys/devices/pci0000:e0/0000:e0:01.1/0000:e1:00.0/0000:e2:02.0/0000:e5:00.0/0000:e6:00.0/0000:e7:00.0"
+   },
+   "topo": {
+    "GPU0": {
+     "GPU0": "X",
+     "GPU1": "PIX",
+     "GPU2": "NODE",
+     "GPU3": "NODE",
+     "GPU4": "SYS",
+     "GPU5": "SYS",
+     "GPU6": "SYS",
+     "GPU7": "SYS",
+     "mlx5_0": "PXB",
+     "mlx5_1": "NODE",
+     "mlx5_2": "SYS",
+     "mlx5_3": "SYS"
+    },
+    "GPU1": {
+     "GPU0": "PIX",
+     "GPU1": "X",
+     "GPU2": "NODE",
+     "GPU3": "NODE",
+     "GPU4": "SYS",
+     "GPU5": "SYS",
+     "GPU6": "SYS",
+     "GPU7": "SYS",
+     "mlx5_0": "PXB",
+     "mlx5_1": "NODE",
+     "mlx5_2": "SYS",
+     "mlx5_3": "SYS"
+    },
+    "GPU2": {
+     "GPU0": "NODE",
+     "GPU1": "NODE",
+     "GPU2": "X",
+     "GPU3": "PIX",
+     "GPU4": "SYS",
+     "GPU5": "SYS",
+     "GPU6": "SYS",
+     "GPU7": "SYS",
+     "mlx5_0": "NODE",
+     "mlx5_1": "PXB",
+     "mlx5_2": "SYS",
+     "mlx5_3": "SYS"
+    },
+    "GPU3": {
+     "GPU0": "NODE",
+     "GPU1": "NODE",
+     "GPU2": "PIX",
+     "GPU3": "X",
+     "GPU4": "SYS",
+     "GPU5": "SYS",
+     "GPU6": "SYS",
+     "GPU7": "SYS",
+     "mlx5_0": "NODE",
+     "mlx5_1": "PXB",
+     "mlx5_2": "SYS",
+     "mlx5_3": "SYS"
+    },
+    "GPU4": {
+     "GPU0": "SYS",
+     "GPU1": "SYS",
+     "GPU2": "SYS",
+     "GPU3": "SYS",
+     "GPU4": "X",
+     "GPU5": "PIX",
+     "GPU6": "NODE",
+     "GPU7": "NODE",
+     "mlx5_0": "SYS",
+     "mlx5_1": "SYS",
+     "mlx5_2": "PXB",
+     "mlx5_3": "NODE"
+    },
+    "GPU5": {
+     "GPU0": "SYS",
+     "GPU1": "SYS",
+     "GPU2": "SYS",
+     "GPU3": "SYS",
+     "GPU4": "PIX",
+     "GPU5": "X",
+     "GPU6": "NODE",
+     "GPU7": "NODE",
+     "mlx5_0": "SYS",
+     "mlx5_1": "SYS",
+     "mlx5_2": "PXB",
+     "mlx5_3": "NODE"
+    },
+    "GPU6": {
+     "GPU0": "SYS",
+     "GPU1": "SYS",
+     "GPU2": "SYS",
+     "GPU3": "SYS",
+     "GPU4": "NODE",
+     "GPU5": "NODE",
+     "GPU6": "X",
+     "GPU7": "PIX",
+     "mlx5_0": "SYS",
+     "mlx5_1": "SYS",
+     "mlx5_2": "NODE",
+     "mlx5_3": "PXB"
+    },
+    "GPU7": {
+     "GPU0": "SYS",
+     "GPU1": "SYS",
+     "GPU2": "SYS",
+     "GPU3": "SYS",
+     "GPU4": "NODE",
+     "GPU5": "NODE",
+     "GPU6": "PIX",
+     "GPU7": "X",
+     "mlx5_0": "SYS",
+     "mlx5_1": "SYS",
+     "mlx5_2": "NODE",
+     "mlx5_3": "PXB"
+    },
+    "mlx5_0": {
+     "GPU0": "PXB",
+     "GPU1": "PXB",
+     "GPU2": "NODE",
+     "GPU3": "NODE",
+     "GPU4": "SYS",
+     "GPU5": "SYS",
+     "GPU6": "SYS",
+     "GPU7": "SYS",
+     "mlx5_0": "X",
+     "mlx5_1": "NODE",
+     "mlx5_2": "SYS",
+     "mlx5_3": "SYS"
+    },
+    "mlx5_1": {
+     "GPU0": "NODE",
+     "GPU1": "NODE",
+     "GPU2": "PXB",
+     "GPU3": "PXB",
+     "GPU4": "SYS",
+     "GPU5": "SYS",
+     "GPU6": "SYS",
+     "GPU7": "SYS",
+     "mlx5_0": "NODE",
+     "mlx5_1": "X",
+     "mlx5_2": "SYS",
+     "mlx5_3": "SYS"
+    },
+    "mlx5_2": {
+     "GPU0": "SYS",
+     "GPU1": "SYS",
+     "GPU2": "SYS",
+     "GPU3": "SYS",
+     "GPU4": "PXB",
+     "GPU5": "PXB",
+     "GPU6": "NODE",
+     "GPU7": "NODE",
+     "mlx5_0": "SYS",
+     "mlx5_1": "SYS",
+     "mlx5_2": "X",
+     "mlx5_3": "NODE"
+    },
+    "mlx5_3": {
+     "GPU0": "SYS",
+     "GPU1": "SYS",
+     "GPU2": "SYS",
+     "GPU3": "SYS",
+     "GPU4": "NODE",
+     "GPU5": "NODE",
+     "GPU6": "PXB",
+     "GPU7": "PXB",
+     "mlx5_0": "SYS",
+     "mlx5_1": "SYS",
+     "mlx5_2": "NODE",
+     "mlx5_3": "X"
+    }
+   },
+   "driver_version": "580.95.05",
+   "cuda_version": "13.0",
+   "cpu_model": "AMD EPYC 9535 64-Core Processor",
+   "cpu_count": 256,
+   "mem_total_bytes": 1584563421184,
+   "cgroup_mem_limit_bytes": null,
+   "disks": [
+    {
+     "path": "/",
+     "device": "overlay",
+     "fs_type": "overlay",
+     "total_bytes": 214748364800,
+     "free_bytes": 171798691840
+    },
+    {
+     "path": "/root",
+     "device": "/dev/nvme0n1p2",
+     "fs_type": "ext4",
+     "total_bytes": 5497558138880,
+     "free_bytes": 5364414152704
+    },
+    {
+     "path": "/workspace",
+     "device": "/dev/nvme1n1p1",
+     "fs_type": "ext4",
+     "total_bytes": 2748779069440,
+     "free_bytes": 2682207076352
+    }
+   ],
+   "docker_version": "27.5.1",
+   "kernel": "6.8.0-60-generic",
+   "ofed_version": "MLNX_OFED_LINUX-24.10-2.1.8.0",
+   "nvidia_peermem": true,
+   "nvlink_active": false
+  },
+  {
+   "name": "node2",
+   "hostname": "lium-rtx6000-02",
+   "address": "10.42.0.3",
+   "control_interface": "wg0",
+   "gpus": [
+    {
+     "index": 0,
+     "name": "NVIDIA RTX PRO 6000 Blackwell Server Edition",
+     "uuid": "GPU-5fe84946-b527-6195-b6af-9d6dbf2ca5bb",
+     "pci_bus_id": "0000:43:00.0",
+     "memory_mib": 97887,
+     "numa_node": 0,
+     "compute_cap": "12.0",
+     "pcie_gen_max": 5,
+     "pcie_width_max": 16
+    },
+    {
+     "index": 1,
+     "name": "NVIDIA RTX PRO 6000 Blackwell Server Edition",
+     "uuid": "GPU-36130b30-3364-a4ca-19fb-835e5fa71fb5",
+     "pci_bus_id": "0000:44:00.0",
+     "memory_mib": 97887,
+     "numa_node": 0,
+     "compute_cap": "12.0",
+     "pcie_gen_max": 5,
+     "pcie_width_max": 16
+    },
+    {
+     "index": 2,
+     "name": "NVIDIA RTX PRO 6000 Blackwell Server Edition",
+     "uuid": "GPU-612baf4c-8017-ae4c-8a60-41dfea0dad4b",
+     "pci_bus_id": "0000:63:00.0",
+     "memory_mib": 97887,
+     "numa_node": 0,
+     "compute_cap": "12.0",
+     "pcie_gen_max": 5,
+     "pcie_width_max": 16
+    },
+    {
+     "index": 3,
+     "name": "NVIDIA RTX PRO 6000 Blackwell Server Edition",
+     "uuid": "GPU-059e7a46-705c-7ed5-5b8e-d48a8b779f33",
+     "pci_bus_id": "0000:64:00.0",
+     "memory_mib": 97887,
+     "numa_node": 0,
+     "compute_cap": "12.0",
+     "pcie_gen_max": 5,
+     "pcie_width_max": 16
+    },
+    {
+     "index": 4,
+     "name": "NVIDIA RTX PRO 6000 Blackwell Server Edition",
+     "uuid": "GPU-d9beebbf-c436-fdf5-2bce-8698e22acaa5",
+     "pci_bus_id": "0000:c3:00.0",
+     "memory_mib": 97887,
+     "numa_node": 1,
+     "compute_cap": "12.0",
+     "pcie_gen_max": 5,
+     "pcie_width_max": 16
+    },
+    {
+     "index": 5,
+     "name": "NVIDIA RTX PRO 6000 Blackwell Server Edition",
+     "uuid": "GPU-0c11993b-5aee-50bf-36b2-9b4db848baea",
+     "pci_bus_id": "0000:c4:00.0",
+     "memory_mib": 97887,
+     "numa_node": 1,
+     "compute_cap": "12.0",
+     "pcie_gen_max": 5,
+     "pcie_width_max": 16
+    },
+    {
+     "index": 6,
+     "name": "NVIDIA RTX PRO 6000 Blackwell Server Edition",
+     "uuid": "GPU-5e5f6c5d-8fd0-8886-33da-1aaead52fbda",
+     "pci_bus_id": "0000:e3:00.0",
+     "memory_mib": 97887,
+     "numa_node": 1,
+     "compute_cap": "12.0",
+     "pcie_gen_max": 5,
+     "pcie_width_max": 16
+    },
+    {
+     "index": 7,
+     "name": "NVIDIA RTX PRO 6000 Blackwell Server Edition",
+     "uuid": "GPU-354eeae8-1cb0-8b0e-2bfb-c1e154175f1d",
+     "pci_bus_id": "0000:e4:00.0",
+     "memory_mib": 97887,
+     "numa_node": 1,
+     "compute_cap": "12.0",
+     "pcie_gen_max": 5,
+     "pcie_width_max": 16
+    }
+   ],
+   "hcas": [
+    {
+     "name": "mlx5_0",
+     "pci_bus_id": "0000:47:00.0",
+     "numa_node": 0,
+     "netdev": "enp71s0np0",
+     "board_id": "MT_0000000879",
+     "fw_ver": "28.42.1000",
+     "ports": [
+      {
+       "port": 1,
+       "state": "4: ACTIVE",
+       "rate": "400 Gb/sec (4X NDR)",
+       "rate_gbps": 400.0,
+       "link_layer": "Ethernet"
+      }
+     ]
+    },
+    {
+     "name": "mlx5_1",
+     "pci_bus_id": "0000:67:00.0",
+     "numa_node": 0,
+     "netdev": "enp103s0np0",
+     "board_id": "MT_0000000879",
+     "fw_ver": "28.42.1000",
+     "ports": [
+      {
+       "port": 1,
+       "state": "4: ACTIVE",
+       "rate": "400 Gb/sec (4X NDR)",
+       "rate_gbps": 400.0,
+       "link_layer": "Ethernet"
+      }
+     ]
+    },
+    {
+     "name": "mlx5_2",
+     "pci_bus_id": "0000:c7:00.0",
+     "numa_node": 1,
+     "netdev": "enp199s0np0",
+     "board_id": "MT_0000000879",
+     "fw_ver": "28.42.1000",
+     "ports": [
+      {
+       "port": 1,
+       "state": "4: ACTIVE",
+       "rate": "400 Gb/sec (4X NDR)",
+       "rate_gbps": 400.0,
+       "link_layer": "Ethernet"
+      }
+     ]
+    },
+    {
+     "name": "mlx5_3",
+     "pci_bus_id": "0000:e7:00.0",
+     "numa_node": 1,
+     "netdev": "enp231s0np0",
+     "board_id": "MT_0000000879",
+     "fw_ver": "28.42.1000",
+     "ports": [
+      {
+       "port": 1,
+       "state": "4: ACTIVE",
+       "rate": "400 Gb/sec (4X NDR)",
+       "rate_gbps": 400.0,
+       "link_layer": "Ethernet"
+      }
+     ]
+    }
+   ],
+   "pci_paths": {
+    "0000:43:00.0": "/sys/devices/pci0000:40/0000:40:01.1/0000:41:00.0/0000:42:00.0/0000:43:00.0",
+    "0000:44:00.0": "/sys/devices/pci0000:40/0000:40:01.1/0000:41:00.0/0000:42:01.0/0000:44:00.0",
+    "0000:47:00.0": "/sys/devices/pci0000:40/0000:40:01.1/0000:41:00.0/0000:42:02.0/0000:45:00.0/0000:46:00.0/0000:47:00.0",
+    "0000:63:00.0": "/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.0/0000:62:00.0/0000:63:00.0",
+    "0000:64:00.0": "/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.0/0000:62:01.0/0000:64:00.0",
+    "0000:67:00.0": "/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.0/0000:62:02.0/0000:65:00.0/0000:66:00.0/0000:67:00.0",
+    "0000:c3:00.0": "/sys/devices/pci0000:c0/0000:c0:01.1/0000:c1:00.0/0000:c2:00.0/0000:c3:00.0",
+    "0000:c4:00.0": "/sys/devices/pci0000:c0/0000:c0:01.1/0000:c1:00.0/0000:c2:01.0/0000:c4:00.0",
+    "0000:c7:00.0": "/sys/devices/pci0000:c0/0000:c0:01.1/0000:c1:00.0/0000:c2:02.0/0000:c5:00.0/0000:c6:00.0/0000:c7:00.0",
+    "0000:e3:00.0": "/sys/devices/pci0000:e0/0000:e0:01.1/0000:e1:00.0/0000:e2:00.0/0000:e3:00.0",
+    "0000:e4:00.0": "/sys/devices/pci0000:e0/0000:e0:01.1/0000:e1:00.0/0000:e2:01.0/0000:e4:00.0",
+    "0000:e7:00.0": "/sys/devices/pci0000:e0/0000:e0:01.1/0000:e1:00.0/0000:e2:02.0/0000:e5:00.0/0000:e6:00.0/0000:e7:00.0"
+   },
+   "topo": {
+    "GPU0": {
+     "GPU0": "X",
+     "GPU1": "PIX",
+     "GPU2": "NODE",
+     "GPU3": "NODE",
+     "GPU4": "SYS",
+     "GPU5": "SYS",
+     "GPU6": "SYS",
+     "GPU7": "SYS",
+     "mlx5_0": "PXB",
+     "mlx5_1": "NODE",
+     "mlx5_2": "SYS",
+     "mlx5_3": "SYS"
+    },
+    "GPU1": {
+     "GPU0": "PIX",
+     "GPU1": "X",
+     "GPU2": "NODE",
+     "GPU3": "NODE",
+     "GPU4": "SYS",
+     "GPU5": "SYS",
+     "GPU6": "SYS",
+     "GPU7": "SYS",
+     "mlx5_0": "PXB",
+     "mlx5_1": "NODE",
+     "mlx5_2": "SYS",
+     "mlx5_3": "SYS"
+    },
+    "GPU2": {
+     "GPU0": "NODE",
+     "GPU1": "NODE",
+     "GPU2": "X",
+     "GPU3": "PIX",
+     "GPU4": "SYS",
+     "GPU5": "SYS",
+     "GPU6": "SYS",
+     "GPU7": "SYS",
+     "mlx5_0": "NODE",
+     "mlx5_1": "PXB",
+     "mlx5_2": "SYS",
+     "mlx5_3": "SYS"
+    },
+    "GPU3": {
+     "GPU0": "NODE",
+     "GPU1": "NODE",
+     "GPU2": "PIX",
+     "GPU3": "X",
+     "GPU4": "SYS",
+     "GPU5": "SYS",
+     "GPU6": "SYS",
+     "GPU7": "SYS",
+     "mlx5_0": "NODE",
+     "mlx5_1": "PXB",
+     "mlx5_2": "SYS",
+     "mlx5_3": "SYS"
+    },
+    "GPU4": {
+     "GPU0": "SYS",
+     "GPU1": "SYS",
+     "GPU2": "SYS",
+     "GPU3": "SYS",
+     "GPU4": "X",
+     "GPU5": "PIX",
+     "GPU6": "NODE",
+     "GPU7": "NODE",
+     "mlx5_0": "SYS",
+     "mlx5_1": "SYS",
+     "mlx5_2": "PXB",
+     "mlx5_3": "NODE"
+    },
+    "GPU5": {
+     "GPU0": "SYS",
+     "GPU1": "SYS",
+     "GPU2": "SYS",
+     "GPU3": "SYS",
+     "GPU4": "PIX",
+     "GPU5": "X",
+     "GPU6": "NODE",
+     "GPU7": "NODE",
+     "mlx5_0": "SYS",
+     "mlx5_1": "SYS",
+     "mlx5_2": "PXB",
+     "mlx5_3": "NODE"
+    },
+    "GPU6": {
+     "GPU0": "SYS",
+     "GPU1": "SYS",
+     "GPU2": "SYS",
+     "GPU3": "SYS",
+     "GPU4": "NODE",
+     "GPU5": "NODE",
+     "GPU6": "X",
+     "GPU7": "PIX",
+     "mlx5_0": "SYS",
+     "mlx5_1": "SYS",
+     "mlx5_2": "NODE",
+     "mlx5_3": "PXB"
+    },
+    "GPU7": {
+     "GPU0": "SYS",
+     "GPU1": "SYS",
+     "GPU2": "SYS",
+     "GPU3": "SYS",
+     "GPU4": "NODE",
+     "GPU5": "NODE",
+     "GPU6": "PIX",
+     "GPU7": "X",
+     "mlx5_0": "SYS",
+     "mlx5_1": "SYS",
+     "mlx5_2": "NODE",
+     "mlx5_3": "PXB"
+    },
+    "mlx5_0": {
+     "GPU0": "PXB",
+     "GPU1": "PXB",
+     "GPU2": "NODE",
+     "GPU3": "NODE",
+     "GPU4": "SYS",
+     "GPU5": "SYS",
+     "GPU6": "SYS",
+     "GPU7": "SYS",
+     "mlx5_0": "X",
+     "mlx5_1": "NODE",
+     "mlx5_2": "SYS",
+     "mlx5_3": "SYS"
+    },
+    "mlx5_1": {
+     "GPU0": "NODE",
+     "GPU1": "NODE",
+     "GPU2": "PXB",
+     "GPU3": "PXB",
+     "GPU4": "SYS",
+     "GPU5": "SYS",
+     "GPU6": "SYS",
+     "GPU7": "SYS",
+     "mlx5_0": "NODE",
+     "mlx5_1": "X",
+     "mlx5_2": "SYS",
+     "mlx5_3": "SYS"
+    },
+    "mlx5_2": {
+     "GPU0": "SYS",
+     "GPU1": "SYS",
+     "GPU2": "SYS",
+     "GPU3": "SYS",
+     "GPU4": "PXB",
+     "GPU5": "PXB",
+     "GPU6": "NODE",
+     "GPU7": "NODE",
+     "mlx5_0": "SYS",
+     "mlx5_1": "SYS",
+     "mlx5_2": "X",
+     "mlx5_3": "NODE"
+    },
+    "mlx5_3": {
+     "GPU0": "SYS",
+     "GPU1": "SYS",
+     "GPU2": "SYS",
+     "GPU3": "SYS",
+     "GPU4": "NODE",
+     "GPU5": "NODE",
+     "GPU6": "PXB",
+     "GPU7": "PXB",
+     "mlx5_0": "SYS",
+     "mlx5_1": "SYS",
+     "mlx5_2": "NODE",
+     "mlx5_3": "X"
+    }
+   },
+   "driver_version": "580.95.05",
+   "cuda_version": "13.0",
+   "cpu_model": "AMD EPYC 9535 64-Core Processor",
+   "cpu_count": 256,
+   "mem_total_bytes": 1584563421184,
+   "cgroup_mem_limit_bytes": null,
+   "disks": [
+    {
+     "path": "/",
+     "device": "overlay",
+     "fs_type": "overlay",
+     "total_bytes": 214748364800,
+     "free_bytes": 171798691840
+    },
+    {
+     "path": "/root",
+     "device": "/dev/nvme0n1p2",
+     "fs_type": "ext4",
+     "total_bytes": 5497558138880,
+     "free_bytes": 5364414152704
+    },
+    {
+     "path": "/workspace",
+     "device": "/dev/nvme1n1p1",
+     "fs_type": "ext4",
+     "total_bytes": 2748779069440,
+     "free_bytes": 2682207076352
+    }
+   ],
+   "docker_version": "27.5.1",
+   "kernel": "6.8.0-60-generic",
+   "ofed_version": "MLNX_OFED_LINUX-24.10-2.1.8.0",
+   "nvidia_peermem": true,
+   "nvlink_active": false
+  },
+  {
+   "name": "node3",
+   "hostname": "lium-rtx6000-03",
+   "address": "10.42.0.4",
+   "control_interface": "wg0",
+   "gpus": [
+    {
+     "index": 0,
+     "name": "NVIDIA RTX PRO 6000 Blackwell Server Edition",
+     "uuid": "GPU-9507103b-ba7c-b2c2-8012-eee6c215a605",
+     "pci_bus_id": "0000:43:00.0",
+     "memory_mib": 97887,
+     "numa_node": 0,
+     "compute_cap": "12.0",
+     "pcie_gen_max": 5,
+     "pcie_width_max": 16
+    },
+    {
+     "index": 1,
+     "name": "NVIDIA RTX PRO 6000 Blackwell Server Edition",
+     "uuid": "GPU-604cb589-9992-71ed-9a55-d3954459d4b1",
+     "pci_bus_id": "0000:44:00.0",
+     "memory_mib": 97887,
+     "numa_node": 0,
+     "compute_cap": "12.0",
+     "pcie_gen_max": 5,
+     "pcie_width_max": 16
+    },
+    {
+     "index": 2,
+     "name": "NVIDIA RTX PRO 6000 Blackwell Server Edition",
+     "uuid": "GPU-35b3d0dc-99ca-a671-0328-100869ce9f27",
+     "pci_bus_id": "0000:63:00.0",
+     "memory_mib": 97887,
+     "numa_node": 0,
+     "compute_cap": "12.0",
+     "pcie_gen_max": 5,
+     "pcie_width_max": 16
+    },
+    {
+     "index": 3,
+     "name": "NVIDIA RTX PRO 6000 Blackwell Server Edition",
+     "uuid": "GPU-acfdaf06-4460-47f3-a9bb-cc0c85c8585d",
+     "pci_bus_id": "0000:64:00.0",
+     "memory_mib": 97887,
+     "numa_node": 0,
+     "compute_cap": "12.0",
+     "pcie_gen_max": 5,
+     "pcie_width_max": 16
+    },
+    {
+     "index": 4,
+     "name": "NVIDIA RTX PRO 6000 Blackwell Server Edition",
+     "uuid": "GPU-204d8a35-7314-ebf9-17bd-32a99d87367b",
+     "pci_bus_id": "0000:c3:00.0",
+     "memory_mib": 97887,
+     "numa_node": 1,
+     "compute_cap": "12.0",
+     "pcie_gen_max": 5,
+     "pcie_width_max": 16
+    },
+    {
+     "index": 5,
+     "name": "NVIDIA RTX PRO 6000 Blackwell Server Edition",
+     "uuid": "GPU-aeb0a03d-64df-e29c-fc78-5614807b193c",
+     "pci_bus_id": "0000:c4:00.0",
+     "memory_mib": 97887,
+     "numa_node": 1,
+     "compute_cap": "12.0",
+     "pcie_gen_max": 5,
+     "pcie_width_max": 16
+    },
+    {
+     "index": 6,
+     "name": "NVIDIA RTX PRO 6000 Blackwell Server Edition",
+     "uuid": "GPU-17680046-bd3c-6b92-dcb8-48e9b126b38b",
+     "pci_bus_id": "0000:e3:00.0",
+     "memory_mib": 97887,
+     "numa_node": 1,
+     "compute_cap": "12.0",
+     "pcie_gen_max": 5,
+     "pcie_width_max": 16
+    },
+    {
+     "index": 7,
+     "name": "NVIDIA RTX PRO 6000 Blackwell Server Edition",
+     "uuid": "GPU-4ab5212d-a9b8-cc6f-a7b3-6dbaf27a740f",
+     "pci_bus_id": "0000:e4:00.0",
+     "memory_mib": 97887,
+     "numa_node": 1,
+     "compute_cap": "12.0",
+     "pcie_gen_max": 5,
+     "pcie_width_max": 16
+    }
+   ],
+   "hcas": [
+    {
+     "name": "mlx5_0",
+     "pci_bus_id": "0000:47:00.0",
+     "numa_node": 0,
+     "netdev": "enp71s0np0",
+     "board_id": "MT_0000000879",
+     "fw_ver": "28.42.1000",
+     "ports": [
+      {
+       "port": 1,
+       "state": "4: ACTIVE",
+       "rate": "400 Gb/sec (4X NDR)",
+       "rate_gbps": 400.0,
+       "link_layer": "Ethernet"
+      }
+     ]
+    },
+    {
+     "name": "mlx5_1",
+     "pci_bus_id": "0000:67:00.0",
+     "numa_node": 0,
+     "netdev": "enp103s0np0",
+     "board_id": "MT_0000000879",
+     "fw_ver": "28.42.1000",
+     "ports": [
+      {
+       "port": 1,
+       "state": "4: ACTIVE",
+       "rate": "400 Gb/sec (4X NDR)",
+       "rate_gbps": 400.0,
+       "link_layer": "Ethernet"
+      }
+     ]
+    },
+    {
+     "name": "mlx5_2",
+     "pci_bus_id": "0000:c7:00.0",
+     "numa_node": 1,
+     "netdev": "enp199s0np0",
+     "board_id": "MT_0000000879",
+     "fw_ver": "28.42.1000",
+     "ports": [
+      {
+       "port": 1,
+       "state": "4: ACTIVE",
+       "rate": "400 Gb/sec (4X NDR)",
+       "rate_gbps": 400.0,
+       "link_layer": "Ethernet"
+      }
+     ]
+    },
+    {
+     "name": "mlx5_3",
+     "pci_bus_id": "0000:e7:00.0",
+     "numa_node": 1,
+     "netdev": "enp231s0np0",
+     "board_id": "MT_0000000879",
+     "fw_ver": "28.42.1000",
+     "ports": [
+      {
+       "port": 1,
+       "state": "4: ACTIVE",
+       "rate": "400 Gb/sec (4X NDR)",
+       "rate_gbps": 400.0,
+       "link_layer": "Ethernet"
+      }
+     ]
+    }
+   ],
+   "pci_paths": {
+    "0000:43:00.0": "/sys/devices/pci0000:40/0000:40:01.1/0000:41:00.0/0000:42:00.0/0000:43:00.0",
+    "0000:44:00.0": "/sys/devices/pci0000:40/0000:40:01.1/0000:41:00.0/0000:42:01.0/0000:44:00.0",
+    "0000:47:00.0": "/sys/devices/pci0000:40/0000:40:01.1/0000:41:00.0/0000:42:02.0/0000:45:00.0/0000:46:00.0/0000:47:00.0",
+    "0000:63:00.0": "/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.0/0000:62:00.0/0000:63:00.0",
+    "0000:64:00.0": "/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.0/0000:62:01.0/0000:64:00.0",
+    "0000:67:00.0": "/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.0/0000:62:02.0/0000:65:00.0/0000:66:00.0/0000:67:00.0",
+    "0000:c3:00.0": "/sys/devices/pci0000:c0/0000:c0:01.1/0000:c1:00.0/0000:c2:00.0/0000:c3:00.0",
+    "0000:c4:00.0": "/sys/devices/pci0000:c0/0000:c0:01.1/0000:c1:00.0/0000:c2:01.0/0000:c4:00.0",
+    "0000:c7:00.0": "/sys/devices/pci0000:c0/0000:c0:01.1/0000:c1:00.0/0000:c2:02.0/0000:c5:00.0/0000:c6:00.0/0000:c7:00.0",
+    "0000:e3:00.0": "/sys/devices/pci0000:e0/0000:e0:01.1/0000:e1:00.0/0000:e2:00.0/0000:e3:00.0",
+    "0000:e4:00.0": "/sys/devices/pci0000:e0/0000:e0:01.1/0000:e1:00.0/0000:e2:01.0/0000:e4:00.0",
+    "0000:e7:00.0": "/sys/devices/pci0000:e0/0000:e0:01.1/0000:e1:00.0/0000:e2:02.0/0000:e5:00.0/0000:e6:00.0/0000:e7:00.0"
+   },
+   "topo": {
+    "GPU0": {
+     "GPU0": "X",
+     "GPU1": "PIX",
+     "GPU2": "NODE",
+     "GPU3": "NODE",
+     "GPU4": "SYS",
+     "GPU5": "SYS",
+     "GPU6": "SYS",
+     "GPU7": "SYS",
+     "mlx5_0": "PXB",
+     "mlx5_1": "NODE",
+     "mlx5_2": "SYS",
+     "mlx5_3": "SYS"
+    },
+    "GPU1": {
+     "GPU0": "PIX",
+     "GPU1": "X",
+     "GPU2": "NODE",
+     "GPU3": "NODE",
+     "GPU4": "SYS",
+     "GPU5": "SYS",
+     "GPU6": "SYS",
+     "GPU7": "SYS",
+     "mlx5_0": "PXB",
+     "mlx5_1": "NODE",
+     "mlx5_2": "SYS",
+     "mlx5_3": "SYS"
+    },
+    "GPU2": {
+     "GPU0": "NODE",
+     "GPU1": "NODE",
+     "GPU2": "X",
+     "GPU3": "PIX",
+     "GPU4": "SYS",
+     "GPU5": "SYS",
+     "GPU6": "SYS",
+     "GPU7": "SYS",
+     "mlx5_0": "NODE",
+     "mlx5_1": "PXB",
+     "mlx5_2": "SYS",
+     "mlx5_3": "SYS"
+    },
+    "GPU3": {
+     "GPU0": "NODE",
+     "GPU1": "NODE",
+     "GPU2": "PIX",
+     "GPU3": "X",
+     "GPU4": "SYS",
+     "GPU5": "SYS",
+     "GPU6": "SYS",
+     "GPU7": "SYS",
+     "mlx5_0": "NODE",
+     "mlx5_1": "PXB",
+     "mlx5_2": "SYS",
+     "mlx5_3": "SYS"
+    },
+    "GPU4": {
+     "GPU0": "SYS",
+     "GPU1": "SYS",
+     "GPU2": "SYS",
+     "GPU3": "SYS",
+     "GPU4": "X",
+     "GPU5": "PIX",
+     "GPU6": "NODE",
+     "GPU7": "NODE",
+     "mlx5_0": "SYS",
+     "mlx5_1": "SYS",
+     "mlx5_2": "PXB",
+     "mlx5_3": "NODE"
+    },
+    "GPU5": {
+     "GPU0": "SYS",
+     "GPU1": "SYS",
+     "GPU2": "SYS",
+     "GPU3": "SYS",
+     "GPU4": "PIX",
+     "GPU5": "X",
+     "GPU6": "NODE",
+     "GPU7": "NODE",
+     "mlx5_0": "SYS",
+     "mlx5_1": "SYS",
+     "mlx5_2": "PXB",
+     "mlx5_3": "NODE"
+    },
+    "GPU6": {
+     "GPU0": "SYS",
+     "GPU1": "SYS",
+     "GPU2": "SYS",
+     "GPU3": "SYS",
+     "GPU4": "NODE",
+     "GPU5": "NODE",
+     "GPU6": "X",
+     "GPU7": "PIX",
+     "mlx5_0": "SYS",
+     "mlx5_1": "SYS",
+     "mlx5_2": "NODE",
+     "mlx5_3": "PXB"
+    },
+    "GPU7": {
+     "GPU0": "SYS",
+     "GPU1": "SYS",
+     "GPU2": "SYS",
+     "GPU3": "SYS",
+     "GPU4": "NODE",
+     "GPU5": "NODE",
+     "GPU6": "PIX",
+     "GPU7": "X",
+     "mlx5_0": "SYS",
+     "mlx5_1": "SYS",
+     "mlx5_2": "NODE",
+     "mlx5_3": "PXB"
+    },
+    "mlx5_0": {
+     "GPU0": "PXB",
+     "GPU1": "PXB",
+     "GPU2": "NODE",
+     "GPU3": "NODE",
+     "GPU4": "SYS",
+     "GPU5": "SYS",
+     "GPU6": "SYS",
+     "GPU7": "SYS",
+     "mlx5_0": "X",
+     "mlx5_1": "NODE",
+     "mlx5_2": "SYS",
+     "mlx5_3": "SYS"
+    },
+    "mlx5_1": {
+     "GPU0": "NODE",
+     "GPU1": "NODE",
+     "GPU2": "PXB",
+     "GPU3": "PXB",
+     "GPU4": "SYS",
+     "GPU5": "SYS",
+     "GPU6": "SYS",
+     "GPU7": "SYS",
+     "mlx5_0": "NODE",
+     "mlx5_1": "X",
+     "mlx5_2": "SYS",
+     "mlx5_3": "SYS"
+    },
+    "mlx5_2": {
+     "GPU0": "SYS",
+     "GPU1": "SYS",
+     "GPU2": "SYS",
+     "GPU3": "SYS",
+     "GPU4": "PXB",
+     "GPU5": "PXB",
+     "GPU6": "NODE",
+     "GPU7": "NODE",
+     "mlx5_0": "SYS",
+     "mlx5_1": "SYS",
+     "mlx5_2": "X",
+     "mlx5_3": "NODE"
+    },
+    "mlx5_3": {
+     "GPU0": "SYS",
+     "GPU1": "SYS",
+     "GPU2": "SYS",
+     "GPU3": "SYS",
+     "GPU4": "NODE",
+     "GPU5": "NODE",
+     "GPU6": "PXB",
+     "GPU7": "PXB",
+     "mlx5_0": "SYS",
+     "mlx5_1": "SYS",
+     "mlx5_2": "NODE",
+     "mlx5_3": "X"
+    }
+   },
+   "driver_version": "580.95.05",
+   "cuda_version": "13.0",
+   "cpu_model": "AMD EPYC 9535 64-Core Processor",
+   "cpu_count": 256,
+   "mem_total_bytes": 1584563421184,
+   "cgroup_mem_limit_bytes": null,
+   "disks": [
+    {
+     "path": "/",
+     "device": "overlay",
+     "fs_type": "overlay",
+     "total_bytes": 214748364800,
+     "free_bytes": 171798691840
+    },
+    {
+     "path": "/root",
+     "device": "/dev/nvme0n1p2",
+     "fs_type": "ext4",
+     "total_bytes": 5497558138880,
+     "free_bytes": 5364414152704
+    },
+    {
+     "path": "/workspace",
+     "device": "/dev/nvme1n1p1",
+     "fs_type": "ext4",
+     "total_bytes": 2748779069440,
+     "free_bytes": 2682207076352
+    }
+   ],
+   "docker_version": "27.5.1",
+   "kernel": "6.8.0-60-generic",
+   "ofed_version": "MLNX_OFED_LINUX-24.10-2.1.8.0",
+   "nvidia_peermem": true,
+   "nvlink_active": false
+  }
+ ]
+}

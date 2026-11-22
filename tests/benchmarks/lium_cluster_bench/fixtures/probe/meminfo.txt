@@ -1,0 +1,12 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+MemTotal:       2113348948 kB
+MemFree:        2051230644 kB
+MemAvailable:   2071893420 kB
+Buffers:          348812 kB
+Cached:         18843204 kB
+SwapCached:            0 kB
+Active:          9312440 kB
+Inactive:       11203652 kB
+HugePages_Total:       0
+Hugepagesize:       2048 kB

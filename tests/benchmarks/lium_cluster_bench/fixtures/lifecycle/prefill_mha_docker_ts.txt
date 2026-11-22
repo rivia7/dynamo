@@ -1,0 +1,17 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+2026-11-05T09:12:02.993551240Z + exec python3 -m dynamo.sglang --config /bench/experiments/h200-001/deployments/3f9a1c2b7d4e/cb-3f9a1c2b7d4e-prefill0-r0.yaml
+2026-11-05T09:12:22.100512881Z [2026-11-05 09:12:22 TP0] Init torch distributed begin.
+2026-11-05T09:12:25.310007718Z [2026-11-05 09:12:25 TP0] Init torch distributed ends. mem usage=0.98 GB
+2026-11-05T09:12:25.520110093Z [2026-11-05 09:12:25 TP0] Load weight begin. avail mem=138.70 GB
+2026-11-05T09:14:21.450020114Z [2026-11-05 09:14:21 TP0] Load weight end. type=GlmMoeForCausalLM, dtype=torch.bfloat16, avail mem=52.10 GB, mem usage=86.60 GB.
+2026-11-05T09:14:22.007461007Z [2026-11-05 09:14:22 TP0] KV Cache is allocated. #tokens: 402816, K size: 18.44 GB, V size: 18.44 GB
+2026-11-05T09:14:22.106338191Z [2026-11-05 09:14:22 TP0] Memory pool end. avail mem=14.95 GB
+2026-11-05T09:14:23.660000192Z [2026-11-05 09:14:23 TP0] max_total_num_tokens=402816, chunked_prefill_size=16384, max_prefill_tokens=32768, max_running_requests=64, context_len=262144, available_gpu_mem=14.95 GB
+2026-11-05T09:14:24.880102331Z [2026-11-05 09:14:24 TP0] Mooncake transfer engine: Failed to register memory region on mlx5_2 (errno=12), retrying with smaller chunks
+2026-11-05T09:14:31.002915044Z 2026-11-05T09:14:31.002810Z  INFO register._register_model_with_runtime_config: Successfully registered LLM with runtime config
+2026-11-05T09:20:11.413117004Z 2026-11-05T09:20:11.413002Z ERROR handler.generate: KVTransferError(bootstrap_room=992211): Failed to send KV to decode: transfer timed out
+2026-11-05T09:20:11.413200713Z Traceback (most recent call last):
+2026-11-05T09:20:11.413210771Z   File "/usr/local/lib/python3.12/dist-packages/sglang/srt/disaggregation/mooncake/conn.py", line 512, in transfer_worker
+2026-11-05T09:20:11.413220931Z     raise KVTransferError(room, "transfer timed out")
+2026-11-05T09:20:11.413230655Z sglang.srt.disaggregation.base.conn.KVTransferError: KVTransferError(bootstrap_room=992211): transfer timed out

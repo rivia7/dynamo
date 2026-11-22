@@ -1,0 +1,15 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+# Node info: DR path slid 0; dlid 0; 0,1,5
+BaseVers:........................1
+ClassVers:.......................1
+NodeType:........................Channel Adapter
+NumPorts:........................1
+SystemGuid:......................0xb83fd20300a51e44
+Guid:............................0xb83fd20300a51e44
+PortGuid:........................0xb83fd20300a51e44
+PartCap:.........................32
+DevId:...........................0x1021
+Revision:........................0x000000a1
+LocalPort:.......................1
+VendorId:........................0x0002c9

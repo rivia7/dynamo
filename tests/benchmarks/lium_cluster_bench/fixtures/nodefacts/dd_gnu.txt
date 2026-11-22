@@ -1,0 +1,5 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+1024+0 records in
+1024+0 records out
+17179869184 bytes (17 GB, 16 GiB) copied, 3.21357 s, 5.3 GB/s

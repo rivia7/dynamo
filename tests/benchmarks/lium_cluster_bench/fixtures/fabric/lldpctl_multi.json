@@ -1,0 +1,55 @@
+{
+  "lldp": {
+    "interface": [
+      {
+        "ens1f0np0": {
+          "via": "LLDP",
+          "rid": "1",
+          "age": "0 day, 02:41:07",
+          "chassis": {
+            "roce-leaf-r0-01": {
+              "id": {"type": "mac", "value": "1c:34:da:a5:b0:00"},
+              "descr": "Cumulus Linux version 5.9.1 running on NVIDIA SN5600",
+              "mgmt-ip": ["192.168.10.21", "fe80::1e34:daff:fea5:b000"],
+              "capability": [
+                {"type": "Bridge", "enabled": true},
+                {"type": "Router", "enabled": true}
+              ]
+            }
+          },
+          "port": {
+            "id": {"type": "ifname", "value": "swp17"},
+            "descr": "swp17",
+            "ttl": "120",
+            "mfs": "9216",
+            "auto-negotiation": {"supported": false, "enabled": false}
+          },
+          "vlan": {"vlan-id": "100", "pvid": true, "value": "vlan100"}
+        }
+      },
+      {
+        "ens2f0np0": {
+          "via": "LLDP",
+          "rid": "2",
+          "age": "0 day, 02:41:07",
+          "chassis": {
+            "roce-leaf-r1-01": {
+              "id": {"type": "mac", "value": "1c:34:da:a5:c1:00"},
+              "descr": "Cumulus Linux version 5.9.1 running on NVIDIA SN5600",
+              "mgmt-ip": "192.168.10.22",
+              "capability": [
+                {"type": "Bridge", "enabled": true},
+                {"type": "Router", "enabled": true}
+              ]
+            }
+          },
+          "port": {
+            "id": {"type": "ifname", "value": "swp17"},
+            "descr": "swp17",
+            "ttl": "120"
+          }
+        }
+      }
+    ]
+  }
+}

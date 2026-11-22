@@ -1,0 +1,4 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+# UCT version=1.12.1 revision dc92435
+# configured with: --build=x86_64-linux-gnu --prefix=/usr --with-verbs --with-rdmacm --enable-mt

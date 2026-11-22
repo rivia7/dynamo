@@ -1,0 +1,122 @@
+[
+  {
+    "index": 1,
+    "id": "aa11bb22-cc33-4d44-8e55-ff6677889900",
+    "huid": "eager-wolf-aa",
+    "name": "train-job",
+    "status": "RUNNING",
+    "gpu_type": "H200",
+    "gpu_count": 8,
+    "config": "8×H200",
+    "template": "lium-cluster",
+    "price_per_hour": 25.6,
+    "spent_usd": 51.2,
+    "spend_cap_usd": 307.2,
+    "uptime": "2h 0m",
+    "created_at": "2026-11-03T16:02:11Z",
+    "ip": "198.51.100.21",
+    "ports": {
+      "22": 31022
+    },
+    "ssh_cmd": "ssh root@198.51.100.21 -p 31022",
+    "ssh_command": "ssh -p 31022 -o StrictHostKeyChecking=accept-new -o 'UserKnownHostsFile=\"/Users/dev/.lium/known_hosts/aa11bb22-cc33-4d44-8e55-ff6677889900\"' root@198.51.100.21",
+    "removal_scheduled_at": "2026-11-04T04:02:11+00:00",
+    "jupyter_url": null
+  },
+  {
+    "index": 2,
+    "id": "bb22cc33-dd44-4e55-9f66-001122334455",
+    "huid": "noble-crane-17",
+    "name": "train-job",
+    "status": "RUNNING",
+    "gpu_type": "H200",
+    "gpu_count": 8,
+    "config": "8×H200",
+    "template": "lium-cluster",
+    "price_per_hour": 25.6,
+    "spent_usd": 51.2,
+    "spend_cap_usd": 307.2,
+    "uptime": "2h 0m",
+    "created_at": "2026-11-03T16:02:11Z",
+    "ip": "198.51.100.22",
+    "ports": {
+      "22": 31122
+    },
+    "ssh_cmd": "ssh root@198.51.100.22 -p 31122",
+    "ssh_command": "ssh -p 31122 -o StrictHostKeyChecking=accept-new -o 'UserKnownHostsFile=\"/Users/dev/.lium/known_hosts/bb22cc33-dd44-4e55-9f66-001122334455\"' root@198.51.100.22",
+    "removal_scheduled_at": "2026-11-04T04:02:11+00:00",
+    "jupyter_url": null
+  },
+  {
+    "index": 3,
+    "id": "cc33dd44-ee55-4f66-a077-112233445566",
+    "huid": "bold-raven-5b",
+    "name": "eval-pool",
+    "status": "RUNNING",
+    "gpu_type": "B200",
+    "gpu_count": 8,
+    "config": "8×B200",
+    "template": "lium-cluster",
+    "price_per_hour": 38.4,
+    "spent_usd": 76.8,
+    "spend_cap_usd": 460.8,
+    "uptime": "2h 0m",
+    "created_at": "2026-11-03T15:40:02Z",
+    "ip": "198.51.100.31",
+    "ports": {
+      "22": 32022
+    },
+    "ssh_cmd": "ssh root@198.51.100.31 -p 32022",
+    "ssh_command": "ssh -p 32022 -o StrictHostKeyChecking=accept-new -o 'UserKnownHostsFile=\"/Users/dev/.lium/known_hosts/cc33dd44-ee55-4f66-a077-112233445566\"' root@198.51.100.31",
+    "removal_scheduled_at": null,
+    "jupyter_url": null
+  },
+  {
+    "index": 4,
+    "id": "dd44ee55-ff66-4077-b188-223344556677",
+    "huid": "keen-otter-90",
+    "name": "eval-pool",
+    "status": "RUNNING",
+    "gpu_type": "B200",
+    "gpu_count": 8,
+    "config": "8×B200",
+    "template": "lium-cluster",
+    "price_per_hour": 38.4,
+    "spent_usd": 76.8,
+    "spend_cap_usd": 460.8,
+    "uptime": "2h 0m",
+    "created_at": "2026-11-03T15:40:02Z",
+    "ip": "198.51.100.32",
+    "ports": {
+      "22": 32122
+    },
+    "ssh_cmd": "ssh root@198.51.100.32 -p 32122",
+    "ssh_command": "ssh -p 32122 -o StrictHostKeyChecking=accept-new -o 'UserKnownHostsFile=\"/Users/dev/.lium/known_hosts/dd44ee55-ff66-4077-b188-223344556677\"' root@198.51.100.32",
+    "removal_scheduled_at": null,
+    "jupyter_url": null
+  },
+  {
+    "index": 5,
+    "id": "ee55ff66-0077-4188-c299-334455667788",
+    "huid": "sunny-koala-2d",
+    "name": "dev-box",
+    "status": "RUNNING",
+    "gpu_type": "H100",
+    "gpu_count": 8,
+    "config": "8×H100",
+    "template": "pytorch-2.8",
+    "price_per_hour": 2.49,
+    "spent_usd": 4.98,
+    "spend_cap_usd": 29.88,
+    "uptime": "2h 0m",
+    "created_at": "2026-11-02T09:15:30Z",
+    "ip": "192.0.2.40",
+    "ports": {
+      "22": 22022
+    },
+    "ssh_cmd": "ssh root@192.0.2.40 -p 22022",
+    "ssh_command": "ssh -p 22022 -o StrictHostKeyChecking=accept-new -o 'UserKnownHostsFile=\"/Users/dev/.lium/known_hosts/ee55ff66-0077-4188-c299-334455667788\"' root@192.0.2.40",
+    "removal_scheduled_at": null,
+    "jupyter_url": null
+  }
+]

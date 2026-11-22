@@ -1,0 +1,43 @@
+{
+  "ok": true,
+  "cluster": "4c1f9a2e-7b3d-4e8a-9f61-2d5c8b0e7a13",
+  "results": [
+    {
+      "pod": "9b2e4f61-1c3a-4d5e-8f70-a1b2c3d4e5f6",
+      "huid": "brave-otter-3c",
+      "name": "cb-b200-exp42",
+      "node_rank": 0,
+      "success": true,
+      "message": "Pod deleted successfully",
+      "error": null
+    },
+    {
+      "pod": "0d8c7b6a-5f4e-4d3c-9b2a-1f0e9d8c7b6a",
+      "huid": "quiet-heron-81",
+      "name": "cb-b200-exp42",
+      "node_rank": 1,
+      "success": true,
+      "message": "Pod deleted successfully",
+      "error": null
+    },
+    {
+      "pod": "7e6d5c4b-3a29-4180-9f7e-6d5c4b3a2918",
+      "huid": "lucky-badger-0f",
+      "name": "cb-b200-exp42",
+      "node_rank": 2,
+      "success": true,
+      "message": "Pod deleted successfully",
+      "error": null
+    },
+    {
+      "pod": "2a3b4c5d-6e7f-4809-a1b2-c3d4e5f60718",
+      "huid": "swift-lynx-d4",
+      "name": "cb-b200-exp42",
+      "node_rank": 3,
+      "success": true,
+      "message": "Pod deleted successfully",
+      "error": null
+    }
+  ],
+  "error": null
+}

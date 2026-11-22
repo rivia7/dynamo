@@ -1,0 +1,15 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+nvidia_uvm 1847296 4 - Live 0x0000000000000000 (POE)
+nvidia_peermem 16384 0 - Live 0x0000000000000000 (POE)
+nvidia_drm 122880 0 - Live 0x0000000000000000 (POE)
+nvidia_modeset 1335296 1 nvidia_drm, Live 0x0000000000000000 (POE)
+nvidia 54857728 77 nvidia_uvm,nvidia_peermem,nvidia_modeset, Live 0x0000000000000000 (POE)
+rdma_ucm 28672 0 - Live 0x0000000000000000 (OE)
+ib_umad 28672 0 - Live 0x0000000000000000 (OE)
+ib_ipoib 151552 0 - Live 0x0000000000000000 (OE)
+mlx5_ib 491520 0 - Live 0x0000000000000000 (OE)
+ib_uverbs 163840 3 rdma_ucm,mlx5_ib, Live 0x0000000000000000 (OE)
+ib_core 434176 7 rdma_ucm,ib_umad,ib_ipoib,mlx5_ib,ib_uverbs,nvidia_peermem, Live 0x0000000000000000 (OE)
+mlx5_core 2297856 1 mlx5_ib, Live 0x0000000000000000 (OE)
+mlxfw 36864 1 mlx5_core, Live 0x0000000000000000 (OE)

@@ -1,0 +1,3 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+{"error": {"code": "insufficient_balance", "exit_code": 6, "hint": "Add funds with 'lium topup' or 'lium fund', or pick a cheaper node ('lium ls --sort price_total')", "message": "Insufficient balance to rent 4 nodes"}, "ok": false}

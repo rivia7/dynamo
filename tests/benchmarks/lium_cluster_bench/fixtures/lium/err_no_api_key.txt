@@ -1,0 +1,3 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+{"error": {"code": "no_api_key", "exit_code": 2, "hint": "Set LIUM_API_KEY, or run 'lium init --api-key <key>' with a key from https://lium.io/api-keys (or 'lium init --no-browser' and then 'lium init --session <ID>'); no account yet? 'lium signup --email you@example.com' creates one and stores its key", "message": "No API key configured and the browser login cannot run because LIUM_NONINTERACTIVE is set."}, "ok": false}

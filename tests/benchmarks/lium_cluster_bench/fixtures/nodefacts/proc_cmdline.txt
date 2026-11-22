@@ -1,0 +1,3 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+BOOT_IMAGE=/boot/vmlinuz-5.15.0-122-generic root=UUID=0b6f6c1e-9a1b-4f3e-8d2c-1f0e9d8c7b6a ro console=tty1 console=ttyS0,115200n8 intel_iommu=on pci=realloc=off transparent_hugepage=always nvidia.NVreg_EnableGpuFirmware=0 ds=nocloud-net;s=http://169.254.169.254/seed/ mitigations=off

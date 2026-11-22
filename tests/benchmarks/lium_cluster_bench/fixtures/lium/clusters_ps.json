@@ -1,0 +1,92 @@
+[
+  {
+    "id": "8f7e6d5c-4b3a-4291-8f7e-6d5c4b3a2910",
+    "name": "train-job",
+    "status": "RUNNING",
+    "size": 2,
+    "master_addr": "10.42.0.1",
+    "price_per_hour": 51.2,
+    "hostfile": "10.42.0.1 slots=8\n10.42.0.2 slots=8\n",
+    "pods": [
+      {
+        "id": "aa11bb22-cc33-4d44-8e55-ff6677889900",
+        "huid": "eager-wolf-aa",
+        "name": "train-job",
+        "status": "RUNNING",
+        "node_rank": 0,
+        "overlay_ip": "10.42.0.1",
+        "ssh_cmd": "ssh root@198.51.100.21 -p 31022",
+        "host": "198.51.100.21",
+        "ssh_port": 31022,
+        "ports": {
+          "22": 31022
+        },
+        "gpu_type": "H200",
+        "gpu_count": 8,
+        "price_per_hour": 25.6
+      },
+      {
+        "id": "bb22cc33-dd44-4e55-9f66-001122334455",
+        "huid": "noble-crane-17",
+        "name": "train-job",
+        "status": "RUNNING",
+        "node_rank": 1,
+        "overlay_ip": "10.42.0.2",
+        "ssh_cmd": "ssh root@198.51.100.22 -p 31122",
+        "host": "198.51.100.22",
+        "ssh_port": 31122,
+        "ports": {
+          "22": 31122
+        },
+        "gpu_type": "H200",
+        "gpu_count": 8,
+        "price_per_hour": 25.6
+      }
+    ]
+  },
+  {
+    "id": "1a2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d",
+    "name": "eval-pool",
+    "status": "RUNNING",
+    "size": 2,
+    "master_addr": "10.42.0.1",
+    "price_per_hour": 76.8,
+    "hostfile": "10.42.0.1 slots=8\n10.42.0.2 slots=8\n",
+    "pods": [
+      {
+        "id": "cc33dd44-ee55-4f66-a077-112233445566",
+        "huid": "bold-raven-5b",
+        "name": "eval-pool",
+        "status": "RUNNING",
+        "node_rank": 0,
+        "overlay_ip": "10.42.0.1",
+        "ssh_cmd": "ssh root@198.51.100.31 -p 32022",
+        "host": "198.51.100.31",
+        "ssh_port": 32022,
+        "ports": {
+          "22": 32022
+        },
+        "gpu_type": "B200",
+        "gpu_count": 8,
+        "price_per_hour": 38.4
+      },
+      {
+        "id": "dd44ee55-ff66-4077-b188-223344556677",
+        "huid": "keen-otter-90",
+        "name": "eval-pool",
+        "status": "RUNNING",
+        "node_rank": 1,
+        "overlay_ip": "10.42.0.2",
+        "ssh_cmd": "ssh root@198.51.100.32 -p 32122",
+        "host": "198.51.100.32",
+        "ssh_port": 32122,
+        "ports": {
+          "22": 32122
+        },
+        "gpu_type": "B200",
+        "gpu_count": 8,
+        "price_per_hour": 38.4
+      }
+    ]
+  }
+]

@@ -1,0 +1,15 @@
+{
+  "budget": {
+    "deploy_estimate_s": 1080,
+    "remaining_s": 20100,
+    "reserve_s": 12600
+  },
+  "error": "signal 15",
+  "exp_id": "exp42",
+  "heartbeat_ts": 1762192000.0,
+  "phase": "search",
+  "pid": 4242,
+  "points_done": 14,
+  "state": "interrupted",
+  "step": "deploying agg-tp8|mtp=1|nic=all|sim=0|rungs=-"
+}

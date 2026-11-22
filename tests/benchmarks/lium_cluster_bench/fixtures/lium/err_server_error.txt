@@ -1,0 +1,4 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+lium: warning: the API answered slowly
+{"error": {"code": "server_error", "exit_code": 3, "hint": "Retry; if it persists, re-run with LIUM_DEBUG=1 and report the request", "message": "502 Bad Gateway"}, "ok": false}

@@ -1,0 +1,3 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+{"error": {"code": "confirmation_required", "exit_code": 2, "hint": "Re-run with --yes", "message": "Confirmation required: Remove cluster 4c1f9a2e? (no prompt shown because LIUM_NONINTERACTIVE is set; re-run with --yes)"}, "ok": false}

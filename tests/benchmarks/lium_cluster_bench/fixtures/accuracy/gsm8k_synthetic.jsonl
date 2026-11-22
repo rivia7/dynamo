@@ -1,0 +1,16 @@
+{"question": "A baker makes 24 muffins and packs them into boxes of 6. How many boxes does she fill?", "answer": "She fills 24 / 6 = <<24/6=4>>4 boxes.\n#### 4"}
+{"question": "Tom has 15 marbles. He gives 4 to his sister and then buys 9 more. How many marbles does he have now?", "answer": "After giving some away he has 15 - 4 = <<15-4=11>>11 marbles.\nAfter buying more he has 11 + 9 = <<11+9=20>>20 marbles.\n#### 20"}
+{"question": "A train travels at 60 miles per hour for 3 hours. How far does it travel?", "answer": "It travels 60 * 3 = <<60*3=180>>180 miles.\n#### 180"}
+{"question": "Maria buys 3 notebooks at $2 each and a pen for $1. How much does she spend?", "answer": "The notebooks cost 3 * 2 = $<<3*2=6>>6.\nShe spends 6 + 1 = $<<6+1=7>>7 in total.\n#### 7"}
+{"question": "A garden has 8 rows of 12 tulips. Half of the tulips are red. How many tulips are red?", "answer": "There are 8 * 12 = <<8*12=96>>96 tulips.\nHalf of them, 96 / 2 = <<96/2=48>>48, are red.\n#### 48"}
+{"question": "Liam reads 25 pages a day. How many pages does he read in 2 weeks?", "answer": "Two weeks have 2 * 7 = <<2*7=14>>14 days.\nHe reads 25 * 14 = <<25*14=350>>350 pages.\n#### 350"}
+{"question": "A store sells 40 laptops and makes $30 profit on each. How much profit does it make?", "answer": "It makes 40 * 30 = $<<40*30=1200>>1,200 in profit.\n#### 1,200"}
+{"question": "The temperature was 5 degrees in the morning and dropped 8 degrees by night. What was the temperature at night?", "answer": "At night it was 5 - 8 = <<5-8=-3>>-3 degrees.\n#### -3"}
+{"question": "Ana saves $12 a week. How many weeks does she need to save $96?", "answer": "She needs 96 / 12 = <<96/12=8>>8 weeks.\n#### 8"}
+{"question": "A recipe needs 3 eggs per cake. How many eggs are needed for 6 cakes?", "answer": "It needs 3 * 6 = <<3*6=18>>18 eggs.\n#### 18"}
+{"question": "A car park has 5 levels with 120 spaces each. 437 cars are parked. How many spaces are free?", "answer": "There are 5 * 120 = <<5*120=600>>600 spaces.\nSo 600 - 437 = <<600-437=163>>163 spaces are free.\n#### 163"}
+{"question": "Ben runs 3 laps of a 400 meter track every day for 5 days. How many meters does he run?", "answer": "Each day he runs 3 * 400 = <<3*400=1200>>1200 meters.\nIn 5 days he runs 1200 * 5 = <<1200*5=6000>>6000 meters.\n#### 6000"}
+{"question": "A box holds 9 apples. How many apples are in 7 boxes?", "answer": "There are 9 * 7 = <<9*7=63>>63 apples.\n#### 63"}
+{"question": "Sam had 50 stickers and gave away 18. How many stickers does he have left?", "answer": "He has 50 - 18 = <<50-18=32>>32 stickers left.\n#### 32"}
+{"question": "A bus carries 45 people per trip. How many people does it carry in 4 trips?", "answer": "It carries 45 * 4 = <<45*4=180>>180 people.\n#### 180"}
+{"question": "A farmer has 3 fields of 2,500 square meters each. What is their total area?", "answer": "The total area is 3 * 2,500 = <<3*2500=7500>>7,500 square meters.\n#### 7,500"}

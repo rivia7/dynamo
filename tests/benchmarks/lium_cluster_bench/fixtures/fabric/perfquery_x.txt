@@ -1,0 +1,27 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+# Port extended counters: Lid 3 port 17 (CapMask: 0x5A00)
+PortSelect:......................17
+CounterSelect:...................0x0000
+PortXmitData:....................183516234511870
+PortRcvData:.....................179203125587312
+PortXmitPkts:....................45812375612
+PortRcvPkts:.....................44933081245
+PortUnicastXmitPkts:.............45812370001
+PortUnicastRcvPkts:..............44933079990
+PortMulticastXmitPkts:...........5611
+PortMulticastRcvPkts:............1255
+SymbolErrorCounter:..............0
+LinkErrorRecoveryCounter:........0
+LinkDownedCounter:...............1
+PortRcvErrors:...................0
+PortRcvRemotePhysicalErrors:.....0
+PortRcvSwitchRelayErrors:........0
+PortXmitDiscards:................12
+PortXmitConstraintErrors:........0
+PortRcvConstraintErrors:.........0
+LocalLinkIntegrityErrors:........0
+ExcessiveBufferOverrunErrors:....0
+VL15Dropped:.....................0
+PortXmitWait:....................9123456789
+QP1Dropped:......................0

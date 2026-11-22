@@ -1,0 +1,22 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+processor	: 0
+vendor_id	: GenuineIntel
+cpu family	: 6
+model		: 143
+model name	: Intel(R) Xeon(R) Platinum 8480+
+stepping	: 8
+microcode	: 0x2b000603
+cpu MHz		: 2000.000
+cache size	: 107520 KB
+physical id	: 0
+siblings	: 112
+core id		: 0
+cpu cores	: 56
+
+processor	: 1
+vendor_id	: GenuineIntel
+cpu family	: 6
+model		: 143
+model name	: Intel(R) Xeon(R) Platinum 8480+
+stepping	: 8

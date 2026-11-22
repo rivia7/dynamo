@@ -1,0 +1,43 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
++ exec python3 -m dynamo.sglang --config /bench/experiments/h200-001/deployments/3f9a1c2b7d4e/cb-3f9a1c2b7d4e-decode0-r0.yaml
+2026-11-05T09:12:03.418224Z  INFO dynamo_runtime::distributed: Initializing DistributedRuntime discovery="etcd" request_plane="tcp"
+2026-11-05T09:12:03.902117Z  INFO dynamo_runtime::system_status_server: System status server listening address="0.0.0.0:8081"
+2026-11-05T09:12:04.551032Z  INFO main.init: Initializing SGLang engine serving_mode="decode"
+2026-11-05T09:12:05.120554Z  INFO server_args.print_server_args: server_args=ServerArgs(model_path='/data/models/GLM-5.3', tokenizer_path='/data/models/GLM-5.3', tp_size=8, dp_size=8, ep_size=8, enable_dp_attention=True, mem_fraction_static=0.82, max_running_requests=1024, chunked_prefill_size=16384, context_length=262144, kv_cache_dtype='fp8_e4m3', disaggregation_mode='decode', disaggregation_transfer_backend='mooncake', disaggregation_ib_device='mlx5_0,mlx5_1,mlx5_2,mlx5_3', speculative_algorithm='EAGLE', enable_metrics=True)
+2026-11-05T09:12:19.334511Z  WARN server_args._handle_gpu_memory_settings: Overlap scheduler is disabled because of using eagle speculative decoding.
+2026-11-05T09:12:21.007345Z  INFO model_runner.init_torch_distributed: Init torch distributed begin.
+2026-11-05T09:12:21.010882Z  INFO model_runner.init_torch_distributed: Init torch distributed begin.
+node2:2203:2203 [0] NCCL INFO Bootstrap : Using wg0:10.42.0.3<0>
+node2:2203:2203 [0] NCCL INFO NET/IB : Using [0]mlx5_0:1/IB [1]mlx5_1:1/IB [2]mlx5_2:1/IB [3]mlx5_3:1/IB ; OOB wg0:10.42.0.3<0>
+node2:2210:2981 [7] NCCL WARN NET/IB : mlx5_3:1 Got async event : GID table change
+2026-11-05T09:12:24.661120Z  INFO model_runner.init_torch_distributed: Init torch distributed ends. mem usage=1.18 GB
+2026-11-05T09:12:24.702417Z  INFO model_runner.init_torch_distributed: Init torch distributed ends. mem usage=1.21 GB
+2026-11-05T09:12:25.101992Z  INFO model_runner.load_model: Load weight begin. avail mem=138.62 GB
+2026-11-05T09:12:25.117730Z  INFO model_runner.load_model: Load weight begin. avail mem=138.60 GB
+Loading safetensors checkpoint shards:   0% Completed | 0/141 [00:00<?, ?it/s]
+Loading safetensors checkpoint shards:  50% Completed | 71/141 [01:05<01:04,  1.08it/s]
+Loading safetensors checkpoint shards: 100% Completed | 141/141 [02:11<00:00,  1.07it/s]
+2026-11-05T09:14:37.882101Z  INFO model_runner.load_model: Load weight end. elapsed=132.78 s, type=GlmMoeDsaForCausalLM, dtype=torch.bfloat16, avail mem=49.31 GB, mem usage=89.31 GB.
+2026-11-05T09:14:38.950442Z  INFO model_runner.load_model: Load weight end. elapsed=133.83 s, type=GlmMoeDsaForCausalLM, dtype=torch.bfloat16, avail mem=49.27 GB, mem usage=89.33 GB.
+2026-11-05T09:14:39.005872Z  INFO model_runner.configure_kv_cache_dtype: Using KV cache dtype: torch.float8_e4m3fn
+2026-11-05T09:14:39.771340Z  INFO memory_pool._create_buffers: KV Cache is allocated. #tokens: 731264, KV size: 23.71 GB
+2026-11-05T09:14:39.802118Z  INFO memory_pool._create_buffers: KV Cache is allocated. #tokens: 731264, KV size: 23.71 GB
+2026-11-05T09:14:39.912003Z  INFO model_runner.init_memory_pool: Memory pool end. avail mem=24.90 GB
+2026-11-05T09:14:40.004391Z  INFO model_runner.init_memory_pool: Memory pool end. avail mem=24.86 GB
+2026-11-05T09:14:41.230198Z  INFO model_runner.init_device_graphs: Capture cuda graph begin. This can take up to several minutes. avail mem=24.31 GB
+2026-11-05T09:14:41.231770Z  INFO cuda_graph_runner.__init__: Capture cuda graph bs [1, 2, 4, 8, 12, 16, 24, 32, 40, 48, 56, 64, 80, 96, 112, 128]
+2026-11-05T09:14:41.260117Z  INFO model_runner.init_device_graphs: Capture cuda graph begin. This can take up to several minutes. avail mem=24.29 GB
+Capturing batches (bs=128 avail_mem=24.25 GB):   6%|▋         | 1/16 [00:03<00:51,  3.44s/it]
+Capturing batches (bs=1 avail_mem=22.71 GB): 100%|██████████| 16/16 [00:55<00:00,  3.47s/it]
+2026-11-05T09:15:37.600114Z  INFO model_runner.init_device_graphs: Capture cuda graph end. Time elapsed: 56.37 s. mem usage=1.62 GB. avail mem=22.69 GB.
+2026-11-05T09:15:38.020565Z  INFO model_runner.init_device_graphs: Capture cuda graph end. Time elapsed: 56.76 s. mem usage=1.64 GB. avail mem=22.65 GB.
+2026-11-05T09:15:39.118005Z  INFO scheduler.__init__: max_total_num_tokens=731264, chunked_prefill_size=16384, max_prefill_tokens=16384, max_running_requests=128, context_len=262144, available_gpu_mem=22.69 GB
+2026-11-05T09:15:39.120778Z  INFO scheduler.__init__: max_total_num_tokens=731264, chunked_prefill_size=16384, max_prefill_tokens=16384, max_running_requests=128, context_len=262144, available_gpu_mem=22.65 GB
+2026-11-05T09:15:41.445510Z  INFO conn.__init__: Mooncake transfer engine initialized (protocol=rdma, devices=mlx5_0,mlx5_1,mlx5_2,mlx5_3)
+2026-11-05T09:15:58.300047Z  INFO publisher.setup_sgl_metrics: SGLang metrics publisher endpoint created
+2026-11-05T09:16:01.887016Z  INFO init_llm.init_decode: Registering model with endpoint types: chat,completions
+2026-11-05T09:16:02.551870Z  INFO register._register_model_with_runtime_config: Successfully registered LLM with runtime config
+2026-11-05T09:16:02.552901Z  INFO register.register_model_with_readiness_gate: Model registration succeeded; processing queued requests
+2026-11-05T09:16:10.004118Z  INFO scheduler.log_decode_stats: Decode batch. #running-req: 1, #token: 1288, token usage: 0.00, accept len: 2.61, gen throughput (token/s): 41.27, #queue-req: 0
+2026-11-05T09:16:11.009113Z  WARN conn.poll: KV transfer for bootstrap_room=8813721 timed out after 30 s; retrying

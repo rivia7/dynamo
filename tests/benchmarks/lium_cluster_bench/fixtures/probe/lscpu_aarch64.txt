@@ -1,0 +1,13 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+Architecture:             aarch64
+  CPU op-mode(s):         64-bit
+  Byte Order:             Little Endian
+CPU(s):                   144
+  On-line CPU(s) list:    0-143
+Vendor ID:                ARM
+  Model name:             Neoverse-V2
+    Model:                0
+    Thread(s) per core:   1
+    Core(s) per socket:   72
+    Socket(s):            2

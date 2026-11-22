@@ -1,0 +1,3 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+{"error": {"code": "invalid_api_key", "exit_code": 3, "hint": "Check the key: 'lium config get api.api_key' shows which one is used; a new one comes from https://lium.io/api-keys", "message": "Invalid API key"}, "ok": false}

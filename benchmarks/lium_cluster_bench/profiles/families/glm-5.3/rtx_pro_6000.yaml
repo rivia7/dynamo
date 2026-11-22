@@ -1,0 +1,88 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+#
+# GLM-5.3 (NVFP4, ~0.43 TB) on RTX PRO 6000 Blackwell, written for 4 nodes x 8
+# (scales to 2/8 nodes; ids/titles are templates) (96 GB,
+# SM120, PCIe only). TP4 cannot hold the weights (4 x 96 GB), so replicas are
+# TP8 per node. trtllm-gen kernels are SM100-only; CUTLASS paths are used.
+# DSA attention backends on SM120 are UNVERIFIED: the ladder walks through the
+# candidates and the preflight smoke reports "unsupported" if all fail.
+gpu: rtx_pro_6000
+model: glm-5.3
+served_context: 262144
+default_grid: {start: 32, max: 256, min: 4}
+
+families:
+  - id: agg-dtp8
+    title: "聚合 TP8/DP8 x{agg}（每机一副本）"
+    priority: 0
+    roles:
+      - role: agg
+        gpus_per_instance: 8
+        instances: 4
+        base: {path: recipes/glm-5.3/sglang/agg-b200-agentic/deploy.yaml, key: agg.yaml}
+        sglang:
+          tensor-parallel-size: 8
+          data-parallel-size: 8
+          moe-runner-backend: flashinfer_cutlass
+          fp4-gemm-backend: flashinfer_cutlass
+          enable-flashinfer-allreduce-fusion: null
+          max-running-requests: 128
+          mem-fraction-static: 0.85
+          hicache-size: 100
+    notes: Derived from the B200 recipe with SM120-safe GEMM/MoE backends.
+
+  - id: pd-{prefill}p{decode}d
+    title: "PD 分离 {prefill}P(TP8) + {decode}D(TP8/DP8)"
+    priority: 10
+    transport: mooncake
+    cross_node: [kv]
+    roles:
+      - role: prefill
+        gpus_per_instance: 8
+        instances: 2
+        base: {path: recipes/glm-5.3/sglang/disagg-b200-agentic/deploy.yaml, key: prefill.yaml}
+        sglang:
+          tensor-parallel-size: 8
+          data-parallel-size: 8
+          ep-size: 8
+          moe-runner-backend: flashinfer_cutlass
+          mem-fraction-static: 0.85
+        extra_args: [--cuda-graph-backend-prefill, disabled]
+        env: {MC_FORCE_HCA: "1"}
+      - role: decode
+        gpus_per_instance: 8
+        instances: 2
+        base: {path: recipes/glm-5.3/sglang/disagg-b200-agentic/deploy.yaml, key: decode.yaml}
+        sglang:
+          enable-symm-mem: null
+          enable-flashinfer-allreduce-fusion: null
+          mem-fraction-static: 0.84
+        env: {MC_FORCE_HCA: "1", SGLANG_DISAGGREGATION_WAITING_TIMEOUT: "3600"}
+
+ladder:
+  - id: sm120-dsa-tilelang
+    when: kernel_unsupported
+    extra_args: [--dsa-prefill-backend, tilelang, --dsa-decode-backend, tilelang]
+    drop_args: [--dsa-prefill-backend, --dsa-decode-backend]
+  - id: sm120-dsa-flashmla
+    when: kernel_unsupported
+    extra_args: [--dsa-prefill-backend, flashmla_kv, --dsa-decode-backend, flashmla_kv]
+    drop_args: [--dsa-prefill-backend, --dsa-decode-backend]
+  - id: sm120-no-spec
+    when: kernel_unsupported
+    sglang:
+      speculative-algorithm: null
+      speculative-num-steps: null
+      speculative-eagle-topk: null
+      speculative-num-draft-tokens: null
+      speculative-attention-mode: null
+      speculative-moe-runner-backend: null
+      speculative-moe-a2a-backend: null
+  - id: sm120-triton-moe
+    when: kernel_unsupported
+    sglang: {moe-runner-backend: triton}
+  - id: oom-mem-0.03
+    when: oom
+    mem_fraction_delta: -0.03
+    halve_cuda_graph_bs: true

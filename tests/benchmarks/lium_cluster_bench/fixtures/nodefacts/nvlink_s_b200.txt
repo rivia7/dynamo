@@ -1,0 +1,21 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+GPU 0: NVIDIA B200 (UUID: GPU-8f2e7b3a-4c1d-6e5f-a0b9-c8d7e6f5a4b3)
+	 Link 0: 50 GB/s
+	 Link 1: 50 GB/s
+	 Link 2: 50 GB/s
+	 Link 3: 50 GB/s
+	 Link 4: 50 GB/s
+	 Link 5: 50 GB/s
+	 Link 6: 50 GB/s
+	 Link 7: 50 GB/s
+	 Link 8: 50 GB/s
+	 Link 9: 50 GB/s
+	 Link 10: 50 GB/s
+	 Link 11: 50 GB/s
+	 Link 12: 50 GB/s
+	 Link 13: 50 GB/s
+	 Link 14: 50 GB/s
+	 Link 15: 50 GB/s
+	 Link 16: 50 GB/s
+	 Link 17: 50 GB/s

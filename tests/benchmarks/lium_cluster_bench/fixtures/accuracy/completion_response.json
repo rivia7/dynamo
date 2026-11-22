@@ -1,0 +1,22 @@
+{
+  "id": "cmpl-6f0c2a4e-5b1d-4c8e-9a37-2d41c0e5b9aa",
+  "object": "text_completion",
+  "created": 1793871100,
+  "model": "glm-5.3",
+  "choices": [
+    {
+      "index": 0,
+      "text": " Two weeks have 2 * 7 = <<2*7=14>>14 days.\nHe reads 25 * 14 = <<25*14=350>>350 pages.\n#### 350\n\n",
+      "finish_reason": "stop",
+      "logprobs": null
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 612,
+    "completion_tokens": 41,
+    "total_tokens": 653,
+    "prompt_tokens_details": {
+      "cached_tokens": 576
+    }
+  }
+}

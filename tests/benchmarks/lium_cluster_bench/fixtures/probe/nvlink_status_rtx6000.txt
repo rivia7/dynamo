@@ -1,0 +1,10 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+GPU 0: NVIDIA RTX PRO 6000 Blackwell Server Edition (UUID: GPU-00088bc9-e6b3-e0cf-5ddb-cc71ca9e525b)
+GPU 1: NVIDIA RTX PRO 6000 Blackwell Server Edition (UUID: GPU-ddeb4ee1-972d-a000-6a39-bd875d3227fd)
+GPU 2: NVIDIA RTX PRO 6000 Blackwell Server Edition (UUID: GPU-c36f4912-c5d2-ffec-4d84-68826e631b72)
+GPU 3: NVIDIA RTX PRO 6000 Blackwell Server Edition (UUID: GPU-3c30e3cd-9e94-1670-338d-b3ca90db302c)
+GPU 4: NVIDIA RTX PRO 6000 Blackwell Server Edition (UUID: GPU-640a1c6a-2393-a630-82df-d8c794e2945a)
+GPU 5: NVIDIA RTX PRO 6000 Blackwell Server Edition (UUID: GPU-b2936eb8-4f55-f0b2-358b-1c0274c78f51)
+GPU 6: NVIDIA RTX PRO 6000 Blackwell Server Edition (UUID: GPU-c32e4996-c829-7b35-4fd3-205a5db09588)
+GPU 7: NVIDIA RTX PRO 6000 Blackwell Server Edition (UUID: GPU-f39334c6-9302-b9b5-8242-e3f9a6347622)

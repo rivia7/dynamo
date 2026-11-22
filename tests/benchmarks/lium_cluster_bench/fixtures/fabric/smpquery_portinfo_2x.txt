@@ -1,0 +1,54 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+# Port info: DR path slid 0; dlid 0; 0,1 port 18
+Mkey:............................<not displayed>
+GidPrefix:.......................0xfe80000000000000
+Lid:.............................0
+SMLid:...........................0
+CapMask:.........................0x00000000
+DiagCode:........................0x0000
+MkeyLeasePeriod:.................0
+LocalPort:.......................18
+LinkWidthEnabled:................1X or 2X or 4X
+LinkWidthSupported:..............1X or 2X or 4X
+LinkWidthActive:.................2X
+LinkSpeedSupported:..............2.5 Gbps or 5.0 Gbps or 10.0 Gbps
+LinkState:.......................Active
+PhysLinkState:...................LinkUp
+LinkDownDefState:................Polling
+ProtectBits:.....................0
+LMC:.............................0
+LinkSpeedActive:.................10.0 Gbps
+LinkSpeedEnabled:................2.5 Gbps or 5.0 Gbps or 10.0 Gbps
+NeighborMTU:.....................4096
+SMSL:............................0
+VLCap:...........................VL0-7
+InitType:........................0x00
+VLHighLimit:.....................4
+VLArbHighCap:....................8
+VLArbLowCap:.....................8
+InitReply:.......................0x00
+MtuCap:..........................4096
+VLStallCount:....................7
+HoqLife:.........................20
+OperVLs:.........................VL0-7
+PartEnforceInb:..................1
+PartEnforceOutb:.................1
+FilterRawInb:....................1
+FilterRawOutb:...................1
+MkeyViolations:..................0
+PkeyViolations:..................0
+QkeyViolations:..................0
+GuidCap:.........................1
+ClientReregister:................0
+McastPkeyTrapSuppressionEnabled:.0
+SubnetTimeout:...................18
+RespTimeVal:.....................20
+LocalPhysErr:....................8
+OverrunErr:......................8
+MaxCreditHint:...................0
+RoundTrip:.......................0
+CapabilityMask2:.................0x00000000
+LinkSpeedExtActive:..............106.25 Gbps
+LinkSpeedExtSupported:...........14.0625 Gbps or 25.78125 Gbps or 53.125 Gbps or 106.25 Gbps
+LinkSpeedExtEnabled:.............14.0625 Gbps or 25.78125 Gbps or 53.125 Gbps or 106.25 Gbps

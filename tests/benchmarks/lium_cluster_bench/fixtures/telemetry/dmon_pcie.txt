@@ -1,0 +1,10 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+# gpu  rxpci  txpci
+# Idx   MB/s   MB/s
+    0  12034   9876
+    1      0      0
+    2      -      -
+# gpu  rxpci  txpci
+# Idx   MB/s   MB/s
+    0  15000  11000

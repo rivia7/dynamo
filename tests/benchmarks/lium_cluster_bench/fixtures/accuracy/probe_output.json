@@ -1,0 +1,163 @@
+{
+ "kind": "accuracy_probe",
+ "version": 1,
+ "benchmark": "gsm8k",
+ "model": "glm-5.3",
+ "endpoint": "http://127.0.0.1:8000/v1/completions",
+ "dataset": "/root/cluster_bench/datasets/gsm8k-test.jsonl",
+ "dataset_sha256": "f756f993b1827e3afd2668372c2dbd7abda68b1cc43ca7e8d773bbb2e48c08f1",
+ "dataset_items": 16,
+ "shots": 5,
+ "first_index": 5,
+ "params": {
+  "shots": 5,
+  "questions": 11,
+  "concurrency": 4,
+  "max_tokens": 512,
+  "request_timeout_s": 120.0,
+  "deadline_s": 900.0,
+  "retries": 1,
+  "temperature": 0.0,
+  "stop": [
+   "Question",
+   "Assistant:",
+   "<|separator|>"
+  ]
+ },
+ "started_at": 1793871100.25,
+ "error": null,
+ "questions": 11,
+ "n": 10,
+ "correct": 8,
+ "accuracy": 0.8,
+ "invalid": 0,
+ "errors": 1,
+ "error_kinds": {
+  "http_503": 1
+ },
+ "finish_reasons": {
+  "length": 1,
+  "stop": 9
+ },
+ "deadline_hit": false,
+ "latency_p50_s": 6.912,
+ "latency_max_s": 19.408,
+ "prompt_tokens": 5484,
+ "completion_tokens": 840,
+ "usage_items": 9,
+ "answer_sources": {
+  "reasoning": 1,
+  "text": 9
+ },
+ "items": [
+  [
+   5,
+   true,
+   350,
+   350
+  ],
+  [
+   6,
+   true,
+   1200,
+   1200
+  ],
+  [
+   7,
+   false,
+   3,
+   -3
+  ],
+  [
+   8,
+   true,
+   8,
+   8
+  ],
+  [
+   9,
+   true,
+   18,
+   18
+  ],
+  [
+   10,
+   null,
+   null,
+   163
+  ],
+  [
+   11,
+   true,
+   6000,
+   6000
+  ],
+  [
+   12,
+   false,
+   9,
+   63
+  ],
+  [
+   13,
+   true,
+   32,
+   32
+  ],
+  [
+   14,
+   true,
+   180,
+   180
+  ],
+  [
+   15,
+   true,
+   7500,
+   7500
+  ]
+ ],
+ "samples": [
+  {
+   "index": 5,
+   "ok": true,
+   "pred": 350,
+   "gold": 350,
+   "finish_reason": "stop",
+   "source": "text",
+   "text": " Two weeks have 2 * 7 = <<2*7=14>>14 days.\nHe reads 25 * 14 = <<25*14=350>>350 pages.\n#### 350",
+   "reasoning": null
+  },
+  {
+   "index": 7,
+   "ok": false,
+   "pred": 3,
+   "gold": -3,
+   "finish_reason": "stop",
+   "source": "text",
+   "text": " It was 8 - 5 = <<8-5=3>>3 degrees.\n#### 3",
+   "reasoning": null
+  },
+  {
+   "index": 12,
+   "ok": false,
+   "pred": 9,
+   "gold": 63,
+   "finish_reason": "length",
+   "source": "text",
+   "text": " 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9",
+   "reasoning": null
+  }
+ ],
+ "notes": [
+  {
+   "source": "request",
+   "error": "http_503: {\"error\": {\"message\": \"Service Unavailable\", \"code\": 503}}"
+  },
+  {
+   "source": "answers",
+   "error": "answers not from the visible text: reasoning=1"
+  }
+ ],
+ "wall_s": 21.734
+}

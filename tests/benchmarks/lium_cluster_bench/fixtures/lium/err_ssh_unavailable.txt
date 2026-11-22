@@ -1,0 +1,3 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+{"error": {"code": "ssh_unavailable", "exit_code": 4, "hint": "Wait for 'lium ps' to show the pod RUNNING with an SSH command, then retry", "message": "Pod brave-otter-3c has no SSH command yet"}, "ok": false}

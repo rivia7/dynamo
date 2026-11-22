@@ -1,0 +1,25 @@
+{
+  "budget": {
+    "deploy_estimate_s": 1020,
+    "remaining_s": 1310,
+    "reserve_s": 0
+  },
+  "exp_id": "exp42",
+  "heartbeat_ts": 1762222000.0,
+  "kb_root": "/root/cluster_bench/kb",
+  "last_point": {
+    "cand_key": "disagg-3p1d|mtp=1|nic=all|sim=0|rungs=-",
+    "concurrency": 256,
+    "purpose": "confirm",
+    "status": "valid",
+    "tps_per_gpu": 331.9
+  },
+  "phase": "finalize",
+  "pid": 4242,
+  "points_done": 41,
+  "report_html": "/root/cluster_bench/experiments/exp42/report/report.zh-CN.html",
+  "report_md": "/root/cluster_bench/experiments/exp42/report/report.zh-CN.md",
+  "state": "done",
+  "step": "",
+  "verdict": "ok"
+}

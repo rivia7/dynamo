@@ -1,0 +1,111 @@
+{
+ "collected_at": 1793871312.408,
+ "cuda_toolkit": "13.0.1",
+ "env": {
+  "CUDA_HOME": "/usr/local/cuda",
+  "CUDA_VERSION": "13.0.1",
+  "LD_LIBRARY_PATH": "/usr/local/ucx/lib:/usr/local/nixl/lib/x86_64-linux-gnu:/usr/local/nvidia/lib:/usr/local/nvidia/lib64",
+  "NVIDIA_DRIVER_CAPABILITIES": "compute,utility",
+  "NVIDIA_VISIBLE_DEVICES": "0",
+  "UCX_TLS": "^cuda_ipc"
+ },
+ "glibc": "2.39",
+ "hostname": "lium-h100-00",
+ "ibv_devices": [
+  "mlx5_0",
+  "mlx5_1",
+  "mlx5_2",
+  "mlx5_3",
+  "mlx5_4",
+  "mlx5_5",
+  "mlx5_6",
+  "mlx5_7"
+ ],
+ "kind": "software_stack",
+ "missing_packages": [],
+ "nccl_libraries": [
+  "/usr/local/lib/python3.12/dist-packages/nvidia/nccl/lib/libnccl.so.2"
+ ],
+ "nccl_plugins": [],
+ "node": "node0",
+ "notes": [],
+ "nvcc": "13.0.88",
+ "os_release": {
+  "ID": "ubuntu",
+  "ID_LIKE": "debian",
+  "PRETTY_NAME": "Ubuntu 24.04.3 LTS",
+  "VERSION_CODENAME": "noble",
+  "VERSION_ID": "24.04"
+ },
+ "packages": {
+  "ai-dynamo": "1.5.1",
+  "ai-dynamo-runtime": "1.5.1",
+  "cuda-bindings": "13.0.2",
+  "cuda-python": "13.0.2",
+  "deep-ep": "1.2.1+9af0e0d",
+  "flashinfer-cubin": "0.5.3",
+  "flashinfer-jit-cache": "0.5.3+cu130",
+  "flashinfer-python": "0.5.3",
+  "huggingface-hub": "0.36.0",
+  "mooncake-transfer-engine": "0.3.7.post2",
+  "nixl": "0.8.0",
+  "numpy": "2.3.4",
+  "nvidia-cublas": "13.1.0.3",
+  "nvidia-cuda-runtime": "13.0.96",
+  "nvidia-cudnn-cu13": "9.14.0.64",
+  "nvidia-cutlass-dsl": "4.2.1",
+  "nvidia-nccl-cu13": "2.28.3",
+  "nvidia-nvshmem-cu13": "3.4.5",
+  "pydantic": "2.12.3",
+  "safetensors": "0.6.2",
+  "sgl-kernel": "0.3.21",
+  "sglang": "0.5.22",
+  "tokenizers": "0.22.1",
+  "torch": "2.9.1+cu130",
+  "torchao": "0.9.0",
+  "torchaudio": "2.9.1+cu130",
+  "torchvision": "0.24.1+cu130",
+  "transformers": "4.57.1",
+  "triton": "3.5.1",
+  "uvloop": "0.22.1",
+  "xgrammar": "0.1.27"
+ },
+ "python": "3.12.3",
+ "torch": {
+  "arch_list": [
+   "sm_75",
+   "sm_80",
+   "sm_86",
+   "sm_90",
+   "sm_100",
+   "sm_120"
+  ],
+  "capability": "9.0",
+  "cuda": "13.0",
+  "cuda_available": true,
+  "cudnn": "91400",
+  "device_count": 1,
+  "device_name": "NVIDIA H100 80GB HBM3",
+  "errors": [],
+  "git_version": "5811a8d7da873dd699ff6687092c225caffcf1bb",
+  "nccl": "2.28.3",
+  "version": "2.9.1+cu130"
+ },
+ "ucx": {
+  "configured_with": [
+   "--enable-shared",
+   "--enable-optimizations",
+   "--enable-cma",
+   "--enable-devel-headers",
+   "--with-cuda=/usr/local/cuda",
+   "--with-verbs",
+   "--with-dm",
+   "--with-gdrcopy=/usr/local",
+   "--with-efa",
+   "--enable-mt"
+  ],
+  "revision": "2a0a4e4",
+  "version": "1.19.0"
+ },
+ "version": 1
+}

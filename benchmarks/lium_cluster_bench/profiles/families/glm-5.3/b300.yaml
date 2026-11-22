@@ -1,0 +1,31 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+#
+# GLM-5.3 (NVFP4) on B300 (written for 4 nodes x 8; scales to 2/8 like B200).
+# No B300 GLM recipe exists, so the B200 families are reused; 288 GB HBM leaves
+# far more KV capacity per replica.
+# SM103 kernel coverage is UNVERIFIED and resolved by the smoke ladder.
+extends: b200.yaml
+gpu: b300
+ladder:
+  - id: kernel-cutlass-moe
+    when: kernel_unsupported
+    sglang: {moe-runner-backend: flashinfer_cutlass, fp4-gemm-backend: flashinfer_cutlass}
+  - id: kernel-flashmla-dsa
+    when: kernel_unsupported
+    extra_args: [--dsa-prefill-backend, flashmla_kv, --dsa-decode-backend, flashmla_kv]
+    drop_args: [--dsa-prefill-backend, --dsa-decode-backend]
+  - id: kernel-no-spec
+    when: kernel_unsupported
+    sglang:
+      speculative-algorithm: null
+      speculative-num-steps: null
+      speculative-eagle-topk: null
+      speculative-num-draft-tokens: null
+      speculative-attention-mode: null
+      speculative-moe-runner-backend: null
+      speculative-moe-a2a-backend: null
+  - id: oom-mem-0.03
+    when: oom
+    mem_fraction_delta: -0.03
+    halve_cuda_graph_bs: true

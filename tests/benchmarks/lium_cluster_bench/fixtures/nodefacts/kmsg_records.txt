@@ -1,0 +1,13 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+4,212,451802,-;DMAR: [Firmware Bug]: No firmware reserved region can cover this RMRR
+6,1290,6112042,-;nvidia: loading out-of-tree module taints kernel.
+4,1388,19873305,-;mlx5_core 0000:3b:00.0 enp59s0f0np0: Link down
+ SUBSYSTEM=net
+ DEVICE=n6
+6,2011,211004512,-;NVRM: Xid (PCI:0000:3a:00): 94, pid=48211, name=python3, Contained: SM (0x1). RST: No, D-RST: No
+ SUBSYSTEM=pci
+ DEVICE=+pci:0000:3a:00.0
+6,2012,211004998,-;NVRM: Xid (PCI:0000:3a:00): 63, pid='<unknown>', name=<unknown>, Row Remapper: New row (0x00000003c0f8a0a0) marked for remapping, reset gpu to activate.
+6,2400,4000000000,-;EXT4-fs (nvme1n1p1): mounted filesystem with ordered data mode
+3,2501,9123552300,-;mlx5_core 0000:19:00.0: mlx5_cmd_out_err:838:(pid 52133): CREATE_QP(0x500) op_mod(0x0) failed, status bad parameter(0x3), syndrome (0x5a1c03), err(-22)

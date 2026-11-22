@@ -1,0 +1,22 @@
+{
+  "budget": {
+    "deploy_estimate_s": 1080,
+    "remaining_s": 22140,
+    "reserve_s": 12600
+  },
+  "exp_id": "exp42",
+  "heartbeat_ts": 1762190000.5,
+  "last_point": {
+    "cand_key": "disagg-3p1d|mtp=1|nic=all|sim=0|rungs=-",
+    "concurrency": 64,
+    "purpose": "search",
+    "status": "valid",
+    "tps_per_gpu": 312.4
+  },
+  "phase": "search",
+  "pid": 4242,
+  "points_done": 12,
+  "reason": "climb the concurrency grid",
+  "state": "running",
+  "step": "measuring disagg-3p1d|mtp=1|nic=all|sim=0|rungs=- c=128 (search)"
+}

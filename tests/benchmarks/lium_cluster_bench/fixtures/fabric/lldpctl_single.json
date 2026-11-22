@@ -1,0 +1,22 @@
+{
+  "lldp": {
+    "interface": {
+      "ens1f0np0": {
+        "via": "LLDP",
+        "rid": "1",
+        "age": "0 day, 00:10:12",
+        "chassis": {
+          "id": {"type": "mac", "value": "b8:59:9f:12:34:00"},
+          "descr": "SONiC Software Version: SONiC.202305 - HwSku: Mellanox-SN4700",
+          "mgmt-ip": "10.250.0.5"
+        },
+        "port": {
+          "id": {"type": "local", "value": "Ethernet8"},
+          "descr": "etp3",
+          "ttl": "120",
+          "mfs": "9100"
+        }
+      }
+    }
+  }
+}

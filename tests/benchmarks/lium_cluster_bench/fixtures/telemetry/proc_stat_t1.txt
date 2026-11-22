@@ -1,0 +1,10 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+cpu  46512342 1282 7724881 2875349213 103211 0 922411 0 0 0
+cpu0 211433 4 39336 12963933 1022 0 23452 0 0 0
+intr 2840229311 0 9 0 0 0 0 0 0 0 0
+ctxt 7323518212
+btime 1793600000
+processes 8122340
+procs_running 5
+procs_blocked 0

@@ -1,0 +1,18 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+# NVIDIA B200 (HGX, NVLink5). Nominal rates are per GPU, per direction.
+# Dense Tensor Core peaks: HGX product page 8-GPU totals / 8 (FP4 72 PFLOPS dense;
+# FP8 72 and BF16 36 PFLOPS are sparse, dense = 1/2):
+# https://www.nvidia.com/en-us/data-center/hgx/ . GB200 (10 PF FP4 dense) is not
+# this profile. HBM 8 TB/s: DGX B200 (64 TB/s per 8 GPUs).
+name: b200
+match: ['\bB200\b']
+arch: sm100
+hbm_gb: 180
+nvlink: true
+weights_variant: nvfp4
+nominal_nvlink_gbs: 900
+nominal_pcie_gbs: 64
+peak_dense_tflops: {fp4: 9000, fp8: 4500, bf16: 2250}
+hbm_tbs: 8.0
+lane_cap: 1024

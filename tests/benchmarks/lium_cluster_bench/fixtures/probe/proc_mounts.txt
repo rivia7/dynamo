@@ -1,0 +1,25 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+overlay / overlay rw,relatime,lowerdir=/var/lib/docker/overlay2/l/ZB7Q5K3J2XWQ:/var/lib/docker/overlay2/l/4MJ2QWV7HA,upperdir=/var/lib/docker/overlay2/9f1c2e/diff,workdir=/var/lib/docker/overlay2/9f1c2e/work 0 0
+proc /proc proc rw,nosuid,nodev,noexec,relatime 0 0
+tmpfs /dev tmpfs rw,nosuid,size=65536k,mode=755,inode64 0 0
+devpts /dev/pts devpts rw,nosuid,noexec,relatime,gid=5,mode=620,ptmxmode=666 0 0
+sysfs /sys sysfs ro,nosuid,nodev,noexec,relatime 0 0
+cgroup /sys/fs/cgroup cgroup2 ro,nosuid,nodev,noexec,relatime,nsdelegate,memory_recursiveprot 0 0
+mqueue /dev/mqueue mqueue rw,nosuid,nodev,noexec,relatime 0 0
+shm /dev/shm tmpfs rw,nosuid,nodev,noexec,relatime,size=1073741824k,inode64 0 0
+/dev/md127 /root ext4 rw,relatime,stripe=256 0 0
+/dev/md127 /etc/resolv.conf ext4 rw,relatime,stripe=256 0 0
+/dev/md127 /etc/hostname ext4 rw,relatime,stripe=256 0 0
+/dev/md127 /etc/hosts ext4 rw,relatime,stripe=256 0 0
+/dev/nvme8n1p1 /workspace xfs rw,relatime,attr2,inode64,logbufs=8,logbsize=32k,noquota 0 0
+/dev/nvme9n1p1 /scratch\040disk ext4 rw,relatime 0 0
+/dev/sda1 /boot/efi vfat rw,relatime,fmask=0077,dmask=0077,codepage=437,iocharset=iso8859-1 0 0
+/dev/sdb1 /small ext4 rw,relatime 0 0
+s3fs /mnt/volume fuse.s3fs rw,nosuid,nodev,relatime,user_id=0,group_id=0,allow_other 0 0
+10.0.0.5:/export/models /mnt/nfs nfs4 rw,relatime,vers=4.2,rsize=1048576,wsize=1048576,hard,proto=tcp 0 0
+10.0.0.6:6789:/ /mnt/ceph ceph rw,relatime,name=admin,acl 0 0
+tank/data /tank zfs rw,xattr,noacl 0 0
+/dev/loop3 /snap/core20/2318 squashfs ro,nodev,relatime,errors=continue 0 0
+tmpfs /proc/acpi tmpfs ro,relatime,inode64 0 0
+tmpfs /sys/firmware tmpfs ro,relatime,inode64 0 0

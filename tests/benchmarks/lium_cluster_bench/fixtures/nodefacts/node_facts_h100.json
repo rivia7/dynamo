@@ -1,0 +1,1411 @@
+{
+ "cgroup": {
+  "cpu_nr_throttled": 0,
+  "cpu_period_us": 100000,
+  "cpu_quota_us": null,
+  "cpu_throttled_us": 0,
+  "cpuset_count": 224,
+  "cpuset_cpus": "0-223",
+  "memory_events": {
+   "high": 0,
+   "low": 0,
+   "max": 0,
+   "oom": 0,
+   "oom_group_kill": 0,
+   "oom_kill": 0
+  },
+  "path": "/",
+  "pids_current": 312,
+  "pids_max": 4096,
+  "version": 2
+ },
+ "collected_at": 1793871106.25,
+ "cpu": {
+  "boost": "1",
+  "cur_khz_max": 3800000,
+  "cur_khz_mean": 2900000,
+  "cur_khz_min": 2000000,
+  "governors": {
+   "performance": 2,
+   "powersave": 2
+  },
+  "max_khz": 3800000,
+  "online": "0-223",
+  "online_count": 224,
+  "scaling_driver": "intel_pstate",
+  "smt_active": true,
+  "smt_control": "on"
+ },
+ "docker": {
+  "cdi_spec_dirs": [
+   "/etc/cdi",
+   "/var/run/cdi"
+  ],
+  "cgroup_driver": "cgroupfs",
+  "cgroup_version": "2",
+  "default_runtime": "runc",
+  "docker_root_dir": "/var/lib/docker",
+  "nvidia_container_runtime": "/usr/bin/nvidia-container-runtime",
+  "nvidia_ctk": null,
+  "nvidia_runtime": true,
+  "runtimes": [
+   "io.containerd.runc.v2",
+   "nvidia",
+   "runc"
+  ],
+  "security_options": [
+   "name=apparmor",
+   "name=seccomp,profile=builtin",
+   "name=cgroupns"
+  ],
+  "server_version": "27.5.1",
+  "storage_driver": "overlay2",
+  "warnings": [
+   "WARNING: bridge-nf-call-iptables is disabled"
+  ]
+ },
+ "driver": {
+  "cuda_version": "12.0",
+  "flavor": "proprietary",
+  "nvrm": "NVRM version: NVIDIA UNIX x86_64 Kernel Module 525.147.05 Wed Oct 25 20:27:35 UTC 2023",
+  "version": "525.147.05"
+ },
+ "duration_s": 6.25,
+ "gpus": [
+  {
+   "architecture": "Hopper",
+   "bus_id": "0000:18:00.0",
+   "clocks_app_graphics_mhz": 1755,
+   "clocks_app_mem_mhz": 2619,
+   "clocks_event_active": [
+    "gpu_idle"
+   ],
+   "clocks_event_us": {},
+   "clocks_max_graphics_mhz": 1980,
+   "clocks_max_mem_mhz": 2619,
+   "clocks_max_sm_mhz": 1980,
+   "clocks_mem_mhz": 2619,
+   "clocks_sm_mhz": 1980,
+   "compute_mode": "Default",
+   "drain_and_reset_recommended": null,
+   "ecc_aggregate_corrected": 0,
+   "ecc_aggregate_uncorrected": 0,
+   "ecc_counters": {
+    "aggregate.dram_correctable": 0,
+    "aggregate.dram_uncorrectable": 0,
+    "aggregate.sram_correctable": 0,
+    "aggregate.sram_uncorrectable": 0,
+    "volatile.dram_correctable": 0,
+    "volatile.dram_uncorrectable": 0,
+    "volatile.sram_correctable": 0,
+    "volatile.sram_uncorrectable": 0
+   },
+   "ecc_current": "Enabled",
+   "ecc_pending": "Enabled",
+   "ecc_volatile_corrected": 0,
+   "ecc_volatile_uncorrected": 0,
+   "fabric_clique_id": null,
+   "fabric_cluster_uuid": null,
+   "fabric_health": {},
+   "fabric_state": "Completed",
+   "fabric_status": "Success",
+   "gsp_firmware": null,
+   "index": 0,
+   "inforom_image": "G520.0200.00.05",
+   "mem_temp_c": 38.0,
+   "mig_current": "Disabled",
+   "mig_pending": "Disabled",
+   "pcie_gen_current": 5,
+   "pcie_gen_device_max": 5,
+   "pcie_gen_host_max": 5,
+   "pcie_gen_max": 5,
+   "pcie_replay": 0,
+   "pcie_replay_rollover": 0,
+   "pcie_width_current": 16,
+   "pcie_width_max": 16,
+   "performance_state": "P0",
+   "persistence_mode": "Enabled",
+   "power_default_w": 700.0,
+   "power_draw_w": 71.62,
+   "power_limit_w": 700.0,
+   "power_max_w": 700.0,
+   "power_min_w": 200.0,
+   "power_requested_w": 700.0,
+   "product": "NVIDIA H100 80GB HBM3",
+   "recovery_action": null,
+   "remap_failure": false,
+   "remap_pending": false,
+   "remapped_correctable": 0,
+   "remapped_uncorrectable": 0,
+   "reset_required": "No",
+   "retired_dbe": null,
+   "retired_pending": null,
+   "retired_sbe": null,
+   "serial": "1654922044813",
+   "temp_c": 31.0,
+   "temperature": {
+    "gpu_temp": 31.0,
+    "gpu_temp_max_gpu_threshold": 87.0,
+    "gpu_temp_max_mem_threshold": 95.0,
+    "gpu_temp_max_threshold": 92.0,
+    "gpu_temp_slow_threshold": 89.0,
+    "memory_temp": 38.0
+   },
+   "uuid": "GPU-5ad0a3c6-7e4c-11b2-2e2b-6cb1f1ad7b8e",
+   "vbios": "96.00.74.00.0D",
+   "xml_fields": {
+    "applications_clocks/graphics_clock": "1755 MHz",
+    "applications_clocks/mem_clock": "2619 MHz",
+    "clocks_throttle_reasons/clocks_throttle_reason_applications_clocks_setting": "Not Active",
+    "clocks_throttle_reasons/clocks_throttle_reason_display_clocks_setting": "Not Active",
+    "clocks_throttle_reasons/clocks_throttle_reason_gpu_idle": "Active",
+    "clocks_throttle_reasons/clocks_throttle_reason_hw_power_brake_slowdown": "Not Active",
+    "clocks_throttle_reasons/clocks_throttle_reason_hw_slowdown": "Not Active",
+    "clocks_throttle_reasons/clocks_throttle_reason_hw_thermal_slowdown": "Not Active",
+    "clocks_throttle_reasons/clocks_throttle_reason_sw_power_cap": "Not Active",
+    "clocks_throttle_reasons/clocks_throttle_reason_sw_thermal_slowdown": "Not Active",
+    "clocks_throttle_reasons/clocks_throttle_reason_sync_boost": "Not Active",
+    "ecc_errors/aggregate/dram_correctable": "0",
+    "ecc_errors/aggregate/dram_uncorrectable": "0",
+    "ecc_errors/aggregate/sram_correctable": "0",
+    "ecc_errors/aggregate/sram_uncorrectable": "0",
+    "ecc_errors/volatile/dram_correctable": "0",
+    "ecc_errors/volatile/dram_uncorrectable": "0",
+    "ecc_errors/volatile/sram_correctable": "0",
+    "ecc_errors/volatile/sram_uncorrectable": "0",
+    "ecc_mode/current_ecc": "Enabled",
+    "ecc_mode/pending_ecc": "Enabled",
+    "fabric/state": "Completed",
+    "fabric/status": "Success",
+    "gpu_reset_status/reset_required": "No",
+    "inforom_version/ecc_object": "7.16",
+    "inforom_version/img_version": "G520.0200.00.05",
+    "inforom_version/oem_object": "2.1",
+    "max_clocks/graphics_clock": "1980 MHz",
+    "max_clocks/mem_clock": "2619 MHz",
+    "max_clocks/sm_clock": "1980 MHz",
+    "max_clocks/video_clock": "1545 MHz",
+    "mig_mode/current_mig": "Disabled",
+    "mig_mode/pending_mig": "Disabled",
+    "pci/pci_gpu_link_info/link_widths/current_link_width": "16x",
+    "pci/pci_gpu_link_info/link_widths/max_link_width": "16x",
+    "pci/pci_gpu_link_info/pcie_gen/current_link_gen": "5",
+    "pci/pci_gpu_link_info/pcie_gen/device_current_link_gen": "5",
+    "pci/pci_gpu_link_info/pcie_gen/max_device_link_gen": "5",
+    "pci/pci_gpu_link_info/pcie_gen/max_host_link_gen": "5",
+    "pci/pci_gpu_link_info/pcie_gen/max_link_gen": "5",
+    "power_readings/default_power_limit": "700.00 W",
+    "power_readings/enforced_power_limit": "700.00 W",
+    "power_readings/max_power_limit": "700.00 W",
+    "power_readings/min_power_limit": "200.00 W",
+    "power_readings/power_draw": "71.62 W",
+    "power_readings/power_limit": "700.00 W",
+    "power_readings/power_management": "Supported",
+    "power_readings/power_state": "P0",
+    "remapped_rows/remapped_row_corr": "0",
+    "remapped_rows/remapped_row_failure": "No",
+    "remapped_rows/remapped_row_pending": "No",
+    "remapped_rows/remapped_row_unc": "0",
+    "remapped_rows/row_remapper_histogram/row_remapper_histogram_high": "0 bank(s)",
+    "remapped_rows/row_remapper_histogram/row_remapper_histogram_low": "0 bank(s)",
+    "remapped_rows/row_remapper_histogram/row_remapper_histogram_max": "2559 bank(s)",
+    "remapped_rows/row_remapper_histogram/row_remapper_histogram_none": "0 bank(s)",
+    "remapped_rows/row_remapper_histogram/row_remapper_histogram_partial": "0 bank(s)",
+    "temperature/gpu_temp": "31 C",
+    "temperature/gpu_temp_max_gpu_threshold": "87 C",
+    "temperature/gpu_temp_max_mem_threshold": "95 C",
+    "temperature/gpu_temp_max_threshold": "92 C",
+    "temperature/gpu_temp_slow_threshold": "89 C",
+    "temperature/memory_temp": "38 C"
+   }
+  },
+  {
+   "architecture": "Hopper",
+   "bus_id": "0000:3a:00.0",
+   "clocks_app_graphics_mhz": 1755,
+   "clocks_app_mem_mhz": 2619,
+   "clocks_event_active": [
+    "gpu_idle",
+    "hw_slowdown",
+    "hw_power_brake_slowdown"
+   ],
+   "clocks_event_us": {},
+   "clocks_max_graphics_mhz": 1980,
+   "clocks_max_mem_mhz": 2619,
+   "clocks_max_sm_mhz": 1980,
+   "clocks_mem_mhz": 2619,
+   "clocks_sm_mhz": 1980,
+   "compute_mode": "Default",
+   "drain_and_reset_recommended": null,
+   "ecc_aggregate_corrected": 12,
+   "ecc_aggregate_uncorrected": 0,
+   "ecc_counters": {
+    "aggregate.dram_correctable": 12,
+    "aggregate.dram_uncorrectable": 0,
+    "aggregate.sram_correctable": 0,
+    "aggregate.sram_uncorrectable": 0,
+    "volatile.dram_correctable": 0,
+    "volatile.dram_uncorrectable": 0,
+    "volatile.sram_correctable": 0,
+    "volatile.sram_uncorrectable": 0
+   },
+   "ecc_current": "Enabled",
+   "ecc_pending": "Enabled",
+   "ecc_volatile_corrected": 0,
+   "ecc_volatile_uncorrected": 0,
+   "fabric_clique_id": null,
+   "fabric_cluster_uuid": null,
+   "fabric_health": {},
+   "fabric_state": "Completed",
+   "fabric_status": "Success",
+   "gsp_firmware": null,
+   "index": 1,
+   "inforom_image": "G520.0200.00.05",
+   "mem_temp_c": 38.0,
+   "mig_current": "Disabled",
+   "mig_pending": "Disabled",
+   "pcie_gen_current": 4,
+   "pcie_gen_device_max": 5,
+   "pcie_gen_host_max": 5,
+   "pcie_gen_max": 5,
+   "pcie_replay": 37,
+   "pcie_replay_rollover": 0,
+   "pcie_width_current": 8,
+   "pcie_width_max": 16,
+   "performance_state": "P0",
+   "persistence_mode": "Enabled",
+   "power_default_w": 700.0,
+   "power_draw_w": 71.62,
+   "power_limit_w": 500.0,
+   "power_max_w": 700.0,
+   "power_min_w": 200.0,
+   "power_requested_w": 500.0,
+   "product": "NVIDIA H100 80GB HBM3",
+   "recovery_action": null,
+   "remap_failure": false,
+   "remap_pending": false,
+   "remapped_correctable": 1,
+   "remapped_uncorrectable": 0,
+   "reset_required": "No",
+   "retired_dbe": null,
+   "retired_pending": null,
+   "retired_sbe": null,
+   "serial": "1654922044977",
+   "temp_c": 31.0,
+   "temperature": {
+    "gpu_temp": 31.0,
+    "gpu_temp_max_gpu_threshold": 87.0,
+    "gpu_temp_max_mem_threshold": 95.0,
+    "gpu_temp_max_threshold": 92.0,
+    "gpu_temp_slow_threshold": 89.0,
+    "memory_temp": 38.0
+   },
+   "uuid": "GPU-c1e7f0d2-9b3a-46d8-87f1-2a6e4c0b9d15",
+   "vbios": "96.00.74.00.0D",
+   "xml_fields": {
+    "applications_clocks/graphics_clock": "1755 MHz",
+    "applications_clocks/mem_clock": "2619 MHz",
+    "clocks_throttle_reasons/clocks_throttle_reason_applications_clocks_setting": "Not Active",
+    "clocks_throttle_reasons/clocks_throttle_reason_display_clocks_setting": "Not Active",
+    "clocks_throttle_reasons/clocks_throttle_reason_gpu_idle": "Active",
+    "clocks_throttle_reasons/clocks_throttle_reason_hw_power_brake_slowdown": "Active",
+    "clocks_throttle_reasons/clocks_throttle_reason_hw_slowdown": "Active",
+    "clocks_throttle_reasons/clocks_throttle_reason_hw_thermal_slowdown": "Not Active",
+    "clocks_throttle_reasons/clocks_throttle_reason_sw_power_cap": "Not Active",
+    "clocks_throttle_reasons/clocks_throttle_reason_sw_thermal_slowdown": "Not Active",
+    "clocks_throttle_reasons/clocks_throttle_reason_sync_boost": "Not Active",
+    "ecc_errors/aggregate/dram_correctable": "12",
+    "ecc_errors/aggregate/dram_uncorrectable": "0",
+    "ecc_errors/aggregate/sram_correctable": "0",
+    "ecc_errors/aggregate/sram_uncorrectable": "0",
+    "ecc_errors/volatile/dram_correctable": "0",
+    "ecc_errors/volatile/dram_uncorrectable": "0",
+    "ecc_errors/volatile/sram_correctable": "0",
+    "ecc_errors/volatile/sram_uncorrectable": "0",
+    "ecc_mode/current_ecc": "Enabled",
+    "ecc_mode/pending_ecc": "Enabled",
+    "fabric/state": "Completed",
+    "fabric/status": "Success",
+    "gpu_reset_status/reset_required": "No",
+    "inforom_version/ecc_object": "7.16",
+    "inforom_version/img_version": "G520.0200.00.05",
+    "inforom_version/oem_object": "2.1",
+    "max_clocks/graphics_clock": "1980 MHz",
+    "max_clocks/mem_clock": "2619 MHz",
+    "max_clocks/sm_clock": "1980 MHz",
+    "max_clocks/video_clock": "1545 MHz",
+    "mig_mode/current_mig": "Disabled",
+    "mig_mode/pending_mig": "Disabled",
+    "pci/pci_gpu_link_info/link_widths/current_link_width": "8x",
+    "pci/pci_gpu_link_info/link_widths/max_link_width": "16x",
+    "pci/pci_gpu_link_info/pcie_gen/current_link_gen": "4",
+    "pci/pci_gpu_link_info/pcie_gen/device_current_link_gen": "4",
+    "pci/pci_gpu_link_info/pcie_gen/max_device_link_gen": "5",
+    "pci/pci_gpu_link_info/pcie_gen/max_host_link_gen": "5",
+    "pci/pci_gpu_link_info/pcie_gen/max_link_gen": "5",
+    "power_readings/default_power_limit": "700.00 W",
+    "power_readings/enforced_power_limit": "500.00 W",
+    "power_readings/max_power_limit": "700.00 W",
+    "power_readings/min_power_limit": "200.00 W",
+    "power_readings/power_draw": "71.62 W",
+    "power_readings/power_limit": "500.00 W",
+    "power_readings/power_management": "Supported",
+    "power_readings/power_state": "P0",
+    "remapped_rows/remapped_row_corr": "1",
+    "remapped_rows/remapped_row_failure": "No",
+    "remapped_rows/remapped_row_pending": "No",
+    "remapped_rows/remapped_row_unc": "0",
+    "remapped_rows/row_remapper_histogram/row_remapper_histogram_high": "1 bank(s)",
+    "remapped_rows/row_remapper_histogram/row_remapper_histogram_low": "0 bank(s)",
+    "remapped_rows/row_remapper_histogram/row_remapper_histogram_max": "2559 bank(s)",
+    "remapped_rows/row_remapper_histogram/row_remapper_histogram_none": "0 bank(s)",
+    "remapped_rows/row_remapper_histogram/row_remapper_histogram_partial": "0 bank(s)",
+    "temperature/gpu_temp": "31 C",
+    "temperature/gpu_temp_max_gpu_threshold": "87 C",
+    "temperature/gpu_temp_max_mem_threshold": "95 C",
+    "temperature/gpu_temp_max_threshold": "92 C",
+    "temperature/gpu_temp_slow_threshold": "89 C",
+    "temperature/memory_temp": "38 C"
+   }
+  }
+ ],
+ "hcas": [
+  {
+   "bdf": "0000:19:00.0",
+   "board_id": "MT_0000000838",
+   "fw_ver": "28.39.2048",
+   "name": "mlx5_0",
+   "ports": [
+    {
+     "counters": {
+      "VL15_dropped": 0,
+      "excessive_buffer_overrun_errors": 0,
+      "link_downed": 1,
+      "link_error_recovery": 0,
+      "local_link_integrity_errors": 0,
+      "multicast_rcv_packets": 0,
+      "multicast_xmit_packets": 0,
+      "port_rcv_constraint_errors": 0,
+      "port_rcv_data": 81729351203,
+      "port_rcv_errors": 0,
+      "port_rcv_packets": 312945512,
+      "port_rcv_remote_physical_errors": 0,
+      "port_rcv_switch_relay_errors": 0,
+      "port_xmit_constraint_errors": 0,
+      "port_xmit_data": 81613342812,
+      "port_xmit_discards": 0,
+      "port_xmit_packets": 312541207,
+      "port_xmit_wait": 1288231,
+      "symbol_error": 0,
+      "unicast_rcv_packets": 312945512,
+      "unicast_xmit_packets": 312541207
+     },
+     "ethtool": {},
+     "hw_counters": {
+      "duplicate_request": 0,
+      "implied_nak_seq_err": 0,
+      "local_ack_timeout_err": 0,
+      "np_cnp_sent": 0,
+      "np_ecn_marked_roce_packets": 0,
+      "out_of_buffer": 0,
+      "out_of_sequence": 0,
+      "packet_seq_err": 0,
+      "req_cqe_error": 0,
+      "req_cqe_flush_error": 0,
+      "req_remote_access_errors": 0,
+      "req_remote_invalid_request": 0,
+      "resp_cqe_error": 0,
+      "resp_cqe_flush_error": 0,
+      "resp_local_length_error": 0,
+      "resp_remote_access_errors": 0,
+      "rnr_nak_retry_err": 0,
+      "roce_adp_retrans": 0,
+      "roce_adp_retrans_to": 0,
+      "roce_slow_restart": 0,
+      "roce_slow_restart_cnps": 0,
+      "roce_slow_restart_trans": 0,
+      "rp_cnp_handled": 0,
+      "rp_cnp_ignored": 0,
+      "rx_atomic_requests": 0,
+      "rx_dct_connect": 0,
+      "rx_icrc_encapsulated": 0,
+      "rx_read_requests": 211,
+      "rx_write_requests": 1288003
+     },
+     "link_layer": "InfiniBand",
+     "mtu": 4092,
+     "netdev": "ibp25s0",
+     "phys_state": "5: LinkUp",
+     "port": 1,
+     "rate": "400 Gb/sec (4X NDR)",
+     "state": "4: ACTIVE"
+    }
+   ]
+  },
+  {
+   "bdf": "0000:3b:00.0",
+   "board_id": "MT_0000000844",
+   "fw_ver": "28.39.2048",
+   "name": "mlx5_1",
+   "ports": [
+    {
+     "counters": {
+      "VL15_dropped": 0,
+      "excessive_buffer_overrun_errors": 0,
+      "link_downed": 0,
+      "link_error_recovery": 0,
+      "local_link_integrity_errors": 0,
+      "port_rcv_constraint_errors": 0,
+      "port_rcv_data": 1844624381502,
+      "port_rcv_errors": 0,
+      "port_rcv_packets": 1843262110,
+      "port_rcv_remote_physical_errors": 0,
+      "port_rcv_switch_relay_errors": 0,
+      "port_xmit_constraint_errors": 0,
+      "port_xmit_data": 1840639127808,
+      "port_xmit_discards": 0,
+      "port_xmit_packets": 1838883019,
+      "port_xmit_wait": 0,
+      "symbol_error": 0
+     },
+     "ethtool": {
+      "rx_arfs_err": 0,
+      "rx_buff_alloc_err": 0,
+      "rx_buffer_passed_thres_phy": 0,
+      "rx_corrected_bits_phy": 58,
+      "rx_crc_errors_phy": 0,
+      "rx_discards_phy": 0,
+      "rx_ecn_mark": 0,
+      "rx_err_lane_0_phy": 0,
+      "rx_err_lane_1_phy": 0,
+      "rx_err_lane_2_phy": 0,
+      "rx_err_lane_3_phy": 0,
+      "rx_in_range_len_errors_phy": 0,
+      "rx_out_of_buffer": 0,
+      "rx_pause_ctrl_phy": 0,
+      "rx_pcs_symbol_err_phy": 0,
+      "rx_prio3_buf_discard": 0,
+      "rx_prio3_cong_discard": 0,
+      "rx_prio3_discards": 0,
+      "rx_prio3_marked": 1290,
+      "rx_prio3_pause": 77105,
+      "rx_prio3_pause_duration": 4815,
+      "rx_prio3_pause_transition": 38552,
+      "rx_symbol_err_phy": 0,
+      "rx_wqe_err": 0,
+      "rx_xdp_drop": 0,
+      "tx_cqe_err": 0,
+      "tx_discards_phy": 0,
+      "tx_errors_phy": 0,
+      "tx_pause_ctrl_phy": 0,
+      "tx_pause_storm_error_events": 0,
+      "tx_pause_storm_warning_events": 0,
+      "tx_prio3_pause": 48211,
+      "tx_prio3_pause_duration": 3020,
+      "tx_queue_dropped": 0
+     },
+     "hw_counters": {
+      "duplicate_request": 0,
+      "implied_nak_seq_err": 0,
+      "local_ack_timeout_err": 2,
+      "np_cnp_sent": 18273,
+      "np_ecn_marked_roce_packets": 18911,
+      "out_of_buffer": 0,
+      "out_of_sequence": 41,
+      "packet_seq_err": 0,
+      "req_cqe_error": 0,
+      "req_cqe_flush_error": 0,
+      "req_remote_access_errors": 0,
+      "req_remote_invalid_request": 0,
+      "resp_cqe_error": 0,
+      "resp_cqe_flush_error": 0,
+      "resp_local_length_error": 0,
+      "resp_remote_access_errors": 0,
+      "rnr_nak_retry_err": 0,
+      "roce_adp_retrans": 0,
+      "roce_adp_retrans_to": 0,
+      "roce_slow_restart": 0,
+      "roce_slow_restart_cnps": 0,
+      "roce_slow_restart_trans": 0,
+      "rp_cnp_handled": 17760,
+      "rp_cnp_ignored": 0,
+      "rx_atomic_requests": 0,
+      "rx_dct_connect": 0,
+      "rx_icrc_encapsulated": 0,
+      "rx_read_requests": 0,
+      "rx_write_requests": 1843259970
+     },
+     "link_layer": "Ethernet",
+     "mtu": 9000,
+     "netdev": "enp59s0f0np0",
+     "phys_state": "5: LinkUp",
+     "port": 1,
+     "rate": "200 Gb/sec (4X HDR)",
+     "state": "4: ACTIVE"
+    }
+   ]
+  }
+ ],
+ "hostname": "lium-h100-07",
+ "kernel": {
+  "cmdline_flags": {
+   "intel_iommu": "on",
+   "mitigations": "off",
+   "nvidia.NVreg_EnableGpuFirmware": "0",
+   "pci": "realloc=off",
+   "transparent_hugepage": "always"
+  },
+  "iommu_devices": [
+   "dmar0",
+   "dmar1"
+  ],
+  "iommu_group_types": {
+   "0000:18:00.0": "DMA-FQ",
+   "0000:19:00.0": "DMA-FQ",
+   "0000:3a:00.0": "DMA-FQ",
+   "0000:3b:00.0": "DMA-FQ"
+  },
+  "iommu_groups": 5,
+  "release": "5.15.0-122-generic",
+  "uptime_s": 12345.67
+ },
+ "kernel_log": {
+  "available": true,
+  "error": null,
+  "events": [
+   {
+    "code": null,
+    "kind": "mlx5",
+    "ours": true,
+    "pci": "0000:3b:00.0",
+    "t_s": 19.873305
+   },
+   {
+    "code": 94,
+    "kind": "xid",
+    "ours": true,
+    "pci": "0000:3a:00.0",
+    "t_s": 211.004512
+   },
+   {
+    "code": 63,
+    "kind": "xid",
+    "ours": true,
+    "pci": "0000:3a:00.0",
+    "t_s": 211.004998
+   },
+   {
+    "code": 13,
+    "kind": "xid",
+    "ours": false,
+    "pci": "0000:c1:00",
+    "t_s": 3605.11821
+   },
+   {
+    "code": null,
+    "kind": "aer",
+    "ours": true,
+    "pci": "0000:39:00.0",
+    "t_s": 7712.000417
+   },
+   {
+    "code": null,
+    "kind": "aer",
+    "ours": true,
+    "pci": "0000:3a:00.0",
+    "t_s": 7712.000431
+   },
+   {
+    "code": null,
+    "kind": "mlx5",
+    "ours": true,
+    "pci": "0000:19:00.0",
+    "t_s": 9123.5523
+   }
+  ],
+  "lines": 10,
+  "samples": [
+   {
+    "kind": "aer",
+    "t_s": 7712.000417,
+    "text": "pcieport 0000:39:00.0: AER: Corrected error message received from 0000:3a:00.0"
+   },
+   {
+    "kind": "aer",
+    "t_s": 7712.000431,
+    "text": "nvidia 0000:3a:00.0: PCIe Bus Error: severity=Corrected, type=Physical Layer, (Receiver ID)"
+   },
+   {
+    "kind": "mlx5",
+    "t_s": 19.873305,
+    "text": "mlx5_core 0000:3b:00.0 enp59s0f0np0: Link down"
+   },
+   {
+    "kind": "mlx5",
+    "t_s": 9123.5523,
+    "text": "mlx5_core 0000:19:00.0: mlx5_cmd_out_err:838:(pid 52133): CREATE_QP(0x500) op_mod(0x0) failed, status bad parameter(0x3), syndrome (0x5a1c03), err(-22)"
+   },
+   {
+    "kind": "xid",
+    "t_s": 211.004512,
+    "text": "NVRM: Xid (PCI:0000:3a:00): 94, pid=48211, name=python3, Contained: SM (0x1). RST: No, D-RST: No"
+   },
+   {
+    "kind": "xid",
+    "t_s": 211.004998,
+    "text": "NVRM: Xid (PCI:0000:3a:00): 63, pid='<unknown>', name=<unknown>, Row Remapper: New row (0x00000003c0f8a0a0) marked for remapping, reset gpu to activate."
+   },
+   {
+    "kind": "xid",
+    "t_s": 3605.11821,
+    "text": "NVRM: Xid (PCI:0000:c1:00): 13, pid=77120, name=python, Graphics Exception: ESR 0x50da30=0x30a000e 0x50da34=0x4 0x50da28=0x0 0x50da2c=0x0"
+   }
+  ],
+  "source": "dmesg"
+ },
+ "kind": "node_facts",
+ "limits": {
+  "memlock_hard": 67108864,
+  "memlock_soft": 67108864,
+  "nofile_hard": 1048576,
+  "nofile_soft": 1048576,
+  "nproc_hard": 1048576,
+  "nproc_soft": 1048576
+ },
+ "memory": {
+  "hugepages": [
+   {
+    "free": 0,
+    "reserved": 0,
+    "size_kb": 2048,
+    "surplus": 0,
+    "total": 0
+   },
+   {
+    "free": 16,
+    "reserved": 0,
+    "size_kb": 1048576,
+    "surplus": 0,
+    "total": 16
+   }
+  ],
+  "mem_available_bytes": 2106151948288,
+  "mem_total_bytes": 2164069322752,
+  "shm_free_bytes": 67104768,
+  "shm_total_bytes": 67108864,
+  "swap_total_bytes": 0,
+  "thp_defrag": "madvise",
+  "thp_enabled": "always"
+ },
+ "modules": {
+  "gdrdrv": false,
+  "ib_umad": true,
+  "ib_uverbs": true,
+  "mlx5_core": true,
+  "mlx5_ib": true,
+  "nvidia": true,
+  "nvidia_drm": true,
+  "nvidia_fs": false,
+  "nvidia_modeset": true,
+  "nvidia_peermem": true,
+  "nvidia_uvm": true,
+  "rdma_ucm": true
+ },
+ "node": "node0",
+ "notes": [],
+ "numa": {
+  "balancing": 1,
+  "nodes": [
+   {
+    "cpulist": "0-55,112-167",
+    "cpus": 112,
+    "distances": [
+     10,
+     21
+    ],
+    "mem_total_bytes": 1082047901696,
+    "node": 0
+   },
+   {
+    "cpulist": "56-111,168-223",
+    "cpus": 112,
+    "distances": [
+     21,
+     10
+    ],
+    "mem_total_bytes": 1082021421056,
+    "node": 1
+   }
+  ],
+  "online": "0-1"
+ },
+ "nvlink": [
+  {
+   "bus_id": "0000:18:00.0",
+   "index": 0,
+   "links": [
+    {
+     "errors": {
+      "crc_errors": 0,
+      "recovery_errors": 0,
+      "replay_errors": 0
+     },
+     "link": 0,
+     "speed_gbs": 26.562
+    },
+    {
+     "errors": {
+      "crc_errors": 0,
+      "recovery_errors": 0,
+      "replay_errors": 0
+     },
+     "link": 1,
+     "speed_gbs": 26.562
+    },
+    {
+     "errors": {
+      "crc_errors": 0,
+      "recovery_errors": 0,
+      "replay_errors": 0
+     },
+     "link": 2,
+     "speed_gbs": 26.562
+    },
+    {
+     "errors": {
+      "crc_errors": 0,
+      "recovery_errors": 0,
+      "replay_errors": 0
+     },
+     "link": 3,
+     "speed_gbs": 26.562
+    },
+    {
+     "errors": {
+      "crc_errors": 0,
+      "recovery_errors": 0,
+      "replay_errors": 0
+     },
+     "link": 4,
+     "speed_gbs": 26.562
+    },
+    {
+     "errors": {
+      "crc_errors": 0,
+      "recovery_errors": 0,
+      "replay_errors": 0
+     },
+     "link": 5,
+     "speed_gbs": 26.562
+    },
+    {
+     "errors": {
+      "crc_errors": 0,
+      "recovery_errors": 0,
+      "replay_errors": 0
+     },
+     "link": 6,
+     "speed_gbs": 26.562
+    },
+    {
+     "errors": {
+      "crc_errors": 0,
+      "recovery_errors": 0,
+      "replay_errors": 0
+     },
+     "link": 7,
+     "speed_gbs": 26.562
+    },
+    {
+     "errors": {
+      "crc_errors": 0,
+      "recovery_errors": 0,
+      "replay_errors": 0
+     },
+     "link": 8,
+     "speed_gbs": 26.562
+    },
+    {
+     "errors": {
+      "crc_errors": 0,
+      "recovery_errors": 0,
+      "replay_errors": 0
+     },
+     "link": 9,
+     "speed_gbs": 26.562
+    },
+    {
+     "errors": {
+      "crc_errors": 0,
+      "recovery_errors": 0,
+      "replay_errors": 0
+     },
+     "link": 10,
+     "speed_gbs": 26.562
+    },
+    {
+     "errors": {
+      "crc_errors": 0,
+      "recovery_errors": 0,
+      "replay_errors": 0
+     },
+     "link": 11,
+     "speed_gbs": 26.562
+    },
+    {
+     "errors": {
+      "crc_errors": 0,
+      "recovery_errors": 0,
+      "replay_errors": 0
+     },
+     "link": 12,
+     "speed_gbs": 26.562
+    },
+    {
+     "errors": {
+      "crc_errors": 0,
+      "recovery_errors": 0,
+      "replay_errors": 0
+     },
+     "link": 13,
+     "speed_gbs": 26.562
+    },
+    {
+     "errors": {
+      "crc_errors": 0,
+      "recovery_errors": 0,
+      "replay_errors": 0
+     },
+     "link": 14,
+     "speed_gbs": 26.562
+    },
+    {
+     "errors": {
+      "crc_errors": 0,
+      "recovery_errors": 0,
+      "replay_errors": 0
+     },
+     "link": 15,
+     "speed_gbs": 26.562
+    },
+    {
+     "errors": {
+      "crc_errors": 0,
+      "recovery_errors": 0,
+      "replay_errors": 0
+     },
+     "link": 16,
+     "speed_gbs": 26.562
+    },
+    {
+     "errors": {
+      "crc_errors": 0,
+      "recovery_errors": 0,
+      "replay_errors": 0
+     },
+     "link": 17,
+     "speed_gbs": 26.562
+    }
+   ],
+   "uuid": "GPU-5ad0a3c6-7e4c-11b2-2e2b-6cb1f1ad7b8e"
+  },
+  {
+   "bus_id": "0000:3a:00.0",
+   "index": 1,
+   "links": [
+    {
+     "errors": {
+      "crc_errors": 0,
+      "recovery_errors": 0,
+      "replay_errors": 0
+     },
+     "link": 0,
+     "speed_gbs": 26.562
+    },
+    {
+     "errors": {
+      "crc_errors": 0,
+      "recovery_errors": 0,
+      "replay_errors": 0
+     },
+     "link": 1,
+     "speed_gbs": 26.562
+    },
+    {
+     "errors": {
+      "crc_errors": 0,
+      "recovery_errors": 0,
+      "replay_errors": 0
+     },
+     "link": 2,
+     "speed_gbs": 26.562
+    },
+    {
+     "errors": {
+      "crc_errors": 12,
+      "recovery_errors": 0,
+      "replay_errors": 3
+     },
+     "link": 3,
+     "speed_gbs": 26.562
+    },
+    {
+     "errors": {
+      "crc_errors": 0,
+      "recovery_errors": 0,
+      "replay_errors": 0
+     },
+     "link": 4,
+     "speed_gbs": 26.562
+    },
+    {
+     "errors": {
+      "crc_errors": 0,
+      "recovery_errors": 0,
+      "replay_errors": 0
+     },
+     "link": 5,
+     "speed_gbs": 26.562
+    },
+    {
+     "errors": {
+      "crc_errors": 0,
+      "recovery_errors": 0,
+      "replay_errors": 0
+     },
+     "link": 6,
+     "speed_gbs": 26.562
+    },
+    {
+     "errors": {
+      "crc_errors": 0,
+      "recovery_errors": 0,
+      "replay_errors": 0
+     },
+     "link": 7,
+     "speed_gbs": null
+    },
+    {
+     "errors": {
+      "crc_errors": 0,
+      "recovery_errors": 0,
+      "replay_errors": 0
+     },
+     "link": 8,
+     "speed_gbs": 26.562
+    },
+    {
+     "errors": {
+      "crc_errors": 0,
+      "recovery_errors": 0,
+      "replay_errors": 0
+     },
+     "link": 9,
+     "speed_gbs": 26.562
+    },
+    {
+     "errors": {
+      "crc_errors": 0,
+      "recovery_errors": 0,
+      "replay_errors": 0
+     },
+     "link": 10,
+     "speed_gbs": 26.562
+    },
+    {
+     "errors": {
+      "crc_errors": 0,
+      "recovery_errors": 0,
+      "replay_errors": 0
+     },
+     "link": 11,
+     "speed_gbs": 26.562
+    },
+    {
+     "errors": {
+      "crc_errors": 0,
+      "recovery_errors": 0,
+      "replay_errors": 0
+     },
+     "link": 12,
+     "speed_gbs": 26.562
+    },
+    {
+     "errors": {
+      "crc_errors": 0,
+      "recovery_errors": 0,
+      "replay_errors": 0
+     },
+     "link": 13,
+     "speed_gbs": 26.562
+    },
+    {
+     "errors": {
+      "crc_errors": 0,
+      "recovery_errors": 0,
+      "replay_errors": 0
+     },
+     "link": 14,
+     "speed_gbs": 26.562
+    },
+    {
+     "errors": {
+      "crc_errors": 0,
+      "recovery_errors": 0,
+      "replay_errors": 0
+     },
+     "link": 15,
+     "speed_gbs": 26.562
+    },
+    {
+     "errors": {
+      "crc_errors": 0,
+      "recovery_errors": 0,
+      "replay_errors": 0
+     },
+     "link": 16,
+     "speed_gbs": 26.562
+    },
+    {
+     "errors": {
+      "crc_errors": 0,
+      "recovery_errors": 0,
+      "replay_errors": 0
+     },
+     "link": 17,
+     "speed_gbs": 26.562
+    }
+   ],
+   "uuid": "GPU-c1e7f0d2-9b3a-46d8-87f1-2a6e4c0b9d15"
+  }
+ ],
+ "p2p": {
+  "atomics": {
+   "GPU0": {
+    "GPU0": "X",
+    "GPU1": "NS"
+   },
+   "GPU1": {
+    "GPU0": "NS",
+    "GPU1": "X"
+   }
+  },
+  "nvlink": {
+   "GPU0": {
+    "GPU0": "X",
+    "GPU1": "OK"
+   },
+   "GPU1": {
+    "GPU0": "OK",
+    "GPU1": "X"
+   }
+  },
+  "read": {
+   "GPU0": {
+    "GPU0": "X",
+    "GPU1": "OK"
+   },
+   "GPU1": {
+    "GPU0": "OK",
+    "GPU1": "X"
+   }
+  },
+  "write": {
+   "GPU0": {
+    "GPU0": "X",
+    "GPU1": "OK"
+   },
+   "GPU1": {
+    "GPU0": "OK",
+    "GPU1": "X"
+   }
+  }
+ },
+ "pcie": [
+  {
+   "acs_ctrl": null,
+   "aer_correctable": 0,
+   "aer_fatal": null,
+   "aer_nonfatal": 0,
+   "bdf": "0000:18:00.0",
+   "current_speed_gts": 32.0,
+   "current_width": 16,
+   "depth": 0,
+   "device": "0x2330",
+   "driver": "nvidia",
+   "endpoints": [],
+   "kind": "gpu",
+   "max_speed_gts": 32.0,
+   "max_width": 16,
+   "numa_node": 0,
+   "parent": "0000:17:00.0",
+   "pci_class": "0x030200",
+   "root_port": false,
+   "vendor": "0x10de"
+  },
+  {
+   "acs_ctrl": null,
+   "aer_correctable": 0,
+   "aer_fatal": null,
+   "aer_nonfatal": 0,
+   "bdf": "0000:19:00.0",
+   "current_speed_gts": 32.0,
+   "current_width": 16,
+   "depth": 0,
+   "device": "0x1021",
+   "driver": "mlx5_core",
+   "endpoints": [],
+   "kind": "hca",
+   "max_speed_gts": 32.0,
+   "max_width": 16,
+   "numa_node": 0,
+   "parent": "0000:17:01.0",
+   "pci_class": "0x020700",
+   "root_port": false,
+   "vendor": "0x15b3"
+  },
+  {
+   "acs_ctrl": null,
+   "aer_correctable": 7,
+   "aer_fatal": null,
+   "aer_nonfatal": 0,
+   "bdf": "0000:3a:00.0",
+   "current_speed_gts": 16.0,
+   "current_width": 8,
+   "depth": 0,
+   "device": "0x2330",
+   "driver": "nvidia",
+   "endpoints": [],
+   "kind": "gpu",
+   "max_speed_gts": 32.0,
+   "max_width": 16,
+   "numa_node": 1,
+   "parent": "0000:39:00.0",
+   "pci_class": "0x030200",
+   "root_port": false,
+   "vendor": "0x10de"
+  },
+  {
+   "acs_ctrl": null,
+   "aer_correctable": 0,
+   "aer_fatal": null,
+   "aer_nonfatal": 0,
+   "bdf": "0000:3b:00.0",
+   "current_speed_gts": 32.0,
+   "current_width": 16,
+   "depth": 0,
+   "device": "0x1021",
+   "driver": "mlx5_core",
+   "endpoints": [],
+   "kind": "hca",
+   "max_speed_gts": 32.0,
+   "max_width": 16,
+   "numa_node": 1,
+   "parent": "0000:39:01.0",
+   "pci_class": "0x020700",
+   "root_port": false,
+   "vendor": "0x15b3"
+  },
+  {
+   "acs_ctrl": 29,
+   "aer_correctable": 0,
+   "aer_fatal": null,
+   "aer_nonfatal": 0,
+   "bdf": "0000:15:01.0",
+   "current_speed_gts": 16.0,
+   "current_width": 16,
+   "depth": 3,
+   "device": "0xc030",
+   "driver": "pcieport",
+   "endpoints": [
+    "0000:18:00.0",
+    "0000:19:00.0"
+   ],
+   "kind": "bridge",
+   "max_speed_gts": 32.0,
+   "max_width": 16,
+   "numa_node": null,
+   "parent": null,
+   "pci_class": "0x060400",
+   "root_port": true,
+   "vendor": "0x1000"
+  },
+  {
+   "acs_ctrl": null,
+   "aer_correctable": 0,
+   "aer_fatal": null,
+   "aer_nonfatal": 0,
+   "bdf": "0000:16:00.0",
+   "current_speed_gts": 16.0,
+   "current_width": 16,
+   "depth": 2,
+   "device": "0xc030",
+   "driver": "pcieport",
+   "endpoints": [
+    "0000:18:00.0",
+    "0000:19:00.0"
+   ],
+   "kind": "bridge",
+   "max_speed_gts": 32.0,
+   "max_width": 16,
+   "numa_node": null,
+   "parent": "0000:15:01.0",
+   "pci_class": "0x060400",
+   "root_port": false,
+   "vendor": "0x1000"
+  },
+  {
+   "acs_ctrl": 29,
+   "aer_correctable": 0,
+   "aer_fatal": null,
+   "aer_nonfatal": 0,
+   "bdf": "0000:17:00.0",
+   "current_speed_gts": 32.0,
+   "current_width": 16,
+   "depth": 1,
+   "device": "0xc030",
+   "driver": "pcieport",
+   "endpoints": [
+    "0000:18:00.0"
+   ],
+   "kind": "bridge",
+   "max_speed_gts": 32.0,
+   "max_width": 16,
+   "numa_node": null,
+   "parent": "0000:16:00.0",
+   "pci_class": "0x060400",
+   "root_port": false,
+   "vendor": "0x1000"
+  },
+  {
+   "acs_ctrl": null,
+   "aer_correctable": 0,
+   "aer_fatal": null,
+   "aer_nonfatal": 0,
+   "bdf": "0000:17:01.0",
+   "current_speed_gts": 32.0,
+   "current_width": 16,
+   "depth": 1,
+   "device": "0xc030",
+   "driver": "pcieport",
+   "endpoints": [
+    "0000:19:00.0"
+   ],
+   "kind": "bridge",
+   "max_speed_gts": 32.0,
+   "max_width": 16,
+   "numa_node": null,
+   "parent": "0000:16:00.0",
+   "pci_class": "0x060400",
+   "root_port": false,
+   "vendor": "0x1000"
+  },
+  {
+   "acs_ctrl": null,
+   "aer_correctable": 0,
+   "aer_fatal": null,
+   "aer_nonfatal": 0,
+   "bdf": "0000:37:01.0",
+   "current_speed_gts": 32.0,
+   "current_width": 16,
+   "depth": 3,
+   "device": "0xc030",
+   "driver": "pcieport",
+   "endpoints": [
+    "0000:3a:00.0",
+    "0000:3b:00.0"
+   ],
+   "kind": "bridge",
+   "max_speed_gts": 32.0,
+   "max_width": 16,
+   "numa_node": null,
+   "parent": null,
+   "pci_class": "0x060400",
+   "root_port": true,
+   "vendor": "0x1000"
+  },
+  {
+   "acs_ctrl": null,
+   "aer_correctable": 0,
+   "aer_fatal": null,
+   "aer_nonfatal": 0,
+   "bdf": "0000:38:00.0",
+   "current_speed_gts": 32.0,
+   "current_width": 16,
+   "depth": 2,
+   "device": "0xc030",
+   "driver": "pcieport",
+   "endpoints": [
+    "0000:3a:00.0",
+    "0000:3b:00.0"
+   ],
+   "kind": "bridge",
+   "max_speed_gts": 32.0,
+   "max_width": 16,
+   "numa_node": null,
+   "parent": "0000:37:01.0",
+   "pci_class": "0x060400",
+   "root_port": false,
+   "vendor": "0x1000"
+  },
+  {
+   "acs_ctrl": 0,
+   "aer_correctable": 0,
+   "aer_fatal": null,
+   "aer_nonfatal": 0,
+   "bdf": "0000:39:00.0",
+   "current_speed_gts": 16.0,
+   "current_width": 8,
+   "depth": 1,
+   "device": "0xc030",
+   "driver": "pcieport",
+   "endpoints": [
+    "0000:3a:00.0"
+   ],
+   "kind": "bridge",
+   "max_speed_gts": 32.0,
+   "max_width": 16,
+   "numa_node": null,
+   "parent": "0000:38:00.0",
+   "pci_class": "0x060400",
+   "root_port": false,
+   "vendor": "0x1000"
+  },
+  {
+   "acs_ctrl": null,
+   "aer_correctable": 0,
+   "aer_fatal": null,
+   "aer_nonfatal": 0,
+   "bdf": "0000:39:01.0",
+   "current_speed_gts": 32.0,
+   "current_width": 16,
+   "depth": 1,
+   "device": "0xc030",
+   "driver": "pcieport",
+   "endpoints": [
+    "0000:3b:00.0"
+   ],
+   "kind": "bridge",
+   "max_speed_gts": 32.0,
+   "max_width": 16,
+   "numa_node": null,
+   "parent": "0000:38:00.0",
+   "pci_class": "0x060400",
+   "root_port": false,
+   "vendor": "0x1000"
+  }
+ ],
+ "started_at": 1793871100.0,
+ "time_sync": {
+  "est_error_s": null,
+  "leap_status": "Normal",
+  "max_error_s": null,
+  "offset_s": -1.2845e-05,
+  "reference": "169.254.169.123",
+  "root_dispersion_s": 0.000197421,
+  "source": "chronyc",
+  "stratum": 4,
+  "synchronized": true
+ },
+ "version": 1
+}

@@ -1,0 +1,89 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+#
+# GLM-5.3 (FP8, ~0.76 TB) on H100 80 GB, written for 4 nodes x 8 (scales to 2/8
+# nodes; on 2 nodes there is room for one replica only). One node (640 GB) cannot
+# hold the weights, so every replica spans two nodes and every family
+# generates cross-node collective traffic. No H100 recipe exists: all configs
+# are derived from the H200 recipes; KV capacity is the binding constraint.
+gpu: h100
+model: glm-5.3
+served_context: 262144
+default_grid: {start: 32, max: 512, min: 4}
+
+families:
+  - id: agg-tp16
+    title: "聚合 TP16/EP16 x{agg}（跨两机）"
+    priority: 0
+    transport: nccl
+    cross_node: [collective]
+    roles:
+      - role: agg
+        gpus_per_instance: 16
+        nodes_per_instance: 2
+        instances: 2
+        base: {path: recipes/glm-5.3/sglang/agg-h200-agentic/deploy.yaml, key: agg.yaml}
+        sglang: {tensor-parallel-size: 16, ep-size: 16, mem-fraction-static: 0.88}
+        extra_args: [--dsa-prefill-backend, flashmla_kv]
+
+  - id: agg-dp16
+    title: "聚合 TP16/DP16（attention DP）x{agg}（跨两机）"
+    priority: 10
+    transport: nccl
+    cross_node: [collective]
+    roles:
+      - role: agg
+        gpus_per_instance: 16
+        nodes_per_instance: 2
+        instances: 2
+        base: {path: recipes/glm-5.3/sglang/disagg-h200-agentic/deploy.yaml, key: decode.yaml}
+        sglang:
+          tensor-parallel-size: 16
+          data-parallel-size: 16
+          mem-fraction-static: 0.9
+          disaggregation-mode: null
+          disaggregation-transfer-backend: null
+          disaggregation-bootstrap-port: null
+          kv-events-config: {publisher: zmq, topic: kv-events, endpoint: "tcp://*:5557"}
+          model-loader-extra-config: {enable_multithread_load: true, num_threads: 32}
+        extra_args: [--dsa-prefill-backend, flashmla_kv, --dsa-decode-backend, flashmla_kv]
+    notes: DP attention shards KV per rank, the only way to hold long agentic contexts on 80 GB parts.
+
+  - id: pd-{prefill}p{decode}d
+    title: "PD 分离 {prefill}P(TP16) + {decode}D(TP16/DP16)"
+    priority: 20
+    transport: mooncake
+    cross_node: [kv, collective]
+    roles:
+      - role: prefill
+        gpus_per_instance: 16
+        nodes_per_instance: 2
+        instances: 1
+        base: {path: recipes/glm-5.3/sglang/disagg-h200-agentic/deploy.yaml, key: prefill.yaml}
+        sglang: {tensor-parallel-size: 16, ep-size: 16, mem-fraction-static: 0.88}
+        extra_args: [--dsa-prefill-backend, flashmla_kv, --cuda-graph-backend-prefill, disabled]
+        env: {MC_FORCE_HCA: "1"}
+      - role: decode
+        gpus_per_instance: 16
+        nodes_per_instance: 2
+        instances: 1
+        base: {path: recipes/glm-5.3/sglang/disagg-h200-agentic/deploy.yaml, key: decode.yaml}
+        sglang: {tensor-parallel-size: 16, data-parallel-size: 16, mem-fraction-static: 0.9}
+        extra_args: [--dsa-prefill-backend, flashmla_kv, --dsa-decode-backend, flashmla_kv]
+        env: {MC_FORCE_HCA: "1", SGLANG_DISAGGREGATION_WAITING_TIMEOUT: "3600"}
+
+ladder:
+  - id: oom-mem-0.03
+    when: oom
+    mem_fraction_delta: -0.03
+    halve_cuda_graph_bs: true
+  - id: oom-ctx-196k
+    when: oom
+    sglang: {context-length: 196608}
+  - id: kernel-no-spec
+    when: kernel_unsupported
+    sglang:
+      speculative-algorithm: null
+      speculative-num-steps: null
+      speculative-eagle-topk: null
+      speculative-num-draft-tokens: null

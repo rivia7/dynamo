@@ -1,0 +1,23 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+==========================================
+cluster_bench SGLang worker
+==========================================
+Model:       cb-h200-007-5d1c
+Frontend:    http://localhost:8083
+==========================================
+cluster_bench: worker runs under Nsight Systems: /usr/local/bin/nsys profile --trace=cuda,nvtx --sample=none --cpuctxsw=none --trace-fork-before-exec=true --cuda-graph-trace=node --capture-range=cudaProfilerApi --capture-range-end=stop --force-overwrite=true -o /bench/experiments/h200-007/diagnostics/w1/cb-5d1c-decode0-r0 python3 -m dynamo.sglang --config /bench/experiments/h200-007/deployments/5d1c/cb-5d1c-decode0-r0.yaml
+2026-11-06T10:41:02.118Z  INFO dynamo_runtime::system_status_server: System status server started on 0.0.0.0:8083
+[2026-11-06 10:41:05 DP0 TP0 EP0] Load weight end. type=GlmMoeDsaForCausalLM, dtype=torch.bfloat16, avail mem=31.07 GB
+[2026-11-06 10:44:51 DP0 TP0 EP0] Capture cuda graph end. Time elapsed: 61.83 s. mem usage=4.12 GB. avail mem=5.37 GB.
+[2026-11-06 10:51:13 DP0 TP0 EP0] Profiling starts. Traces will be saved to: /tmp (with profile id: 1793961073.6512268)
+Capture range started in the application.
+[2026-11-06 10:51:13 DP3 TP3 EP3] Decode batch, #running-req: 212, #token: 1984213, token usage: 0.61, accept len: 2.71, cuda graph: True, gen throughput (token/s): 4180.22, #queue-req: 0
+[2026-11-06 10:51:14 DP0 TP0 EP0] Stop profiling...
+[2026-11-06 10:51:14 DP0 TP0 EP0] Profiling done. Traces are saved to: /tmp
+Capture range ended in the application.
+Generating '/tmp/nsys-report-6f2e.qdstrm'
+[1/1] [========================100%] cb-5d1c-decode0-r0.nsys-rep
+Generated:
+    /bench/experiments/h200-007/diagnostics/w1/cb-5d1c-decode0-r0.nsys-rep
+[2026-11-06 10:51:40 DP0 TP0 EP0] Decode batch, #running-req: 208, #token: 1977010, token usage: 0.60, accept len: 2.69, cuda graph: True, gen throughput (token/s): 4511.80, #queue-req: 0

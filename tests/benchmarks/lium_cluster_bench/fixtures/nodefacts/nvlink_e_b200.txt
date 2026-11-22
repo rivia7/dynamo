@@ -1,0 +1,291 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+GPU 0: NVIDIA B200 (UUID: GPU-8f2e7b3a-4c1d-6e5f-a0b9-c8d7e6f5a4b3)
+	 Link 0: Malformed Packet Errors: 0
+	 Link 0: Buffer Overrun Errors: 0
+	 Link 0: Rx Errors: 0
+	 Link 0: Rx remote Errors: 0
+	 Link 0: Rx General Errors: 0
+	 Link 0: Local Link Integrity Errors: 0
+	 Link 0: Tx Discards: 0
+	 Link 0: Link Recovery Successful Events: 0
+	 Link 0: Link Recovery Failed Events: 0
+	 Link 0: Total Link Recovery Events: 0
+	 Link 0: Effective Errors: 0
+	 Link 0: Effective BER: 15e-255
+	 Link 0: Symbol Errors: 0
+	 Link 0: Symbol BER: 15e-255
+	 Link 0: FEC Errors - 0: 8812
+	 Link 0: FEC Errors - 1: 3
+	 Link 1: Malformed Packet Errors: 0
+	 Link 1: Buffer Overrun Errors: 0
+	 Link 1: Rx Errors: 0
+	 Link 1: Rx remote Errors: 0
+	 Link 1: Rx General Errors: 0
+	 Link 1: Local Link Integrity Errors: 0
+	 Link 1: Tx Discards: 0
+	 Link 1: Link Recovery Successful Events: 0
+	 Link 1: Link Recovery Failed Events: 0
+	 Link 1: Total Link Recovery Events: 0
+	 Link 1: Effective Errors: 0
+	 Link 1: Effective BER: 15e-255
+	 Link 1: Symbol Errors: 0
+	 Link 1: Symbol BER: 15e-255
+	 Link 1: FEC Errors - 0: 8812
+	 Link 1: FEC Errors - 1: 3
+	 Link 2: Malformed Packet Errors: 0
+	 Link 2: Buffer Overrun Errors: 0
+	 Link 2: Rx Errors: 0
+	 Link 2: Rx remote Errors: 0
+	 Link 2: Rx General Errors: 0
+	 Link 2: Local Link Integrity Errors: 0
+	 Link 2: Tx Discards: 0
+	 Link 2: Link Recovery Successful Events: 0
+	 Link 2: Link Recovery Failed Events: 0
+	 Link 2: Total Link Recovery Events: 0
+	 Link 2: Effective Errors: 0
+	 Link 2: Effective BER: 15e-255
+	 Link 2: Symbol Errors: 0
+	 Link 2: Symbol BER: 15e-255
+	 Link 2: FEC Errors - 0: 8812
+	 Link 2: FEC Errors - 1: 3
+	 Link 3: Malformed Packet Errors: 0
+	 Link 3: Buffer Overrun Errors: 0
+	 Link 3: Rx Errors: 0
+	 Link 3: Rx remote Errors: 0
+	 Link 3: Rx General Errors: 0
+	 Link 3: Local Link Integrity Errors: 0
+	 Link 3: Tx Discards: 0
+	 Link 3: Link Recovery Successful Events: 0
+	 Link 3: Link Recovery Failed Events: 0
+	 Link 3: Total Link Recovery Events: 0
+	 Link 3: Effective Errors: 0
+	 Link 3: Effective BER: 15e-255
+	 Link 3: Symbol Errors: 0
+	 Link 3: Symbol BER: 15e-255
+	 Link 3: FEC Errors - 0: 8812
+	 Link 3: FEC Errors - 1: 3
+	 Link 4: Malformed Packet Errors: 0
+	 Link 4: Buffer Overrun Errors: 0
+	 Link 4: Rx Errors: 0
+	 Link 4: Rx remote Errors: 0
+	 Link 4: Rx General Errors: 0
+	 Link 4: Local Link Integrity Errors: 0
+	 Link 4: Tx Discards: 0
+	 Link 4: Link Recovery Successful Events: 0
+	 Link 4: Link Recovery Failed Events: 0
+	 Link 4: Total Link Recovery Events: 0
+	 Link 4: Effective Errors: 0
+	 Link 4: Effective BER: 15e-255
+	 Link 4: Symbol Errors: 0
+	 Link 4: Symbol BER: 15e-255
+	 Link 4: FEC Errors - 0: 8812
+	 Link 4: FEC Errors - 1: 3
+	 Link 5: Malformed Packet Errors: 0
+	 Link 5: Buffer Overrun Errors: 0
+	 Link 5: Rx Errors: 0
+	 Link 5: Rx remote Errors: 0
+	 Link 5: Rx General Errors: 0
+	 Link 5: Local Link Integrity Errors: 0
+	 Link 5: Tx Discards: 0
+	 Link 5: Link Recovery Successful Events: 1
+	 Link 5: Link Recovery Failed Events: 0
+	 Link 5: Total Link Recovery Events: 1
+	 Link 5: Effective Errors: 0
+	 Link 5: Effective BER: 15e-255
+	 Link 5: Symbol Errors: 2
+	 Link 5: Symbol BER: 4.1e-13
+	 Link 5: FEC Errors - 0: 9312
+	 Link 5: FEC Errors - 1: 17
+	 Link 6: Malformed Packet Errors: 0
+	 Link 6: Buffer Overrun Errors: 0
+	 Link 6: Rx Errors: 0
+	 Link 6: Rx remote Errors: 0
+	 Link 6: Rx General Errors: 0
+	 Link 6: Local Link Integrity Errors: 0
+	 Link 6: Tx Discards: 0
+	 Link 6: Link Recovery Successful Events: 0
+	 Link 6: Link Recovery Failed Events: 0
+	 Link 6: Total Link Recovery Events: 0
+	 Link 6: Effective Errors: 0
+	 Link 6: Effective BER: 15e-255
+	 Link 6: Symbol Errors: 0
+	 Link 6: Symbol BER: 15e-255
+	 Link 6: FEC Errors - 0: 8812
+	 Link 6: FEC Errors - 1: 3
+	 Link 7: Malformed Packet Errors: 0
+	 Link 7: Buffer Overrun Errors: 0
+	 Link 7: Rx Errors: 0
+	 Link 7: Rx remote Errors: 0
+	 Link 7: Rx General Errors: 0
+	 Link 7: Local Link Integrity Errors: 0
+	 Link 7: Tx Discards: 0
+	 Link 7: Link Recovery Successful Events: 0
+	 Link 7: Link Recovery Failed Events: 0
+	 Link 7: Total Link Recovery Events: 0
+	 Link 7: Effective Errors: 0
+	 Link 7: Effective BER: 15e-255
+	 Link 7: Symbol Errors: 0
+	 Link 7: Symbol BER: 15e-255
+	 Link 7: FEC Errors - 0: 8812
+	 Link 7: FEC Errors - 1: 3
+	 Link 8: Malformed Packet Errors: 0
+	 Link 8: Buffer Overrun Errors: 0
+	 Link 8: Rx Errors: 0
+	 Link 8: Rx remote Errors: 0
+	 Link 8: Rx General Errors: 0
+	 Link 8: Local Link Integrity Errors: 0
+	 Link 8: Tx Discards: 0
+	 Link 8: Link Recovery Successful Events: 0
+	 Link 8: Link Recovery Failed Events: 0
+	 Link 8: Total Link Recovery Events: 0
+	 Link 8: Effective Errors: 0
+	 Link 8: Effective BER: 15e-255
+	 Link 8: Symbol Errors: 0
+	 Link 8: Symbol BER: 15e-255
+	 Link 8: FEC Errors - 0: 8812
+	 Link 8: FEC Errors - 1: 3
+	 Link 9: Malformed Packet Errors: 0
+	 Link 9: Buffer Overrun Errors: 0
+	 Link 9: Rx Errors: 0
+	 Link 9: Rx remote Errors: 0
+	 Link 9: Rx General Errors: 0
+	 Link 9: Local Link Integrity Errors: 0
+	 Link 9: Tx Discards: 0
+	 Link 9: Link Recovery Successful Events: 0
+	 Link 9: Link Recovery Failed Events: 0
+	 Link 9: Total Link Recovery Events: 0
+	 Link 9: Effective Errors: 0
+	 Link 9: Effective BER: 15e-255
+	 Link 9: Symbol Errors: 0
+	 Link 9: Symbol BER: 15e-255
+	 Link 9: FEC Errors - 0: 8812
+	 Link 9: FEC Errors - 1: 3
+	 Link 10: Malformed Packet Errors: 0
+	 Link 10: Buffer Overrun Errors: 0
+	 Link 10: Rx Errors: 0
+	 Link 10: Rx remote Errors: 0
+	 Link 10: Rx General Errors: 0
+	 Link 10: Local Link Integrity Errors: 0
+	 Link 10: Tx Discards: 0
+	 Link 10: Link Recovery Successful Events: 0
+	 Link 10: Link Recovery Failed Events: 0
+	 Link 10: Total Link Recovery Events: 0
+	 Link 10: Effective Errors: 0
+	 Link 10: Effective BER: 15e-255
+	 Link 10: Symbol Errors: 0
+	 Link 10: Symbol BER: 15e-255
+	 Link 10: FEC Errors - 0: 8812
+	 Link 10: FEC Errors - 1: 3
+	 Link 11: Malformed Packet Errors: 0
+	 Link 11: Buffer Overrun Errors: 0
+	 Link 11: Rx Errors: 0
+	 Link 11: Rx remote Errors: 0
+	 Link 11: Rx General Errors: 0
+	 Link 11: Local Link Integrity Errors: 0
+	 Link 11: Tx Discards: 0
+	 Link 11: Link Recovery Successful Events: 0
+	 Link 11: Link Recovery Failed Events: 0
+	 Link 11: Total Link Recovery Events: 0
+	 Link 11: Effective Errors: 0
+	 Link 11: Effective BER: 15e-255
+	 Link 11: Symbol Errors: 0
+	 Link 11: Symbol BER: 15e-255
+	 Link 11: FEC Errors - 0: 8812
+	 Link 11: FEC Errors - 1: 3
+	 Link 12: Malformed Packet Errors: 0
+	 Link 12: Buffer Overrun Errors: 0
+	 Link 12: Rx Errors: 0
+	 Link 12: Rx remote Errors: 0
+	 Link 12: Rx General Errors: 0
+	 Link 12: Local Link Integrity Errors: 0
+	 Link 12: Tx Discards: 0
+	 Link 12: Link Recovery Successful Events: 0
+	 Link 12: Link Recovery Failed Events: 0
+	 Link 12: Total Link Recovery Events: 0
+	 Link 12: Effective Errors: 0
+	 Link 12: Effective BER: 15e-255
+	 Link 12: Symbol Errors: 0
+	 Link 12: Symbol BER: 15e-255
+	 Link 12: FEC Errors - 0: 8812
+	 Link 12: FEC Errors - 1: 3
+	 Link 13: Malformed Packet Errors: 0
+	 Link 13: Buffer Overrun Errors: 0
+	 Link 13: Rx Errors: 0
+	 Link 13: Rx remote Errors: 0
+	 Link 13: Rx General Errors: 0
+	 Link 13: Local Link Integrity Errors: 0
+	 Link 13: Tx Discards: 0
+	 Link 13: Link Recovery Successful Events: 0
+	 Link 13: Link Recovery Failed Events: 0
+	 Link 13: Total Link Recovery Events: 0
+	 Link 13: Effective Errors: 0
+	 Link 13: Effective BER: 15e-255
+	 Link 13: Symbol Errors: 0
+	 Link 13: Symbol BER: 15e-255
+	 Link 13: FEC Errors - 0: 8812
+	 Link 13: FEC Errors - 1: 3
+	 Link 14: Malformed Packet Errors: 0
+	 Link 14: Buffer Overrun Errors: 0
+	 Link 14: Rx Errors: 0
+	 Link 14: Rx remote Errors: 0
+	 Link 14: Rx General Errors: 0
+	 Link 14: Local Link Integrity Errors: 0
+	 Link 14: Tx Discards: 0
+	 Link 14: Link Recovery Successful Events: 0
+	 Link 14: Link Recovery Failed Events: 0
+	 Link 14: Total Link Recovery Events: 0
+	 Link 14: Effective Errors: 0
+	 Link 14: Effective BER: 15e-255
+	 Link 14: Symbol Errors: 0
+	 Link 14: Symbol BER: 15e-255
+	 Link 14: FEC Errors - 0: 8812
+	 Link 14: FEC Errors - 1: 3
+	 Link 15: Malformed Packet Errors: 0
+	 Link 15: Buffer Overrun Errors: 0
+	 Link 15: Rx Errors: 0
+	 Link 15: Rx remote Errors: 0
+	 Link 15: Rx General Errors: 0
+	 Link 15: Local Link Integrity Errors: 0
+	 Link 15: Tx Discards: 0
+	 Link 15: Link Recovery Successful Events: 0
+	 Link 15: Link Recovery Failed Events: 0
+	 Link 15: Total Link Recovery Events: 0
+	 Link 15: Effective Errors: 0
+	 Link 15: Effective BER: 15e-255
+	 Link 15: Symbol Errors: 0
+	 Link 15: Symbol BER: 15e-255
+	 Link 15: FEC Errors - 0: 8812
+	 Link 15: FEC Errors - 1: 3
+	 Link 16: Malformed Packet Errors: 0
+	 Link 16: Buffer Overrun Errors: 0
+	 Link 16: Rx Errors: 0
+	 Link 16: Rx remote Errors: 0
+	 Link 16: Rx General Errors: 0
+	 Link 16: Local Link Integrity Errors: 0
+	 Link 16: Tx Discards: 0
+	 Link 16: Link Recovery Successful Events: 0
+	 Link 16: Link Recovery Failed Events: 0
+	 Link 16: Total Link Recovery Events: 0
+	 Link 16: Effective Errors: 0
+	 Link 16: Effective BER: 15e-255
+	 Link 16: Symbol Errors: 0
+	 Link 16: Symbol BER: 15e-255
+	 Link 16: FEC Errors - 0: 8812
+	 Link 16: FEC Errors - 1: 3
+	 Link 17: Malformed Packet Errors: 0
+	 Link 17: Buffer Overrun Errors: 0
+	 Link 17: Rx Errors: 0
+	 Link 17: Rx remote Errors: 0
+	 Link 17: Rx General Errors: 0
+	 Link 17: Local Link Integrity Errors: 0
+	 Link 17: Tx Discards: 0
+	 Link 17: Link Recovery Successful Events: 0
+	 Link 17: Link Recovery Failed Events: 0
+	 Link 17: Total Link Recovery Events: 0
+	 Link 17: Effective Errors: 0
+	 Link 17: Effective BER: 15e-255
+	 Link 17: Symbol Errors: 0
+	 Link 17: Symbol BER: 15e-255
+	 Link 17: FEC Errors - 0: 8812
+	 Link 17: FEC Errors - 1: 3

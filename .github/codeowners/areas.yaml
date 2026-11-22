@@ -496,6 +496,7 @@ areas:
   - benchmarks/burstgpt_loadgen/
   - benchmarks/frontend/
   - benchmarks/incluster/
+  - benchmarks/lium_cluster_bench/
   - benchmarks/mocker/README.md
   - benchmarks/mocker/bench_ais_concurrency.py
   - benchmarks/nat_trace/

@@ -1,0 +1,3 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+{"data": {"request_id": "req_7f3a9c21"}, "error": {"code": "rate_limited", "exit_code": 3, "hint": "Wait a few seconds and retry; back off if it repeats", "message": "Rate limit exceeded: 60 requests per minute"}, "ok": false}

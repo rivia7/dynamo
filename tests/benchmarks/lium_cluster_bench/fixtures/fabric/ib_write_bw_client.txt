@@ -1,0 +1,25 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+---------------------------------------------------------------------------------------
+                    RDMA_Write BW Test
+ Dual-port       : OFF		Device         : mlx5_0
+ Number of qps   : 2		Transport type : IB
+ Connection type : RC		Using SRQ      : OFF
+ PCIe relax order: ON
+ ibv_wr* API     : ON
+ TX depth        : 128
+ CQ Moderation   : 1
+ Mtu             : 4096[B]
+ Link type       : IB
+ Max inline data : 0[B]
+ rdma_cm QPs	 : OFF
+ Data ex. method : Ethernet
+---------------------------------------------------------------------------------------
+ local address: LID 0x1a QPN 0x0127 PSN 0x3f0b1d RKey 0x1fffbd VAddr 0x007f2a4c000000
+ local address: LID 0x1a QPN 0x0128 PSN 0x4ab8e3 RKey 0x1fffbd VAddr 0x007f2a4c010000
+ remote address: LID 0x1f QPN 0x0128 PSN 0x8d2a11 RKey 0x1ff9be VAddr 0x007f8c3e000000
+ remote address: LID 0x1f QPN 0x0129 PSN 0x1c90a7 RKey 0x1ff9be VAddr 0x007f8c3e010000
+---------------------------------------------------------------------------------------
+ #bytes     #iterations    BW peak[Gb/sec]    BW average[Gb/sec]   MsgRate[Mpps]
+ 65536      2184736          0.00               381.85     		   0.728335
+---------------------------------------------------------------------------------------

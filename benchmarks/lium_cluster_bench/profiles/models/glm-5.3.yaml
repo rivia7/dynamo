@@ -1,0 +1,29 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+# GLM-5.3 served through Dynamo + SGLang. Worker args and env mirror
+# recipes/glm-5.3/sglang/*-agentic/deploy.yaml.
+name: glm-5.3
+served_model_name: zai-org/GLM-5.3
+checkpoints:
+  nvfp4: {repo: RadixArk/GLM-5.3-NVFP4, revision: main, approx_size_gb: 430}
+  fp8: {repo: zai-org/GLM-5.3, revision: main, approx_size_gb: 756}
+worker_args: [--dyn-tool-call-parser, glm47, --dyn-reasoning-parser, glm45, --reasoning-parser, glm45]
+env:
+  DYN_SGL_ALLOW_TOP_LOGPROBS: "1"
+  # The SGLang 0.5.18 forward-pass metrics reporter crashes on the first EAGLE
+  # decode batch in sglang-runtime:1.5.1 (see the recipe comment).
+  DYN_FORWARDPASS_METRIC_PORT: ""
+spec_decode_keys:
+  - speculative-algorithm
+  - speculative-num-steps
+  - speculative-eagle-topk
+  - speculative-num-draft-tokens
+  - speculative-attention-mode
+  - speculative-moe-runner-backend
+  - speculative-moe-a2a-backend
+simulate_acceptance_env:
+  SGLANG_SIMULATE_ACC_LEN: "2.69"
+  SGLANG_SIMULATE_ACC_METHOD: match-expected
+  SGLANG_SIMULATE_ACC_TOKEN_MODE: real-draft-token
+trust_remote_code: true
+moe: true  # mixture of experts (diagnostics report EPLB balancedness)

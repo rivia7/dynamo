@@ -1,0 +1,26 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+Generating SQLite file /bench/experiments/h200-007/diagnostics/w1/cb-5d1c-agg0-r0.sqlite from /bench/experiments/h200-007/diagnostics/w1/cb-5d1c-agg0-r0.nsys-rep
+Exporting 1638415 events: [=================================================100%]
+Processing [/bench/experiments/h200-007/diagnostics/w1/cb-5d1c-agg0-r0.sqlite] with [/opt/nvidia/nsight-systems-cli/2025.6.1/host-linux-x64/reports/cuda_gpu_kern_sum.py]...
+
+ ** CUDA GPU Kernel Summary (cuda_gpu_kern_sum):
+
+Time (%),Total Time (ns),Instances,Avg (ns),Med (ns),Min (ns),Max (ns),StdDev (ns),Name
+46.9,3114201600,1224,2544282.4,2534105.2,2315296,3078581,78872.8,"void deep_gemm::sm90_fp8_gemm_1d2d_impl<0u, 4096u, 7168u, 32u, 128u, 192u, 128u, 128u, 128u, 0u, 5u, 1u, 128u, 256u, 1u, false, 132u, (deep_gemm::GemmType)1, deep_gemm::EpilogueIdentity>(float*, int*, unsigned int, unsigned int, unsigned int, CUtensorMap_st, CUtensorMap_st, CUtensorMap_st, CUtensorMap_st)"
+21.1,1402368000,1224,1145725.5,1141142.6,1042610,1386327,35517.5,"void cutlass::device_kernel<flash::enable_sm90_or_later<flash::FlashAttnFwdSm90<flash::CollectiveMainloopFwdSm90<2, cute::tuple<cute::C<1>, cute::C<1>, cute::C<1> >, cute::tuple<cute::C<128>, cute::C<128>, cute::C<192> >, 192, cutlass::bfloat16_t, float, cutlass::arch::Sm90, true, false, false, false, false, false, true, false, false, true, false, false>, flash::CollectiveEpilogueFwd<cute::tuple<cute::C<128>, cute::C<128>, cute::C<128> >, cute::tuple<cute::C<1>, cute::C<1>, cute::C<1> >, cutlass::bfloat16_t, cutlass::arch::Sm90, 256, false, false, false>, flash::VarlenDynamicPersistentTileScheduler<128, 256, 128, false, true, true> > > >(flash::enable_sm90_or_later<flash::FlashAttnFwdSm90<flash::CollectiveMainloopFwdSm90<2, cute::tuple<cute::C<1>, cute::C<1>, cute::C<1> >, cute::tuple<cute::C<128>, cute::C<128>, cute::C<192> >, 192, cutlass::bfloat16_t, float, cutlass::arch::Sm90, true, false, false, false, false, false, true, false, false, true, false, false>, flash::CollectiveEpilogueFwd<cute::tuple<cute::C<128>, cute::C<128>, cute::C<128> >, cute::tuple<cute::C<1>, cute::C<1>, cute::C<1> >, cutlass::bfloat16_t, cutlass::arch::Sm90, 256, false, false, false>, flash::VarlenDynamicPersistentTileScheduler<128, 256, 128, false, true, true> > >::Params)"
+12.2,812544000,1224,663843.1,661187.8,604097,803250,20579.1,"void deep_ep::internode::dispatch<false, 8, 9, 7168, 4, 24, 128>(int4*, float*, long*, float*, void*, int*, int*, int*, int*, int*, int4 const*, float const*, long const*, float const*, int const*, bool const*, int, int, int, int, int, int, void*, int, int, void**, int, int, int, int)"
+12.0,798105600,1224,652047.1,649438.9,593362,788976,20213.5,"void deep_ep::internode::combine<__nv_bfloat16, 8, 9, 7168, 4, 24, 128>(int4*, float*, bool const*, void const*, float const*, int const*, int const*, void const*, int*, int*, int*, int*, int, int, int, int, int, void*, int, int, void**, int, int, int)"
+7.7,512870400,2448,209505.9,208667.9,190650,253502,6494.7,"void cutlass::device_kernel<cutlass::gemm::kernel::GemmUniversal<cute::tuple<int, int, int, int>, cutlass::gemm::collective::CollectiveMma<cutlass::gemm::MainloopSm90TmaGmmaWarpSpecializedBlockScalingFP8<4, 2, cute::tuple<cute::C<1>, cute::C<2>, cute::C<1> >, cutlass::gemm::KernelTmaWarpSpecializedCooperativeFP8BlockScaledAccum>, cute::tuple<cute::C<128>, cute::C<128>, cute::C<128> >, cutlass::float_e4m3_t, cute::tuple<long, cute::C<1>, long>, cutlass::float_e4m3_t, cute::tuple<long, cute::C<1>, long>, cute::TiledMMA<cute::MMA_Atom<cute::SM90_64x128x32_F32E4M3E4M3_SS_TN<(cute::GMMA::ScaleIn)1, (cute::GMMA::ScaleIn)1> >, cute::Layout<cute::tuple<cute::C<2>, cute::C<1>, cute::C<1> >, cute::tuple<cute::C<1>, cute::C<0>, cute::C<0> > >, cute::tuple<cute::Underscore, cute::Underscore, cute::Underscore> >>, cutlass::epilogue::collective::CollectiveEpilogue<>, cutlass::gemm::PersistentScheduler> >(cutlass::gemm::kernel::GemmUniversal<cute::tuple<int, int, int, int>>::Params)"
+
+Processing [/bench/experiments/h200-007/diagnostics/w1/cb-5d1c-agg0-r0.sqlite] with [/opt/nvidia/nsight-systems-cli/2025.6.1/host-linux-x64/reports/cuda_gpu_mem_time_sum.py]...
+
+ ** CUDA GPU MemOps Summary (by Time) (cuda_gpu_mem_time_sum):
+
+Time (%),Total Time (ns),Count,Avg (ns),Med (ns),Min (ns),Max (ns),StdDev (ns),Operation
+79.8,8123456,3200,2538.6,2528.4,2310,3071,78.7,[CUDA memcpy Device-to-Device]
+20.2,2054321,1680,1222.8,1217.9,1112,1479,37.9,[CUDA memset]
+
+Processing [/bench/experiments/h200-007/diagnostics/w1/cb-5d1c-agg0-r0.sqlite] with [/opt/nvidia/nsight-systems-cli/2025.6.1/host-linux-x64/reports/nvtx_sum.py]...
+SKIPPED: /bench/experiments/h200-007/diagnostics/w1/cb-5d1c-agg0-r0.sqlite does not contain NV Tools Extension (NVTX) data.
+

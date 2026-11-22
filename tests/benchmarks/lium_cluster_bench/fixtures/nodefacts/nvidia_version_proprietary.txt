@@ -1,0 +1,4 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+NVRM version: NVIDIA UNIX x86_64 Kernel Module  525.147.05  Wed Oct 25 20:27:35 UTC 2023
+GCC version:  gcc version 11.4.0 (Ubuntu 11.4.0-1ubuntu1~22.04)

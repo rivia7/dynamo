@@ -1,0 +1,17 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+# NVIDIA H100 SXM (HGX, NVLink4). FP8 GLM-5.3 (~0.76 TB) needs two nodes per replica.
+# Dense Tensor Core peaks: half of the product page's sparse figures (FP8 3,958,
+# BF16 1,979 TFLOPS "with sparsity"): https://www.nvidia.com/en-us/data-center/h100/ .
+# No FP4 Tensor Cores. HBM 3.35 TB/s (SXM).
+name: h100
+match: ['\bH100\b']
+arch: sm90
+hbm_gb: 80
+nvlink: true
+weights_variant: fp8
+nominal_nvlink_gbs: 450
+nominal_pcie_gbs: 64
+peak_dense_tflops: {fp8: 1979, bf16: 989.5}
+hbm_tbs: 3.35
+lane_cap: 512

@@ -441,6 +441,7 @@
 /components/src/dynamo/replay/                                                                          @ai-dynamo/dynamo-performance-codeowners
 /recipes/nemotron-3-nano-omni/                                                                          @ai-dynamo/dynamo-performance-codeowners
 /recipes/nemotron-3-super-fp8/                                                                          @ai-dynamo/dynamo-performance-codeowners
+/benchmarks/lium_cluster_bench/                                                                         @ai-dynamo/dynamo-performance-codeowners
 /benchmarks/sin_load_generator/                                                                         @ai-dynamo/dynamo-performance-codeowners
 /benchmarks/prefix_data_generator/                                                                      @ai-dynamo/dynamo-performance-codeowners
 /benchmarks/request_trace/README.md                                                                     @ai-dynamo/dynamo-performance-codeowners

@@ -1,0 +1,16 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
++ exec python3 -m dynamo.sglang --config /bench/experiments/h100-002/deployments/91c2d7e0aa41/cb-91c2d7e0aa41-agg0-r0.yaml
+2026-11-05T11:40:02.004118Z  INFO model_runner.init_torch_distributed: Init torch distributed begin.
+2026-11-05T11:40:05.553090Z  INFO model_runner.init_torch_distributed: Init torch distributed ends. mem usage=1.02 GB
+2026-11-05T11:40:05.902231Z  INFO model_runner.load_model: Load weight begin. avail mem=78.51 GB
+2026-11-05T11:41:58.117002Z  INFO model_runner.load_model: Load weight end. type=GlmMoeDsaForCausalLM, dtype=torch.bfloat16, avail mem=6.12 GB, mem usage=72.39 GB.
+2026-11-05T11:41:58.902551Z  INFO memory_pool._create_buffers: KV Cache is allocated. #tokens: 61440, KV size: 1.99 GB
+2026-11-05T11:41:59.010227Z  INFO model_runner.init_memory_pool: Memory pool end. avail mem=3.95 GB
+2026-11-05T11:42:00.115026Z  INFO model_runner.init_device_graphs: Capture cuda graph begin. This can take up to several minutes. avail mem=3.40 GB
+2026-11-05T11:42:09.771301Z ERROR scheduler.run_scheduler_process: Scheduler hit an exception: Traceback (most recent call last):
+  File "/usr/local/lib/python3.12/dist-packages/sglang/srt/model_executor/cuda_graph_runner.py", line 401, in capture
+    out = self.capture_one_batch_size(bs, forward)
+torch.OutOfMemoryError: CUDA out of memory. Tried to allocate 1.12 GiB. GPU 3 has a total capacity of 79.10 GiB of which 402.06 MiB is free.
+2026-11-05T11:42:09.990004Z ERROR engine.launch: Rank 0 scheduler is dead. Please check if there are relevant logs.
+NVRM: Xid (PCI:0000:9d:00): 31, pid=4412, name=python3, Ch 00000010, intr 10000000. MMU Fault: ENGINE GRAPHICS GPCCLIENT_T1_0 faulted @ 0x7f_1c000000.

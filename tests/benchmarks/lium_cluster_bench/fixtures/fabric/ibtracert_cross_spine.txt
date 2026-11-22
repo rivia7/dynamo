@@ -1,0 +1,8 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+From ca {0xb83fd20300a51b2c} portnum 1 lid 26-26 "gpu-h100-07 mlx5_0"
+[1] -> switch port {0xfc6a1c0300e7a1b0}[17] lid 3-3 "MF0;ib-leaf-r0-01:MQM9700/U1"
+[33] -> switch port {0xfc6a1c0300e9c000}[9] lid 12-12 "MF0;ib-spine-01:MQM9700/U1"
+[21] -> switch port {0xfc6a1c0300e7a2c8}[5] lid 4-4 "MF0;ib-leaf-r0-02:MQM9700/U1"
+[5] -> ca port {0xb83fd20300a62a10}[1] lid 31-31 "gpu-h100-11 mlx5_0"
+To ca {0xb83fd20300a62a10} portnum 1 lid 31-31 "gpu-h100-11 mlx5_0"

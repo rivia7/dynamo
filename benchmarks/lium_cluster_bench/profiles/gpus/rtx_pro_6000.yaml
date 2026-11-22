@@ -1,0 +1,21 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+# NVIDIA RTX PRO 6000 Blackwell Server Edition: PCIe Gen5 x16 only (datasheet), no NVLink.
+# Tensor Core peaks: the product page lists FP4 4, FP8 2, BF16 1 PFLOPS without
+# saying sparse or dense; the Workstation edition footnotes the same 4,000 FP4 TOPS
+# as "using sparsity", so the dense values below are those figures halved
+# (UNVERIFIED): https://www.nvidia.com/en-us/data-center/rtx-pro-6000-blackwell-server-edition/ .
+# GDDR7 1,597 GB/s (the Workstation card's 1,792 GB/s does not apply).
+name: rtx_pro_6000
+match: ['RTX PRO 6000', 'RTX Pro 6000']
+arch: sm120
+hbm_gb: 96
+nvlink: false
+weights_variant: nvfp4
+nominal_pcie_gbs: 64
+peak_dense_tflops: {fp4: 2000, fp8: 1000, bf16: 500}
+hbm_tbs: 1.597
+lane_cap: 256
+notes: >-
+  GLM-5.3 DSA attention kernels on SM120 are UNVERIFIED; the smoke ladder decides.
+  Dense Tensor Core peaks are half the product page figures (UNVERIFIED).

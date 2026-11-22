@@ -1,0 +1,12 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+[    0.451802] DMAR: [Firmware Bug]: No firmware reserved region can cover this RMRR [0x000000006e000000-0x000000006e7fffff], contact BIOS vendor for fixes
+[    6.112042] nvidia: loading out-of-tree module taints kernel.
+[    6.112060] nvidia: module license 'NVIDIA' taints kernel.
+[   19.873305] mlx5_core 0000:3b:00.0 enp59s0f0np0: Link down
+[  211.004512] NVRM: Xid (PCI:0000:3a:00): 94, pid=48211, name=python3, Contained: SM (0x1). RST: No, D-RST: No
+[  211.004998] NVRM: Xid (PCI:0000:3a:00): 63, pid='<unknown>', name=<unknown>, Row Remapper: New row (0x00000003c0f8a0a0) marked for remapping, reset gpu to activate.
+[ 3605.118210] NVRM: Xid (PCI:0000:c1:00): 13, pid=77120, name=python, Graphics Exception: ESR 0x50da30=0x30a000e 0x50da34=0x4 0x50da28=0x0 0x50da2c=0x0
+[ 7712.000417] pcieport 0000:39:00.0: AER: Corrected error message received from 0000:3a:00.0
+[ 7712.000431] nvidia 0000:3a:00.0: PCIe Bus Error: severity=Corrected, type=Physical Layer, (Receiver ID)
+[ 9123.552300] mlx5_core 0000:19:00.0: mlx5_cmd_out_err:838:(pid 52133): CREATE_QP(0x500) op_mod(0x0) failed, status bad parameter(0x3), syndrome (0x5a1c03), err(-22)

@@ -1,0 +1,3 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+{"error": {"code": "cluster_rented_not_listed", "exit_code": 3, "hint": "Do not re-run 'lium clusters up': the nodes are rented and billing. 'lium clusters ps' shows the cluster once every member is listed; 'lium clusters rm <id>' removes it.", "message": "The rent of 4 nodes was confirmed but the pod listing shows 3 of them"}, "ok": false}

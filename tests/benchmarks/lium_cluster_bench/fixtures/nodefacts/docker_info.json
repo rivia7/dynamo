@@ -1,0 +1,131 @@
+{
+ "Architecture": "x86_64",
+ "CDISpecDirs": [
+  "/etc/cdi",
+  "/var/run/cdi"
+ ],
+ "CPUSet": true,
+ "CPUShares": true,
+ "CgroupDriver": "cgroupfs",
+ "CgroupVersion": "2",
+ "ContainerdCommit": {
+  "ID": "bcc810d6b9066471b0b6fa75f557a15a1cbf31bb"
+ },
+ "Containers": 2,
+ "ContainersPaused": 0,
+ "ContainersRunning": 0,
+ "ContainersStopped": 2,
+ "CpuCfsPeriod": true,
+ "CpuCfsQuota": true,
+ "Debug": false,
+ "DefaultRuntime": "runc",
+ "DockerRootDir": "/var/lib/docker",
+ "Driver": "overlay2",
+ "DriverStatus": [
+  [
+   "Backing Filesystem",
+   "xfs"
+  ],
+  [
+   "Supports d_type",
+   "true"
+  ],
+  [
+   "Using metacopy",
+   "false"
+  ],
+  [
+   "Native Overlay Diff",
+   "true"
+  ],
+  [
+   "userxattr",
+   "false"
+  ]
+ ],
+ "ExperimentalBuild": false,
+ "HttpProxy": "",
+ "HttpsProxy": "",
+ "ID": "4a1f2c3d-5e6f-4a7b-8c9d-0e1f2a3b4c5d",
+ "IPv4Forwarding": true,
+ "Images": 3,
+ "IndexServerAddress": "https://index.docker.io/v1/",
+ "InitBinary": "docker-init",
+ "InitCommit": {
+  "ID": "de40ad0"
+ },
+ "Isolation": "",
+ "KernelVersion": "5.15.0-122-generic",
+ "Labels": [],
+ "LiveRestoreEnabled": false,
+ "LoggingDriver": "json-file",
+ "MemTotal": 2164069322752,
+ "MemoryLimit": true,
+ "NCPU": 224,
+ "NEventsListener": 0,
+ "NFd": 27,
+ "NGoroutines": 44,
+ "Name": "lium-h100-07",
+ "NoProxy": "",
+ "OSType": "linux",
+ "OSVersion": "22.04",
+ "OomKillDisable": false,
+ "OperatingSystem": "Ubuntu 22.04.5 LTS",
+ "PidsLimit": true,
+ "Plugins": {
+  "Authorization": null,
+  "Log": [
+   "awslogs",
+   "fluentd",
+   "gcplogs",
+   "gelf",
+   "journald",
+   "json-file",
+   "local",
+   "splunk",
+   "syslog"
+  ],
+  "Network": [
+   "bridge",
+   "host",
+   "ipvlan",
+   "macvlan",
+   "null",
+   "overlay"
+  ],
+  "Volume": [
+   "local"
+  ]
+ },
+ "RuncCommit": {
+  "ID": "v1.2.4-0-g6c52b3f"
+ },
+ "Runtimes": {
+  "io.containerd.runc.v2": {
+   "path": "runc",
+   "status": {
+    "org.opencontainers.runtime-spec.features": "{}"
+   }
+  },
+  "nvidia": {
+   "path": "nvidia-container-runtime"
+  },
+  "runc": {
+   "path": "runc",
+   "status": {
+    "org.opencontainers.runtime-spec.features": "{}"
+   }
+  }
+ },
+ "SecurityOptions": [
+  "name=apparmor",
+  "name=seccomp,profile=builtin",
+  "name=cgroupns"
+ ],
+ "ServerVersion": "27.5.1",
+ "SwapLimit": true,
+ "SystemTime": "2026-11-04T09:12:07.512402201Z",
+ "Warnings": [
+  "WARNING: bridge-nf-call-iptables is disabled"
+ ]
+}

@@ -1,0 +1,18 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+# NVIDIA H200 (HGX, NVLink4). Nominal rates are per GPU, per direction.
+# Dense Tensor Core peaks: half of the product page's sparse figures (FP8 3,958,
+# BF16 1,979 TFLOPS "with sparsity"): https://www.nvidia.com/en-us/data-center/h200/ .
+# No FP4 Tensor Cores. HBM 4.8 TB/s, NVLink 900 GB/s and PCIe Gen5 128 GB/s are
+# bidirectional on the same page.
+name: h200
+match: ['\bH200\b']
+arch: sm90
+hbm_gb: 141
+nvlink: true
+weights_variant: fp8
+nominal_nvlink_gbs: 450
+nominal_pcie_gbs: 64
+peak_dense_tflops: {fp8: 1979, bf16: 989.5}
+hbm_tbs: 4.8
+lane_cap: 512
