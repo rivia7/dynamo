@@ -10,9 +10,16 @@ under ``nsys profile --capture-range=cudaProfilerApi``. A short AIPerf load
 runs at the leader's concurrency; after its warm-up every instance leader
 gets ``POST /engine/control/start_profile`` for a few forward steps. The
 reports are summarized with ``nsys stats`` into a kernel-time breakdown per
-role. Throughput inside the window is never an official result (nsys node
-graph tracing slows the workers); the window is skipped when the budget
-cannot cover it. Every step is fail-soft and leaves a note.
+role, and ``agents/nsys_timeline.py`` reduces each SQLite export to the
+wall-time split of the captured steps (communication, attention, MoE, idle;
+``domain/steps.py``). Throughput inside the window is never an official
+result (nsys node graph tracing slows the workers); the window is skipped
+when the budget cannot cover it. Every step is fail-soft and leaves a note.
+
+When the experiment already has a window whose reports were read
+(``--redo diagnose`` again), the phase summarizes those reports once more
+with the current code instead of capturing: no deployment, no load, and the
+reports are never overwritten.
 """
 
 from __future__ import annotations
@@ -34,7 +41,10 @@ from benchmarks.cluster_bench.app.history import build_history, make_budget
 from benchmarks.cluster_bench.app.nvlink_ops import nvlink_events
 from benchmarks.cluster_bench.app.phases.planned import unsupported_verdict
 from benchmarks.cluster_bench.app.pipeline import PhaseRuntime
+from benchmarks.cluster_bench.app.store import EventStore
+from benchmarks.cluster_bench.app.summary import plan_lookup_for
 from benchmarks.cluster_bench.domain import search
+from benchmarks.cluster_bench.domain.base import stable_hash
 from benchmarks.cluster_bench.domain.kernels import (
     KernelBreakdown,
     KernelReport,
@@ -48,6 +58,7 @@ from benchmarks.cluster_bench.domain.schema import (
     PointResult,
 )
 from benchmarks.cluster_bench.domain.search import RunPoint
+from benchmarks.cluster_bench.domain.steps import StepBreakdown, merge_step_breakdowns
 
 logger = logging.getLogger(__name__)
 
@@ -81,6 +92,42 @@ def engine_values(point: PointResult | None) -> dict[str, float]:
     return out
 
 
+# notes a re-analysis writes; the next one replaces them
+_REANALYSIS_NOTES = (
+    "re-analyzed the reports of the earlier window",
+    "re-analysis skipped:",
+)
+
+
+def _dump(items: Mapping[str, KernelBreakdown | StepBreakdown]) -> dict | None:
+    return {r: b.model_dump(mode="json") for r, b in items.items()} or None
+
+
+def role_timelines(
+    reports: Sequence[KernelReport], plan: LaunchPlan
+) -> dict[str, StepBreakdown]:
+    """Wall-time split of the captured steps per serving role."""
+    role_of = {c.name: c.role for c in plan.containers}
+    grouped: dict[str, list[StepBreakdown]] = {}
+    for report in reports:
+        if report.timeline is not None:
+            role = role_of.get(report.source, "unknown")
+            grouped.setdefault(role, []).append(
+                StepBreakdown.model_validate(report.timeline)
+            )
+    merged = {r: merge_step_breakdowns(i) for r, i in sorted(grouped.items())}
+    return {r: m for r, m in merged.items() if m is not None}
+
+
+def captured_window(store: EventStore) -> DiagnosticsResult | None:
+    """The last diagnostic window whose Nsight Systems reports were read."""
+    for event in reversed(store.of_type(EventType.DIAGNOSTICS)):
+        result = DiagnosticsResult.model_validate(event.data["result"])
+        if result.nsys == "ok" and result.kernels:
+            return result
+    return None
+
+
 def role_breakdowns(
     reports: Sequence[KernelReport], plan: LaunchPlan
 ) -> dict[str, KernelBreakdown]:
@@ -101,6 +148,11 @@ class DiagnosePhase:
         cfg = ctx.config.diagnose
         if not cfg.enabled:
             _done(ctx, "diagnostic window not requested (--diagnose)")
+            return
+        prior = captured_window(ctx.store)
+        if prior is not None:
+            self._record(ctx, self._reanalyze(ctx, prior))
+            _done(ctx, "diagnostic window re-analyzed from its reports")
             return
         if unsupported_verdict(ctx):
             _done(ctx, "diagnostic window skipped: GPU type unsupported")
@@ -128,40 +180,105 @@ class DiagnosePhase:
             _done(ctx, reason)
             return
         result = self._window(ctx, rt, leader)
+        self._record(ctx, result)
+        _done(ctx, f"diagnostic window recorded (nsys {result.nsys})")
+
+    @staticmethod
+    def _record(ctx: RunContext, result: DiagnosticsResult) -> None:
         ctx.save_json("analysis/diagnostics.json", result.model_dump(mode="json"))
         ctx.store.append(
             EventType.DIAGNOSTICS, {"result": result.model_dump(mode="json")}
         )
-        _done(ctx, f"diagnostic window recorded (nsys {result.nsys})")
+
+    @staticmethod
+    def _diagnostics(ctx: RunContext) -> NsysDiagnostics:
+        return NsysDiagnostics(
+            ctx.cluster,
+            workdir=ctx.config.workdir,
+            results_dir=ctx.exp_dir / "diagnostics",
+            labels=experiment_labels(ctx.config.exp_id),
+            src_dir=ctx.src_dir,
+        )
+
+    @staticmethod
+    def _image(
+        ctx: RunContext, diag: NsysDiagnostics
+    ) -> tuple[str | None, str | None, str]:
+        """(image, nsys version, why not): one image with nsys on every node."""
+        ctx.status(step="diagnostics: preparing an image with Nsight Systems")
+        images = diag.ensure_image(ctx.node_names, ctx.config.image)
+        bad = {n: i for n, i in images.items() if not i.ok}
+        tags = {i.image for i in images.values() if i.ok}
+        if bad or len(tags) != 1:
+            first = next(iter(bad.values()), None)
+            why = "; ".join(first.notes) if first and first.notes else "no image"
+            return (
+                None,
+                None,
+                f"Nsight Systems unavailable on {len(bad)} node(s): {why}",
+            )
+        info = next(iter(images.values())).nsys
+        return tags.pop(), info.version if info else None, ""
 
     # ------------------------------------------------------------------ steps
+    def _reanalyze(
+        self, ctx: RunContext, prior: DiagnosticsResult
+    ) -> DiagnosticsResult:
+        """The earlier window's reports, summarized again with this code.
+
+        The step count is the capture's own (``capture_steps``; a window
+        recorded before that field existed takes ``--diagnose-steps``)."""
+        steps = prior.capture_steps or ctx.config.diagnose.steps
+        notes = [f"{_REANALYSIS_NOTES[0]} ({steps} steps)"]
+
+        def kept(why: str) -> DiagnosticsResult:
+            notes.append(f"{_REANALYSIS_NOTES[1]} {why}")
+            return prior.model_copy(
+                update={"notes": tuple(dict.fromkeys((*prior.notes, *notes)))}
+            )
+
+        plan = plan_lookup_for(ctx.exp_dir)(stable_hash(prior.cand_key, 8))
+        if plan is None:
+            return kept("the window's launch plan is missing")
+        diag = self._diagnostics(ctx)
+        image, _, why = self._image(ctx, diag)
+        if image is None:
+            return kept(why)
+        reports = self._collect(ctx, diag, plan, image, notes, steps)
+        kernels = role_breakdowns(reports, plan)
+        for report in reports:
+            notes.extend(report.notes)
+        if not kernels:
+            return kept("no report could be read again")
+        reread = tuple(f"{r.source}:" for r in reports)
+
+        def stale(note: str) -> bool:
+            """A note of an earlier analysis of the reports read again."""
+            return note.startswith(_REANALYSIS_NOTES) or note.startswith(reread)
+
+        return prior.model_copy(
+            update={
+                "kernels": _dump(kernels),
+                "timeline": _dump(role_timelines(reports, plan)) or prior.timeline,
+                "capture_steps": steps,
+                "notes": tuple(
+                    dict.fromkeys((*(n for n in prior.notes if not stale(n)), *notes))
+                ),
+            }
+        )
+
     def _window(
         self, ctx: RunContext, rt: PhaseRuntime, leader: PointResult
     ) -> DiagnosticsResult:
         cfg = ctx.config.diagnose
         notes: list[str] = []
-        diag = NsysDiagnostics(
-            ctx.cluster,
-            workdir=ctx.config.workdir,
-            results_dir=ctx.exp_dir / "diagnostics",
-            labels=experiment_labels(ctx.config.exp_id),
-        )
+        diag = self._diagnostics(ctx)
         image, nsys_state, version = None, "off", None
         if cfg.nsys:
-            ctx.status(step="diagnostics: preparing an image with Nsight Systems")
-            images = diag.ensure_image(ctx.node_names, ctx.config.image)
-            bad = {n: i for n, i in images.items() if not i.ok}
-            tags = {i.image for i in images.values() if i.ok}
-            if bad or len(tags) != 1:
-                nsys_state = "unavailable"
-                first = next(iter(bad.values()), None)
-                why = "; ".join(first.notes) if first and first.notes else "no image"
-                notes.append(f"Nsight Systems unavailable on {len(bad)} node(s): {why}")
-            else:
-                image = tags.pop()
-                nsys_state = "ok"
-                info = next(iter(images.values())).nsys
-                version = info.version if info else None
+            image, version, why = self._image(ctx, diag)
+            nsys_state = "ok" if image is not None else "unavailable"
+            if image is None:
+                notes.append(why)
         cand = leader.candidate.model_copy(
             update={"diag": "nsys" if nsys_state == "ok" else "metrics"}
         )
@@ -190,7 +307,9 @@ class DiagnosePhase:
         notes.extend(triggered)
         reports: list[KernelReport] = []
         if cand.diag == "nsys":
-            reports = self._collect(ctx, diag, plan, image or ctx.config.image, notes)
+            reports = self._collect(
+                ctx, diag, plan, image or ctx.config.image, notes, cfg.steps
+            )
         rt.session.teardown()
         kernels = role_breakdowns(reports, plan)
         for report in reports:
@@ -199,8 +318,9 @@ class DiagnosePhase:
             notes.append("no kernel breakdown: no readable Nsight Systems report")
         return result.model_copy(
             update={
-                "kernels": {r: b.model_dump(mode="json") for r, b in kernels.items()}
-                or None,
+                "kernels": _dump(kernels),
+                "timeline": _dump(role_timelines(reports, plan)),
+                "capture_steps": cfg.steps if cand.diag == "nsys" else None,
                 "engine": engine_values(point),
                 "output_tps": point.metrics.output_tps
                 if point and point.metrics
@@ -271,6 +391,7 @@ class DiagnosePhase:
         plan: LaunchPlan,
         image: str,
         notes: list[str],
+        steps: int,
     ) -> list[KernelReport]:
         expected = expected_reports(
             plan.containers,
@@ -302,6 +423,9 @@ class DiagnosePhase:
                         image=image,
                         source=name,
                         expected_devices=devices,
+                        # kept next to the report for a later re-analysis
+                        keep_sqlite=True,
+                        steps=steps,
                     )
                 )
             return out

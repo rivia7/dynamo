@@ -1,0 +1,50 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+# GLM-5.3-Flash served through Dynamo + SGLang: a 45-layer MoE (288 experts,
+# top-8; about 320B parameters with the MTP layer, 16.7B active per token)
+# with hybrid attention (34 KDA linear-attention layers and 11 DSA sparse-MLA
+# layers without RoPE, whose indexer pools keys: index_kpool 4) and mHC. The
+# recipes pass worker args instead of a ConfigMap, so the family files carry
+# the whole SGLang config; worker args, env and the simulated acceptance
+# mirror recipes/glm-5.3-flash/sglang/*-agentic/kustomize.
+name: glm-5.3-flash
+served_model_name: zai-org/GLM-5.3-Flash
+checkpoints:
+  # The recipes' checkpoint.
+  nvfp4:
+    repo: RadixArk/GLM-5.3-Flash-NVFP4
+    revision: f46cf340d35a22d0d83d0c1dac8957cf2b1bcd35
+    approx_size_gb: 203
+    sglang: {quantization: modelopt_fp4}
+  # NVIDIA's ModelOpt export (--checkpoint nvfp4-nvidia): NVFP4 routed experts
+  # and dense MLPs; BF16 attention (KDA and MLA), routers and shared experts
+  # (read from the safetensors headers, 2026-11-23). As for
+  # nvidia/GLM-5.3-NVFP4, the BF16 shared expert is not fused into the NVFP4
+  # routed-expert kernel.
+  nvfp4-nvidia:
+    repo: nvidia/GLM-5.3-Flash-NVFP4
+    revision: 1d00738646cbb0c6d0a9eb403dac5f366f1473a7
+    approx_size_gb: 205
+    sglang: {quantization: modelopt_fp4, disable-shared-experts-fusion: true}
+worker_args: [--dyn-tool-call-parser, glm47, --dyn-reasoning-parser, glm45]
+env:
+  # As in profiles/models/glm-5.3.yaml: top logprobs for the accuracy checks,
+  # and the forward-pass metrics reporter off.
+  DYN_SGL_ALLOW_TOP_LOGPROBS: "1"
+  DYN_FORWARDPASS_METRIC_PORT: ""
+spec_decode_keys:
+  - speculative-algorithm
+  - speculative-num-steps
+  - speculative-eagle-topk
+  - speculative-num-draft-tokens
+  - speculative-attention-mode
+  - speculative-moe-runner-backend
+  - speculative-moe-a2a-backend
+  # ReplaySSM verify keeps the KDA state for the draft chain; no draft, no ring.
+  - enable-linear-replayssm-spec
+simulate_acceptance_env:
+  SGLANG_SIMULATE_ACC_LEN: "2.5657"
+  SGLANG_SIMULATE_ACC_METHOD: match-expected
+  SGLANG_SIMULATE_ACC_TOKEN_MODE: real-draft-token
+trust_remote_code: true
+moe: true  # mixture of experts (diagnostics report EPLB balancedness)

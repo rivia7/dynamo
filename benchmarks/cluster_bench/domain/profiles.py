@@ -54,6 +54,27 @@ def detect_gpu_profile(gpu_name: str, profiles: Mapping[str, GpuProfile]) -> Gpu
 # --------------------------------------------------------------------------
 
 
+def select_checkpoint(
+    model: ModelProfile, gpu: GpuProfile, requested: str | None = None
+) -> tuple[str, Checkpoint]:
+    """The checkpoint variant to serve and its entry.
+
+    ``requested`` (--checkpoint) wins; else the GPU profile's weights_variant
+    when the model has it; else the model's first checkpoint.
+    """
+    if requested is not None:
+        if requested not in model.checkpoints:
+            raise ProfileError(
+                f"model {model.name} has no checkpoint {requested!r}; "
+                f"choose one of {sorted(model.checkpoints)}"
+            )
+        return requested, model.checkpoints[requested]
+    if gpu.weights_variant in model.checkpoints:
+        return gpu.weights_variant, model.checkpoints[gpu.weights_variant]
+    variant = next(iter(model.checkpoints))
+    return variant, model.checkpoints[variant]
+
+
 # --------------------------------------------------------------------------
 # Recipe ConfigMaps and config merging
 # --------------------------------------------------------------------------

@@ -8,7 +8,9 @@
 #   worker   - python3 -m dynamo.sglang with the rendered --config and args
 #              (under Nsight Systems when CB_NSYS_OUTPUT is set, see below);
 #              with CB_DECODE_ONLY=1 the D-Only shim agents/sglang_decode_only.py
-#              (dynamo.sglang decode without a prefill peer, fake KV transfer)
+#              (dynamo.sglang decode without a prefill peer, fake KV transfer);
+#              CB_SGLANG_HOTFIXES names SGLang source edits applied first
+#              (agents/sglang_hotfix.py)
 # All settings arrive through the container env file rendered by
 # benchmarks/cluster_bench/adapters/engine_sglang.py.
 
@@ -87,6 +89,13 @@ case "$ROLE" in
                 nsys_prefix=("$nsys_bin" profile "${nsys_flags[@]}" -o "$CB_NSYS_OUTPUT")
                 echo "cluster_bench: worker runs under Nsight Systems: ${nsys_prefix[*]}"
             fi
+        fi
+        # SGLang source hotfixes the profile names (agents/sglang_hotfix.py),
+        # applied before the worker starts so every engine process imports
+        # them; a hotfix that does not fit the image stops the launch.
+        if [[ -n "${CB_SGLANG_HOTFIXES:-}" ]]; then
+            python3 -P "${DYNAMO_HOME}/benchmarks/cluster_bench/agents/sglang_hotfix.py" \
+                apply "$CB_SGLANG_HOTFIXES"
         fi
         worker_entry=(-m dynamo.sglang)
         if [[ "${CB_DECODE_ONLY:-0}" == "1" ]]; then

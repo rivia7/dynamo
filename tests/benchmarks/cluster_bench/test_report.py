@@ -10,6 +10,8 @@ import xml.etree.ElementTree as ET
 import pytest
 
 from benchmarks.cluster_bench.domain.capacity import interconnect_needs
+from benchmarks.cluster_bench.domain.gpuactivity import ActivityBrief, RoleActivity
+from benchmarks.cluster_bench.domain.pointstate import PointState, StressBrief
 from benchmarks.cluster_bench.domain.schema import (
     FloorResult,
     Inventory,
@@ -200,9 +202,10 @@ def test_resources_section_reports_needs_mfu_and_kv(
     assert "在有跨节点流量的 Disagg 1P1D" in sec and "它实测最少 4 张/节点" in sec
     assert "瓶颈很可能不在带宽总量" not in sec  # no cross-family comparison
     assert "这个部署需要 NVLink" in sec
-    # 2.2: MFU of the one agg role, its curve, the dense FP8 peak
-    assert "| 聚合（agg） | 32 | 210.6 | 10.6% | 31% |" in sec
-    assert "稠密峰值 1,979 TFLOPS" in sec and "| 256 | 112.4 | 10.6% |" in sec
+    # 2.3: MFU of the one agg role, its curve, the dense FP8 peak; measured MBU
+    assert "| 聚合（agg） | 32 | 210.6 | 10.6% | 31% | 65.7% | 3.15 |" in sec
+    assert "稠密峰值 1,979 TFLOPS" in sec and "| 256 | 112.4 | 10.6% | 65.7% |" in sec
+    assert "DRAM_BW_UTIL" in sec and "每卡 4.8 TB/s" in sec
     assert strings.t("resources.mfu_total") not in sec  # single role
     # 2.3: 4 x 381k tokens; 24 requests at the p50 context; a near-full pool
     assert "可同时放下的上下文：152.4 万 tokens" in sec
@@ -212,6 +215,7 @@ def test_resources_section_reports_needs_mfu_and_kv(
     assert f"| **{est}** | 1 |" in md
     assert f"| **{strings.t('resources.kpi_nics')}** |" not in md
     assert "| **MFU（agg）** | 10.6% |" in md
+    assert "| **MBU（agg）** | 65.7% | 实测 3.15 / 4.8 TB/s/卡" in md
     assert "152.4 万 tokens" in page
 
 
@@ -434,6 +438,23 @@ def test_charts_handle_empty_input():
         svg.hbar_chart("e2", [], title="t", x_label="x", empty_text="无"),
         svg.grouped_bar_chart("e3", [], [], [], title="t", y_label="y"),
         svg.grouped_bar_chart("e4", ["g"], ["a"], [[None]], title="t", y_label="y"),
+        svg.stacked_hbar_chart("e5", ["a"], [], title="t", x_label="x", empty_text="无"),
+        svg.stacked_hbar_chart(
+            "e6", ["a"], [svg.Stack("s", (None,))], title="t", x_label="x"
+        ),
+        svg.heat_rows_chart("e7", [], title="t", x_label="x", shade_name="s"),
+        svg.heat_rows_chart(
+            "e8",
+            [svg.HeatRow("g", 0.0, 1.0, ())],
+            title="t",
+            x_label="x",
+            shade_name="s",
+        ),
+        svg.lane_chart("e9", ["a"], [], 0.0, title="t", x_label="x", empty_text="无"),
+        svg.stacked_area_chart("e10", ["a"], 1.0, [], title="t", x_label="x"),
+        svg.stacked_area_chart(
+            "e11", ["a"], 1.0, [(0.0,), (None,)], title="t", x_label="x"
+        ),
     ):
         ET.fromstring(chart)
 
@@ -485,6 +506,8 @@ def test_pd_leader_headlines_the_whole_cluster_mfu(tmp_path, h200, strings):
         role_gpus={"prefill": 16, "decode": 16},
         precision="fp8",
         peak_tflops=1979.0,
+        dram_active={"prefill": 0.42, "decode": 0.71},
+        peak_mem_tbs=4.8,
         cache_source="usage",
     )
     points = tuple(
@@ -496,3 +519,166 @@ def test_pd_leader_headlines_the_whole_cluster_mfu(tmp_path, h200, strings):
     tile = f"| **{strings.t('resources.kpi_mfu_total')}** | {total} | prefill "
     assert tile in md and " · decode " in md
     assert "| **MFU（decode）** |" not in md
+    mbu = strings.t("resources.kpi_mbu_total")
+    assert f"| **{mbu}** | 56.5% | prefill 42.0% · decode 71.0%" in md
+
+
+def _titles(root) -> set[str]:
+    return {t.text for t in root.iter("title")}
+
+
+def test_bubble_charts_are_well_formed_titled_and_deterministic():
+    parts = ["通信", "attention", "空闲"]
+    builds = {
+        "stacked": lambda: svg.stacked_hbar_chart(
+            "s",
+            parts,
+            [
+                svg.Stack("decode", (1.0, 2.0, 0.5), ("c 1", "a 2", "i 0.5"), "3.5 ms"),
+                svg.Stack("<a&b>", (None, 1.0, 0.0)),
+            ],
+            title="t",
+            x_label="ms",
+            muted=(2,),
+            faded=(1,),
+        ),
+        "heat": lambda: svg.heat_rows_chart(
+            "h",
+            [
+                svg.HeatRow(
+                    "GPU 0", 0.0, 1.0, (0.0, 0.25, 0.25, 0.9), ((1.5, 3.0, "AR"),)
+                ),
+                svg.HeatRow("GPU 1", 0.5, 1.0, (0.1, 0.0)),
+            ],
+            title="t",
+            x_label="ms",
+            shade_name="空闲",
+            mark_name="通信",
+            tip=lambda label, a, b, v: f"{label} {a:g}-{b:g} {v:.2f}",
+        ),
+        "lane": lambda: svg.lane_chart(
+            "l",
+            parts,
+            [
+                svg.LaneSpan(0.0, 10.0, 0, tip="comm"),
+                svg.LaneSpan(10.0, 30.0, 1, 0.0, 0.6, tip="bin"),
+                svg.LaneSpan(10.0, 30.0, 2, 0.6, 1.0, tip="bin"),
+            ],
+            40.0,
+            title="t",
+            x_label="µs",
+            muted=(2,),
+        ),
+        "area": lambda: svg.stacked_area_chart(
+            "a",
+            parts,
+            0.5,
+            [(0.5, 0.2, 0.3), (0.9, 0.3, 0.0), (0.2, None, 0.8)],
+            title="t",
+            x_label="ms",
+            tips=("0-0.5", "0.5-1", ""),
+            muted=(2,),
+        ),
+    }
+    roots = {}
+    for name, build in builds.items():
+        chart = build()
+        assert chart == build(), name
+        roots[name] = ET.fromstring(chart)
+        assert roots[name].find("title") is not None, name
+    stacked, heat, lane = roots["stacked"], roots["heat"], roots["lane"]
+    area = roots["area"]
+    # one area per part used; a bin without a tip is no hover target
+    assert len([p for p in area.iter("path") if "mk" in p.get("class", "")]) == 3
+    assert _titles(area) == {"t", "0-0.5", "0.5-1"}
+    assert {"c 1", "a 2", "i 0.5"} <= _titles(stacked)
+    assert {"decode", "<a&b>", "3.5 ms"} <= {t.text for t in stacked.iter("text")}
+    # equal neighbours merge into one cell; an idle-free cell is not drawn
+    assert {"GPU 0 1-3 0.25", "GPU 0 3-4 0.90", "GPU 1 0.5-1.5 0.10", "AR"} <= _titles(
+        heat
+    )
+    assert not any(t.startswith("GPU 0 0-1") for t in _titles(heat))
+    # the two halves of one bin share one title
+    assert sorted(t for t in _titles(lane) if t in ("comm", "bin")) == ["bin", "comm"]
+    with pytest.raises(ValueError):
+        many = [str(i) for i in range(svg.MAX_SERIES + 1)]
+        svg.stacked_hbar_chart(
+            "x", many, [svg.Stack("s", (1.0,) * len(many))], title="t", x_label="x"
+        )
+
+
+def _with_activity(summary, family_id: str, *, gr: float, sm: float, tx: float):
+    """Every point of a family with one GPM aggregate over its "agg" GPUs."""
+
+    def state(point):
+        role = RoleActivity(
+            role="agg",
+            gpus_sampled=point.gpu_count,
+            gr_pct_mean=gr,
+            sm_pct_mean=sm,
+            pcie_tx_gbs_mean=tx,
+            pcie_rx_gbs_mean=tx / 2,
+        )
+        activity = ActivityBrief(gpus_sampled=point.gpu_count, roles={"agg": role})
+        base = point.state or PointState()
+        stress = (base.stress or StressBrief()).model_copy(
+            update={"activity": activity}
+        )
+        return base.model_copy(update={"stress": stress})
+
+    points = tuple(
+        p.model_copy(update={"state": state(p)})
+        if p.candidate.family_id == family_id
+        else p
+        for p in summary.points
+    )
+    return summary.model_copy(update={"points": points})
+
+
+def test_runtime_section_splits_gpu_time_into_three_layers(tmp_path, h200, plan_lookup):
+    summary = _with_activity(h200, "agg-tp8", gr=90.0, sm=60.0, tx=2.0)
+    out = tmp_path / "report"
+    md, page = _render(summary, out, plan_lookup)
+    assert "GPU 时间分三层（聚合（agg），GPM 平均）" in md
+    assert "SM 在算 60%，有 kernel 但 SM 空着 30%，没有 kernel 10%" in md
+    # 2 GB/s from each of 32 GPUs over the leader's 112.4 x 32 output tok/s
+    assert "32 张卡合计，每个输出 token 发送 17.8 MB" in md
+    assert (out / "figures" / "fig-gpm-layers.svg").exists()
+    assert "](figures/fig-gpm-layers.svg)" in md
+    (chart,) = [c for c in _inline_svgs(page) if 'id="fig-gpm-layers-title"' in c]
+    root = ET.fromstring(chart)
+    labels = {t.text for t in root.iter("text")}
+    assert "C=256" in labels and "PCIe 18 MB/token" in labels
+    assert not any("C=" in (t or "") and "NIC" in (t or "") for t in labels)
+    md, _ = _render(h200, tmp_path / "plain", plan_lookup)
+    assert "GPU 时间分三层" not in md and "fig-gpm-layers" not in md
+
+
+def test_resources_section_shows_how_nccl_joins_the_gpus(tmp_path, h200):
+    hops = {
+        "0->1": ["P2P/CUMEM"],
+        "1->0": ["P2P/CUMEM"],
+        "3->4": ["SHM/direct"],
+        "4->3": ["SHM/direct"],
+    }
+    peaks = tuple(
+        p.model_copy(update={"details": {**p.details, "nccl_hops": hops}})
+        if p.test == "nccl_all_reduce_intra"
+        else p
+        for p in h200.peaks
+    )
+    nodes = h200.inventory.nodes
+    node0 = nodes[0].model_copy(
+        update={"topo": {"GPU0": {"GPU1": "NV18"}, "GPU3": {"GPU4": "SYS"}}}
+    )
+    inventory = h200.inventory.model_copy(update={"nodes": (node0, *nodes[1:])})
+    summary = h200.model_copy(update={"peaks": peaks, "inventory": inventory})
+    md, _ = _render(summary, tmp_path / "hops")
+    md = _unescaped(md)
+    assert "| GPU 0 ↔ GPU 1 | NV18 | P2P/CUMEM |" in md
+    assert "| GPU 3 ↔ GPU 4 | SYS | SHM/direct |" in md
+    # one row per pair, both directions together
+    assert "GPU 1 ↔ GPU 0" not in md and "GPU 4 ↔ GPU 3" not in md
+    assert "NCCL_P2P_LEVEL=SYS" in md
+    md, _ = _render(h200, tmp_path / "plain")
+    assert "NCCL 走的路" not in md

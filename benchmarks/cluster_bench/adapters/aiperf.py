@@ -27,9 +27,12 @@ the 0.14.0 wheel (aiperf/common/scenario/inferencex_agentx_mvp.py):
   prefix cache and no worker restart is needed between concurrency points;
 * ``--max-context-length`` drops whole traces whose recorded peak exceeds
   it (no truncation);
-* ``output_token_throughput`` is total OSL / duration, and OSL already
-  includes reasoning tokens; ``input_token_throughput`` is total ISL /
-  duration (the P-Only objective);
+* ``output_token_throughput`` is total OSL over the profiling phase's wall
+  time (``start_time`` to ``end_time``, grace period included; the
+  ``benchmark_duration`` metric spans only the finished requests), and OSL
+  already includes reasoning tokens; ``input_token_throughput`` is total ISL
+  over the same time (the P-Only objective). Requests still running when the
+  grace period ends never finish, so neither total counts them;
 * ``--extra-inputs`` consumes several ``key:value`` pairs and is merged into
   the payload after the per-turn ``max_completion_tokens``, so P-Only's
   ``max_completion_tokens:1`` caps every request at one output token.
@@ -38,7 +41,10 @@ the 0.14.0 wheel (aiperf/common/scenario/inferencex_agentx_mvp.py):
 from __future__ import annotations
 
 import json
+import re
 import shlex
+from collections import Counter
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Mapping, Sequence
 
@@ -198,11 +204,13 @@ def build_profile_command(
     seed: int = 42,
     stage: Stage = "e2e",
     extra_args: Sequence[str] = (),
+    hf_endpoint: str | None = None,
 ) -> str:
     """Shell command (env assignments + argv) for one measured point.
 
     ``stage`` "prefill" (P-Only) caps every request at one output token;
-    ``extra_args`` (``--aiperf-arg``) are appended verbatim.
+    ``extra_args`` (``--aiperf-arg``) are appended verbatim; ``hf_endpoint``
+    (--hf-endpoint) is where AIPerf downloads a public dataset from.
     """
     ds = parse_dataset(dataset) if isinstance(dataset, str) else dataset
     check_extra_args(extra_args)
@@ -214,6 +222,8 @@ def build_profile_command(
         "AIPERF_HTTP_CONNECTION_LIMIT": str(max(400, 2 * concurrency)),
         "HF_HOME": hf_home,
     }
+    if hf_endpoint:
+        env["HF_ENDPOINT"] = hf_endpoint
     argv = [
         aiperf_bin,
         "profile",
@@ -326,6 +336,25 @@ def _stat(report: Mapping[str, Any], name: str, stat: str) -> float | None:
     return float(metric[stat])
 
 
+def _phase_s(report: Mapping[str, Any]) -> float | None:
+    """Wall time of the profiling phase: what AIPerf divides its throughputs by.
+
+    ``start_time`` and ``end_time`` bound the phase, its grace period included
+    (``benchmark_duration`` spans only the finished requests); without them the
+    output throughput and its own total give it back.
+    """
+    try:
+        start = datetime.fromisoformat(str(report["start_time"]))
+        span = (datetime.fromisoformat(str(report["end_time"])) - start).total_seconds()
+    except (KeyError, TypeError, ValueError):
+        span = 0.0
+    if span > 0:
+        return span
+    osl = _stat(report, "total_osl", "avg")
+    tps = _stat(report, "output_token_throughput", "avg")
+    return osl / tps if osl and tps else None
+
+
 def parse_profile_export(report: Mapping[str, Any]) -> PointMetrics:
     """``profile_export_aiperf.json`` -> PointMetrics."""
     error_types: dict[str, int] = {}
@@ -374,6 +403,7 @@ def parse_profile_export(report: Mapping[str, Any]) -> PointMetrics:
         itl_p99_ms=_stat(report, "inter_token_latency", "p99"),
         request_throughput=_stat(report, "request_throughput", "avg"),
         duration_s=_stat(report, "benchmark_duration", "avg"),
+        phase_s=_phase_s(report),
         isl_avg=_stat(report, "input_sequence_length", "avg"),
         osl_avg=_stat(report, "output_sequence_length", "avg"),
         error_types=error_types,
@@ -416,10 +446,14 @@ def load_request_summary(
     gpus: int,
     tiers: Sequence[SloTier] | None = None,
     window: tuple[float, float] | None = None,
+    duration_s: float | None = None,
     arch: ModelArch | None = None,
     cached_fraction: float | None = None,
 ) -> RequestSummary | None:
-    """Per-request summary from the newest ``profile_export.jsonl`` (or None)."""
+    """Per-request summary from the newest ``profile_export.jsonl`` (or None).
+
+    ``duration_s`` is what the rates divide by: pass ``PointMetrics.phase_s``.
+    """
     records_files = sorted(artifact_dir.rglob("profile_export.jsonl"))
     if not records_files:
         return None
@@ -430,6 +464,7 @@ def load_request_summary(
         gpus=gpus,
         tiers=tiers,
         window=window,
+        duration_s=duration_s,
         cancelled=cancelled,
         unreadable=bad,
         arch=arch,
@@ -451,6 +486,69 @@ def load_point_metrics(artifact_dir: Path) -> PointMetrics | None:
             update={"window_start_ns": window[0], "window_end_ns": window[1]}
         )
     return metrics
+
+
+# AIPerf's exit box: "Reason: Run aborted by 'timing_manager': warmup_failure."
+# (an AgentX warmup aborts the whole run on one failed trajectory).
+_ABORT_RE = re.compile(r"Run aborted by '([^']+)': ([A-Za-z0-9_-]+)")
+# Record errors arrive as "SSEResponseError('Error occurred in SSE response: ...')".
+_WRAPPED_RE = re.compile(r"^\w+\((['\"])(.*)\1\)$", re.DOTALL)
+_SSE_PREFIX = "Error occurred in SSE response: "
+MAX_ERROR_CHARS = 160
+
+
+def _error_text(error: Mapping[str, Any]) -> str:
+    """``HTTP 400: <message>`` without AIPerf's exception wrapper."""
+    message = " ".join(
+        str(error.get("message") or error.get("type") or "error").split()
+    )
+    wrapped = _WRAPPED_RE.match(message)
+    if wrapped:
+        message = wrapped[2]
+    message = message.removeprefix(_SSE_PREFIX)
+    code = error.get("code")
+    text = f"HTTP {code}: {message}" if code else message
+    if len(text) > MAX_ERROR_CHARS:
+        text = text[: MAX_ERROR_CHARS - 3] + "..."
+    return text
+
+
+def failure_details(point_dir: Path) -> tuple[str, ...]:
+    """Why AIPerf left no summary export (best effort).
+
+    AIPerf's abort reason from the harness's copy of its output
+    (``aiperf.log``) and the most common error among the per-request records
+    it wrote before stopping.
+    """
+    details: list[str] = []
+    try:
+        log = (point_dir / "aiperf.log").read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        log = ""
+    aborted = _ABORT_RE.search(log)
+    if aborted:
+        details.append(f"AIPerf aborted the run ({aborted[1]}: {aborted[2]})")
+    errors: Counter[str] = Counter()
+    for path in sorted(point_dir.rglob("profile_export.jsonl")):
+        try:
+            with open(path, "r", encoding="utf-8", errors="replace") as fh:
+                for line in fh:
+                    if '"error"' not in line:
+                        continue
+                    try:
+                        error = json.loads(line).get("error")
+                    except (ValueError, AttributeError):
+                        continue
+                    if isinstance(error, Mapping):
+                        errors[_error_text(error)] += 1
+        except OSError:
+            continue
+    if errors:
+        text, count = errors.most_common(1)[0]
+        details.append(
+            f"{sum(errors.values())} failed request(s), most common ({count}x): {text}"
+        )
+    return tuple(details)
 
 
 def dropped_trace_count(log_text: str) -> int | None:

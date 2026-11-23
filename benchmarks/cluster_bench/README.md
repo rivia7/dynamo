@@ -45,8 +45,21 @@ it. Before renting, the Lium controller refuses a size that no tuned family
 fits (`--nodes 2|4|8`; other sizes keep the families that scale exactly).
 
 Supported GPU profiles: B300, B200, H200, H100 (2-node replicas), RTX PRO 6000
-Blackwell (PCIe only; DSA kernels are verified by a dummy-weight smoke ladder).
+Blackwell (PCIe only; DSA kernels are verified by a dummy-weight smoke ladder)
+and RTX PRO 6000D (PCIe only, 89.8 GB: attention TP8 instead of DP8, because
+the replicated BF16 attention weights would not fit).
 Other GPUs and models run untuned with `--model-repo` and `--model-size-gb`.
+
+GLM-5.3-Flash (`--model glm-5.3-flash`: hybrid KDA linear attention plus DSA
+MLA layers) is tuned for the RTX PRO 6000D only, as TP4 and TP8 roles. On SM120
+its attention runs only on SGLang's TileLang DSA kernels with a BF16 KV cache,
+and SGLang 0.5.21 needs one source edit for that. Such edits are named in
+`agents/sglang_hotfix.py`; a role lists the ones it needs in its
+`CB_SGLANG_HOTFIXES` env, `scripts/launch_node.sh` applies them inside the
+worker container before the engine starts, and preflight checks that each one
+fits the pinned image (`preflight/sglang_hotfixes.txt`), so a run never serves
+an unpatched engine. The profile serves 229376 tokens, as GLM-5.3 does on that
+GPU, so both models replay the same AgentX traces.
 
 ## 快速开始
 
@@ -70,6 +83,9 @@ bash benchmarks/cluster_bench/cluster_bench.sh controller run-all --exp-id h200-
 #    同一集群、同一模型和数据集的 P-Only 与 D-Only 都测完后，KB 的 INDEX.md 给出 PD 配比
 #    分步执行：controller up | sync | launch | watch | pull | down | status
 #    也可以不写文件：--machine 'ssh -p 2222 root@203.0.113.10' --machine root@203.0.113.11（可重复）
+#    网络受限（连不上 huggingface.co / GitHub）：先把权重放到每台机器的同一路径，再加
+#    -- --model-path /data/models/GLM-5.3-NVFP4 --checkpoint nvfp4-nvidia --hf-endpoint https://hf-mirror.com
+#    （见下文 Restricted networks and pre-placed weights）
 
 # 2. 指定数据集（默认 semianalysis_cc_traces_weka_062126：SemiAnalysis Claude Code trace 完整语料，
 #    用 AIPerf 的 --scenario agentx 闭环回放）
@@ -189,7 +205,8 @@ Each machine needs:
 - Internet access on every machine: bootstrap installs uv, Python 3.12 and the
   harness's Python packages into `<workdir>/venv` (AIPerf 0.14.0 on node0),
   and every node pulls the image and downloads its share of the weights from
-  Hugging Face.
+  Hugging Face. Behind a restricted network, see
+  [Restricted networks and pre-placed weights](#restricted-networks-and-pre-placed-weights).
 - Root works best: switching NVLink off for the NVLink/PCIe comparison needs
   it. With another user the controller warns; pass `-- --no-nvlink-ablation`
   if the comparison fails.
@@ -199,6 +216,43 @@ the machines line: an `~/.ssh/config` alias still supplies `HostName`,
 `IdentityFile` and `ProxyJump`, but not `User` or `Port`. A machine without
 `-i` uses `--ssh-identity`, else ssh's own defaults and agent (never lium's
 key).
+
+### Restricted networks and pre-placed weights
+
+Where huggingface.co, GitHub or PyPI is slow or blocked, prepare the machines
+once and give the runner (after `--`) up to three flags:
+
+- `--model-path /data/models/GLM-5.3-NVFP4`: the weights are already at this
+  absolute path, the same on every node (copy them over the LAN). Nothing is
+  downloaded and the space check is skipped. The download phase checks that
+  every node holds the same files with the same sizes as node0, that
+  `config.json` and every shard the safetensors index names are there, and
+  that no `.aria2`, `.incomplete` or `.part` file is left; it does not hash
+  them. Pin `--model-revision <commit>` to record which commit they are.
+- `--checkpoint VARIANT`: which checkpoint of the tuned model profile the
+  weights are, for example `nvfp4-nvidia` for `nvidia/GLM-5.3-NVFP4` (SGLang
+  loads its mixed NVFP4/FP8 layers as `modelopt_mixed`). The checkpoint's
+  `sglang:` keys are merged into every role, over the recipe and the family.
+  Without the flag the GPU profile's `weights_variant` is used.
+- `--hf-endpoint https://hf-mirror.com`: `HF_ENDPOINT` for what the nodes
+  still fetch from Hugging Face: the AIPerf dataset, and the weights when
+  there is no `--model-path`.
+
+Bootstrap finds uv in `~/.local/bin` (for example `pip install --user uv`
+from a PyPI mirror), and uv reads `~/.config/uv/uv.toml`, so mirrors there
+cover the venv: a PyPI index and, for a host without Python 3.12, a
+python-build-standalone mirror (top-level keys go before `[[index]]`):
+
+```toml
+python-install-mirror = "https://mirror.nju.edu.cn/github-release/astral-sh/python-build-standalone"
+
+[[index]]
+url = "https://pypi.tuna.tsinghua.edu.cn/simple"
+default = true
+```
+
+The pinned image comes from `nvcr.io`; pulling it on every machine before the
+run saves the first deployment the wait.
 
 ## Lium.io specifics
 
@@ -340,28 +394,29 @@ artifacts) are refused. Preflight checks the dataset's flags against
 | preflight | Replicate code to peers, bootstrap venvs, probe GPUs/HCAs/topology/disks, pick profiles (for P-Only/D-Only the stage families) and a local weights disk (never `/mnt` on Lium), pull the image, verify every SGLang/Dynamo/AIPerf flag (the stage's and the dataset's included) against `--help` of the pinned versions; D-Only: run the decode-only shim's `--check` inside the image |
 | download | Resolve the HF commit, download 1/N of the shards per node in the background, meanwhile run intra-node P2P microbenchmarks and a dummy-weight kernel smoke (walks the GPU profile's ladder), then NCCL-broadcast the missing shards over the RDMA fabric and verify sha256; then measure the weights disk's direct-read speed |
 | fabric | Upstream switch topology and link health (see below): identify (sysfs / MAD / LLDP), traces between every node pair per rail, a perftest link matrix (round-robin pairs, every rail concurrently, ~2-4 min on 8 nodes; `--no-link-matrix` skips it), and the list of switch ports sampled at every load point |
-| microbench | Inter-node NCCL collectives and GPU-direct send/recv with 8/4/2/1 NICs (speed-of-light references) |
+| microbench | Inter-node NCCL collectives and GPU-direct send/recv with 8/4/2/1 NICs (speed-of-light references); the intra-node collectives run with `NCCL_DEBUG=INFO` (`INIT`), and the transport NCCL set up for every GPU-to-GPU hop (`P2P/...`, or `SHM/...` through host memory) is kept with the peak and shown next to `nvidia-smi topo -m` in report section 2.1 |
 | search | Topology families in priority order (recipe baseline first), powers-of-two concurrency climb per family, pruning, P:D alternate by symptom, floor bracketing, MTP-off ablation (P-Only: no floors and no MTP; D-Only: MTP with simulated acceptance) |
 | accuracy | E2E only (P-Only and D-Only produce no real answers). GSM8K 5-shot (200 questions, sha256-pinned test split, greedy, Dynamo `/v1/completions`) on the leader; a configuration below the floor (0.80) or more than 0.07 below the best checked one (outside the 95% CI) never leads, so the next best is checked (`--accuracy-max-checks`, default 3); `--no-accuracy` disables it |
 | pilot | n=3 repetitions at the leader's knee: noise floor and minimum detectable effect |
 | nic_sweep | 1/2/4/8 NICs on the best configuration that has measured cross-node traffic |
 | confirm | Rerun of the leader with the AgentX preset's warmup, `--confirm-duration-s` (default 1200 s, >= 900 s for AgentX) and no `--unsafe-override` |
 | nvlink | NVLink against PCIe: tear down, switch NVLink out of the GPU-GPU path on every node (Hopper: `nvidia-smi nvlink -sBwMode OFF`, "P2P is via PCIe bus"; Blackwell: `-sLWidth 0` only if offered), prove it with a GPU-GPU copy benchmark (must drop to PCIe speed), deploy the leader with NVLS and SGLang's custom all-reduce off (`NCCL_P2P_LEVEL=SYS`), measure one point at the leader's concurrency, restore NVLink (also on resume after a crash and in finalize). Without root or a supported switch: NCCL without P2P, staged through host memory (a labelled lower bound). A DeepEP leader (NVLink-only intranode kernels) hands the comparison to the best family without DeepEP; PCIe-only GPUs skip it. The run is invalid if NVLink counters show traffic. Its budget is the first to yield: the leader's climb and every earlier step may spend it (`--no-nvlink-ablation` turns it off) |
-| diagnose | Opt-in (`--diagnose`): the leader redeployed as a diagnostic variant (SGLang `--enable-mfu-metrics`, device timer, `--expert-balancedness-report-mode prometheus` for MoE; workers under Nsight Systems from the pinned image or a derived `cb-diag/...` image built on each node), a short load, `POST /engine/control/start_profile` for 10 forward steps, `nsys stats` -> kernel-time shares per role. Never ranked |
+| diagnose | Opt-in (`--diagnose`): the leader redeployed as a diagnostic variant (SGLang `--enable-mfu-metrics`, device timer, `--expert-balancedness-report-mode prometheus` for MoE; workers under Nsight Systems from the pinned image or a derived `cb-diag/...` image built on each node), a short load, `POST /engine/control/start_profile` for 10 forward steps, `nsys stats` -> kernel-time shares per role, and each report's SQLite export reduced on the node to the wall-time split of a forward step (NCCL, attention, MoE, dense GEMM, other, idle; stalls >= 5 ms cut out for a steady split). The report draws it: step bars per role, every GPU's idle over the window with the long collectives on it, two steps of one GPU's timeline as stacked shares, and a 1.8 ms close-up with every kernel at its real time. Never ranked |
 | finalize | "after" health snapshot, summary, report, KB export |
 
 ## Focus resources of the leader
 
 Report section 2 and the KB view `resources.md` answer these questions about
 the leader at its saturation point (2.1 interconnect, 2.2 NVLink against
-PCIe, 2.3 MFU, 2.4 KV capacity), each with the method stated next to the
+PCIe, 2.3 MFU and MBU, 2.4 KV capacity), each with the method stated next to the
 number:
 
 | Question | How it is derived | Where |
 |---|---|---|
 | How much interconnect does it need? | For each link kind (NVLink per GPU, GPU PCIe, GPU<->NIC PCIe, IB/RoCE per node) the busiest device's p99 over 1-s bins, worse direction; utilization against the nominal per-direction rate; need = p99 / `--link-target-util` (default 0.7). Fewest NICs per node twice: measured by the NIC sweep (fewest within the noise floor with every larger count also holding; the sweep runs on the best cross-node family when the leader has none, and is attributed to it) and estimated from the leader's own IB need / one NIC's rate. NVLink is needed when the GPU-GPU need exceeds one PCIe link | `summary.interconnect`, KB `index.jsonl` (`min_nics_*`, `ib_*`, `nvlink_*`) |
 | Does it need NVLink? | Measured: the same configuration at the same concurrency with NVLink switched off (phase `nvlink` above): tok/s/GPU, per-user rate, TTFT and ITL against NVLink, the delta judged against the noise floor, the method, what carried the traffic (PCIe P2P or host staging), the GPU-GPU copy rate and PCIe p99 during the run | `summary.nvlink`, KB `index.jsonl` `nvlink_off_*`, `run.jsonl` `p2p` |
-| How much of the GPUs' floating-point peak does it use (MFU)? | Model FLOPs from the checkpoint's `config.json` (MLA, MoE with shared experts and dense layers, DSA top-k attention plus its indexer, dense GQA) for useful tokens only: prompt tokens not served from the prefix cache (per-request `usage` or the server's hit rate) and generated tokens; MTP drafts are excluded. Divided by window x GPUs x the GPU profile's dense peak at the checkpoint's GEMM precision; per role for PD; NVML GPM tensor activity alongside | `PointResult.mfu`, `summary.model_arch`, KB `run.jsonl` `mfu_*`, `index.jsonl` `leader_mfu_*` |
+| How much of the GPUs' floating-point peak does it use (MFU)? | Model FLOPs from the checkpoint's `config.json` (MLA, MoE with shared experts and dense layers, DSA top-k attention plus its indexer, dense GQA) for useful tokens only: prompt tokens not served from the prefix cache (per-request `usage` or the server's hit rate) and generated tokens; MTP drafts are excluded. Divided by AIPerf's throughput duration (its profiling phase, grace period included) x GPUs x the GPU profile's dense peak at the checkpoint's GEMM precision; per role for PD; NVML GPM tensor activity alongside | `PointResult.mfu`, `summary.model_arch`, KB `run.jsonl` `mfu_*`, `index.jsonl` `leader_mfu_*` |
+| How much of the GPUs' memory bandwidth does it use (MBU)? | Measured, not modeled: NVML GPM `DRAM_BW_UTIL` (bandwidth used / the GPU's maximum) of every GPU at 1 s from the telemetry agent, the mean over the point per role, GPU-weighted across PD roles; achieved TB/s = MBU x the GPU profile's `hbm_tbs`. No bytes model: the experts a batch routes to, KV replicated across TP ranks, the DSA indexer scan and speculative decoding change the bytes a step reads. Needs GPM (Hopper and newer); without samples the report says MBU was not measured. MBU does not need `config.json`, so a point without model FLOPs still has it | `PointResult.mfu` (`roles[].mbu`, `total_mbu`, `*_mem_tbs_per_gpu`), KB `run.jsonl` `mbu_*`, `index.jsonl` `leader_mbu_*`, `peak_mem_tbs_per_gpu` |
 | How much context fits in the KV cache? | Per-rank pool `max_total_num_tokens` (cold-start log) x attention-DP ranks x instances of the serving role (agg, or decode with PD); longest single request = one rank's pool capped by the context length; concurrent requests at the trace's p50/p90 context (ISL + OSL); pool usage at the leader point; bytes per token measured vs from `config.json`; HiCache host tokens | `summary.kv_capacity`, KB `index.jsonl` `kv_*` |
 
 ## What is collected for the knowledge base
@@ -379,10 +434,10 @@ UDP traceroute, P perftest / perfquery, D derived.
 | Switch load under load | PortXmitData/RcvData/XmitWait/discards/errors of every leaf port facing our HCAs and every leaf uplink, before/after each AIPerf run (PMA queries from node0) | every point | `points/<id>/switch_load.json`, `PointResult.switch_load` |
 | NIC / GPU stress | IB congestion and error counters (port_xmit_wait, discards, CNP/ECN, out_of_buffer, ...), RoCE PFC/pause counters (`ethtool -S`), GPU clocks, temperature, power, energy, throttle reasons | every point (telemetry, 5 s slow tick) | `points/<id>/stress.json`, `PointResult.state.stress` |
 | Service state | Dynamo frontend / router and SGLang worker `/metrics` scraped by AIPerf (names checked against the SGLang 0.5.21 and 0.5.23 sources): running/queued requests, KV usage, prefix hit rate, PD queues, KV transfer (latency, bootstrap, allocation wait), per-request stage latencies (`per_stage_req_latency_seconds`: bootstrap, prefill, KV transfer, decode wait), CUDA graph coverage of decode passes, retracted and evicted tokens, request-weighted MTP acceptance (generated tokens per verify step) and acceptance rate; bottleneck label with evidence; energy per output token | every point | `points/<id>/servicestate.json`, `PointResult.state` |
-| GPU activity | NVML GPM per GPU at 1 s: SM, occupancy, tensor, DRAM bandwidth, PCIe and NVLink rates; regime per role (compute / memory / waiting / idle) for the bottleneck label; per-GPU availability (`unsupported`, `NVML_ERROR_*`) is data | every point (telemetry agent; off while nsys runs) | `stress.json` `activity`, `PointState.stress.activity` |
-| Requests | From AIPerf's per-request records (`--export-level records`, no extra load): goodput under SLO tiers (`u50`: TTFT <= 10 s and ITL <= 20 ms; `u20`: 30 s / 50 ms; `--goodput-slo`), the best point per tier, TTFT by session turn (prefix reuse), session spans and subagent requests | every point | `points/<id>/requests.json`, `PointResult.requests` |
+| GPU activity | NVML GPM per GPU at 1 s: SM, occupancy, tensor, DRAM bandwidth, PCIe and NVLink rates; regime per role (compute / memory / waiting / idle) for the bottleneck label; the DRAM bandwidth is the MBU of report section 2.3; the report splits each role's time three ways (SMs at work = SM activity, a kernel running on idle SMs = graphics-engine minus SM activity, no kernel = the rest) for every point of the leader's family, and turns PCIe TX into MB per output token (input token for prefill); per-GPU availability (`unsupported`, `NVML_ERROR_*`) is data | every point (telemetry agent; off while nsys runs) | `stress.json` `activity`, `PointState.stress.activity` |
+| Requests | From AIPerf's per-request records (`--export-level records`, no extra load): goodput under SLO tiers (`u50`: TTFT <= 10 s and ITL <= 20 ms; `u20`: 30 s / 50 ms; `--goodput-slo`) over the same duration AIPerf's throughput divides by, so it never exceeds the throughput, the best point per tier, TTFT by session turn (prefix reuse), session spans and subagent requests | every point | `points/<id>/requests.json`, `PointResult.requests` |
 | Accuracy | GSM8K result, Wilson 95% CI, verdict and reason per checked configuration; answer source (text / reasoning field) | accuracy phase | `accuracy/`, `summary.accuracy`, KB `accuracy.jsonl` |
-| Diagnostics (opt-in) | kernel-time shares by category (attention, MoE GEMM, dense GEMM, DeepEP, NCCL, KV cache, ...) and top kernels per role, per-GPU trace coverage, nsys version; SGLang estimated TFLOP/s and memory traffic per GPU, forward-busy share, EPLB balancedness | diagnose phase | `diagnostics/`, `summary.diagnostics`, KB `index.jsonl` `diag_*` |
+| Diagnostics (opt-in) | kernel-time shares by category (attention, MoE GEMM, dense GEMM, DeepEP, NCCL, KV cache, ...) and top kernels per role (with a reading of the name from `kernel_labels` in the locale file, average µs and calls per step per GPU), the wall-time split of a step per role, the longest idle gaps and calls, per-GPU idle bins and a two-step sample of the timeline, per-GPU trace coverage, nsys version; SGLang estimated TFLOP/s and memory traffic per GPU, forward-busy share, EPLB balancedness | diagnose phase | `diagnostics/`, `summary.diagnostics`, KB `index.jsonl` `diag_*` |
 | Cold start | per container: time to weights loaded, KV pool, CUDA graphs, ready; weight/KV memory, `max_total_num_tokens`, `max_running_requests`; NCCL/OOM/RDMA log issues | every deployment | `deployments/<fp>/lifecycle.json`, `DeployResult.lifecycle` |
 | Node facts and health | PCIe links (incl. upstream bridges, AER/ACS), NUMA, hugepages/THP, `/dev/shm`, memlock, cgroup, IOMMU, kernel modules, driver flavour, `nvidia-smi -q -x` (ECC, row remap, power limits, clocks, fabric/clique), NVLink status/errors, P2P matrices, HCA counters, kernel log (Xid, mlx5) when readable; "before" and "after" snapshots -> what grew under load | preflight, finalize | `facts/`, `summary.fact_findings`, `health_deltas`, report section 11, KB `health.jsonl` |
 | Environment | software stack inside the pinned image (sglang, flashinfer, torch/NCCL, nixl, dynamo, UCX, OS), clock offsets between nodes, weights-disk read speed | preflight, download | `summary.software`, `clock_offsets`, `disk_reads` |
@@ -395,7 +450,11 @@ so MAD queries and the link matrix work even if the image lacks them.
 Key facts the harness relies on (verified in the AIPerf 0.14.0 wheel): every
 AIPerf run cache-busts first-turn prefixes with a fresh uuid, so concurrency
 points need no worker restart; `--max-context-length` drops whole traces, so
-Hopper profiles serve 262144 tokens instead of the recipe's 250000.
+Hopper profiles serve 262144 tokens instead of the recipe's 250000. The RTX PRO
+6000D profile serves 229376: a TP8 decode worker there holds 248192 tokens of
+KV, and AIPerf aborts an AgentX run when one warmup request is longer than that.
+When AIPerf leaves no summary export, the point's audit names AIPerf's abort
+reason and the most common request error.
 
 ## Layout
 
@@ -403,7 +462,7 @@ Hopper profiles serve 262144 tokens instead of the recipe's 250000.
 domain/    pure models and logic, no I/O (schema, profiles, stages (P-Only/D-Only families, worker
            config, PD split), datasets (--dataset forms), inventory, nicplan, search, analysis, bandwidth,
            fabric, nodefacts, servicestate, loadstress, lifecycle, pointstate, switchload, cost, requests,
-           gpuactivity, accuracy, kernels, modelarch (config.json FLOPs/KV bytes, MFU), capacity
+           gpuactivity, accuracy, kernels, modelarch (config.json FLOPs/KV bytes, MFU, MBU), capacity
            (interconnect needs, fewest NICs, KV capacity), nvlink (switch methods, NVLink-off comparison))
 ports.py   protocols the application depends on (Executor, Cluster, Provider, Engine, TransportPlugin, Clock)
 fsutil.py  crash-safe file primitives shared by every layer (atomic writes, file lock, sha256)
@@ -412,7 +471,8 @@ adapters/  profile_store (YAML profiles + recipe ConfigMaps), ssh/docker executo
            SGLang renderer, transports, AIPerf, HF fetch, telemetry, microbenchmarks,
            fabric prober, node-facts collector, accuracy probe runner, Nsight Systems diagnostics
 agents/    standalone node-side scripts (probe, telemetry sampler with NVML GPM, P2P/NCCL benchmarks,
-           NCCL file gather, fabric_probe, node_facts, accuracy_probe, sglang_decode_only (D-Only worker))
+           NCCL file gather, fabric_probe, node_facts, accuracy_probe, sglang_decode_only (D-Only worker),
+           sglang_hotfix (named SGLang source edits a profile applies at worker launch))
 app/       event store, deployment session, pipeline and phases (incl. accuracy gate, diagnose), fabric/facts
            collection points, model_ops (config.json read once per run, MFU per point), nvlink_ops
            (switch NVLink off on every node and back), summary, simulator

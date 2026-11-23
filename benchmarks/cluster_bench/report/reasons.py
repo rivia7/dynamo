@@ -134,7 +134,10 @@ RULES: tuple[Rule, ...] = (
         r"^best ([\d.]+) < ([\d.]+) x leader ([\d.]+) tok/s/GPU$",
         lambda m: f"最高 {m[1]} tok/s/GPU，不到当前最优 {m[3]} 的 {m[2]} 倍，提前放弃",
     ),
-    _rule(r"^no valid measurement \((.*)\)$", lambda m: f"没有有效的测量结果（{localize(m[1])}）"),
+    _rule(
+        r"^no valid measurement \((.*)\)$",
+        lambda m: f"没有有效的测量结果（{'；'.join(localize(p) for p in m[1].split('; '))}）",
+    ),
     _rule(r"^insufficient budget for deploy \+ first point$", lambda m: "预算不够部署并测第一个点"),
     _rule(r"^image lacks flags (.*)$", lambda m: f"镜像缺少参数 {m[1]}"),
     _rule(
@@ -175,6 +178,14 @@ RULES: tuple[Rule, ...] = (
     ),
     # audit (domain/analysis.py)
     _rule(r"^no AIPerf export found$", lambda m: "找不到 AIPerf 的导出结果"),
+    _rule(
+        r"^AIPerf aborted the run \(([^:]+): ([^)]+)\)$",
+        lambda m: f"AIPerf 中止了这次测量（{m[1]}：{m[2]}）",
+    ),
+    _rule(
+        r"^(\d+) failed request\(s\), most common \((\d+)x\): (.+)$",
+        lambda m: f"{m[1]} 个请求失败，最常见的错误（{m[2]} 次）：{m[3]}",
+    ),
     _rule(
         r"^aiperf (\S+) != pinned (\S+)$",
         lambda m: f"AIPerf 版本 {m[1]} 和固定的版本 {m[2]} 不一致",
@@ -441,6 +452,22 @@ RULES: tuple[Rule, ...] = (
         lambda m: "不知道有多少输入 token 命中了前缀缓存，prefill 计算量（以及 MFU）是上限",
     ),
     _rule(
+        r"^MBU = NVML GPM DRAM_BW_UTIL \(bandwidth used / the GPU's maximum\), the mean over the point; its TB/s assumes that maximum is the GPU profile's memory bandwidth$",
+        lambda m: "MBU = NVML GPM 的 DRAM_BW_UTIL（用掉的显存带宽 ÷ GPU 的最大显存带宽），取测量点内的平均；折算 TB/s 时假定这个最大值就是 GPU 配置文件里的显存带宽",
+    ),
+    _rule(
+        r"^model FLOPs unknown: MFU not computed$",
+        lambda m: "不知道模型计算量（没有 config.json 或逐请求记录），没有算 MFU",
+    ),
+    _rule(
+        r"^no NVML GPM DRAM bandwidth samples: MBU not measured$",
+        lambda m: "NVML GPM 没有显存带宽数据，没有 MBU",
+    ),
+    _rule(
+        r"^no memory bandwidth in the GPU profile: MBU not converted to TB/s$",
+        lambda m: "GPU 配置文件里没有显存带宽，MBU 没有折算成 TB/s",
+    ),
+    _rule(
         r"^model config unreadable \((.*)\): (.*)$",
         lambda m: f"读不了模型配置（{m[1]}）：{m[2]}",
     ),
@@ -461,6 +488,10 @@ RULES: tuple[Rule, ...] = (
     _rule(
         r"^(\S+) profile: Dense Tensor Core peaks are half the product page figures \(UNVERIFIED\)$",
         lambda m: f"{m[1]}：稠密峰值算力是把产品页数字减半得到的（未经验证），MFU 的分母可能有偏差",
+    ),
+    _rule(
+        r"^(\S+) profile: Dense Tensor Core peaks are the RTX PRO 6000 values scaled by SM count \(UNVERIFIED\)$",
+        lambda m: f"{m[1]}：稠密峰值算力是按 SM 数从 RTX PRO 6000 的数值折算的（未经验证），MFU 的分母可能有偏差",
     ),
     _rule(
         r"^(\S+) profile: GLM-5\.3 DSA attention kernels on (\w+) are UNVERIFIED; the smoke ladder decides$",

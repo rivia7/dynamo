@@ -284,6 +284,11 @@ class Measurer:
             nvlink_p99_gbs=nvlink_p99(bandwidth.stats) if bandwidth else None,
             nvlink_leak_gbs=NVLINK_LEAK_GBS,
             stage=plan.stage,
+            failure_details=(
+                aiperf_adapter.failure_details(pdir)
+                if metrics is None and self.ctx.simulator is None
+                else ()
+            ),
         )
         tps = objective_per_gpu(metrics, plan.gpu_count, plan.stage)
         input_tps = (
@@ -382,6 +387,7 @@ class Measurer:
                 gpus=gpus,
                 tiers=self.ctx.config.slo_tiers,
                 window=window,
+                duration_s=metrics.phase_s if metrics else None,
                 arch=stored_arch(self.ctx),
                 cached_fraction=state.derived(
                     "cached_token_fraction", roles=("prefill", "agg")
@@ -435,6 +441,7 @@ class Measurer:
             hf_home=self.ctx.hf_home,
             stage=plan.stage,
             extra_args=self.ctx.config.aiperf_args,
+            hf_endpoint=self.ctx.config.hf_endpoint,
         )
         atomic_write_text(pdir / "aiperf_command.sh", command + "\n")
         try:

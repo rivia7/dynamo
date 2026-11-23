@@ -88,6 +88,9 @@ UNVERIFIED_BASE = (
     "Model FLOPs counted from config.json (MLA / MoE / DSA formula; useful "
     "tokens only, MTP drafts excluded); MFU uses the dense datasheet peak of "
     "the checkpoint's GEMM precision",
+    "MBU = NVML GPM DRAM_BW_UTIL (bandwidth used / the GPU's maximum), the mean "
+    "over the point; its TB/s assumes that maximum is the GPU profile's memory "
+    "bandwidth",
     "KV capacity per instance = max_total_num_tokens (logged by TP rank 0) x "
     "attention-DP ranks",
     "nvidia-smi nvlink -sBwMode / -sLWidth inside the pod (needs root; output "

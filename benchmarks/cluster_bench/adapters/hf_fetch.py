@@ -374,10 +374,13 @@ def model_dir_for(model_root: str, repo_id: str, commit: str) -> str:
 
 
 def list_repo_files(
-    repo_id: str, revision: str, token: str | None
+    repo_id: str, revision: str, token: str | None, endpoint: str | None = None
 ) -> tuple[str, list[RepoFile]]:
-    """Resolve ``revision`` to a commit and list every file with size and sha256."""
-    info = HfApi().model_info(
+    """Resolve ``revision`` to a commit and list every file with size and sha256.
+
+    ``endpoint`` (--hf-endpoint) replaces https://huggingface.co, e.g. a mirror.
+    """
+    info = HfApi(endpoint=endpoint).model_info(
         repo_id, revision=revision, files_metadata=True, token=token or None
     )
     if not info.sha:
@@ -496,6 +499,82 @@ def marker_matches(marker: Mapping[str, Any] | None, plan: FetchPlan) -> bool:
         and marker.get("commit") == plan.commit
         and marker.get("files") == {f.path: f.size for f in plan.files}
     )
+
+
+# Files of a pre-placed model (--model-path) that are not part of the model:
+# huggingface_hub's local-dir metadata, this harness's marker, and the control
+# files of an unfinished download.
+_LOCAL_IGNORED_PREFIXES = (".cache/",)
+_UNFINISHED_SUFFIXES = (".aria2", ".incomplete", ".part")
+MAX_LISTED_PROBLEMS = 20
+
+
+def local_file_sizes(stdout: str) -> dict[str, int] | None:
+    """``relpath -> bytes`` from ``completion_probe_command`` output (None: unreadable)."""
+    try:
+        _, sizes = parse_completion_probe(stdout)
+    except ValueError:
+        return None
+    return {
+        rel: size
+        for rel, size in sizes.items()
+        if rel != MARKER_NAME and not rel.startswith(_LOCAL_IGNORED_PREFIXES)
+    }
+
+
+def local_copy_problems(
+    sizes_by_node: Mapping[str, Mapping[str, int] | None],
+    reference: str,
+    shards: Sequence[str] = (),
+    model_dir: str = "the model directory",
+) -> list[str]:
+    """Why the per-node copies of a pre-placed model (--model-path) are unusable.
+
+    ``sizes_by_node`` maps node -> ``local_file_sizes`` (None: not listable);
+    every node must hold the same files with the same sizes as ``reference``,
+    which must have config.json and every shard the safetensors index names.
+    """
+    problems: list[str] = []
+    ref = sizes_by_node.get(reference)
+    if not ref:
+        return [f"{reference}: {model_dir} is missing, empty or unreadable"]
+    if "config.json" not in ref:
+        problems.append(f"{reference}: no config.json in {model_dir}")
+    if not any(p.endswith(".safetensors") for p in ref):
+        problems.append(f"{reference}: no .safetensors files in {model_dir}")
+    problems += [
+        f"{reference}: {shard} is in the safetensors index but missing"
+        for shard in sorted(set(shards) - set(ref))
+    ]
+    for node, sizes in sizes_by_node.items():
+        if sizes is None:
+            problems.append(f"{node}: {model_dir} is missing or unreadable")
+            continue
+        problems += [
+            f"{node}: {rel} looks like an unfinished download"
+            for rel in sorted(sizes)
+            if rel.endswith(_UNFINISHED_SUFFIXES)
+        ]
+        if node == reference:
+            continue
+        for rel in sorted(set(ref) | set(sizes)):
+            mine, theirs = sizes.get(rel), ref.get(rel)
+            if mine == theirs:
+                continue
+            if mine is None:
+                problems.append(
+                    f"{node}: {rel} is missing ({reference} has {theirs} bytes)"
+                )
+            elif theirs is None:
+                problems.append(f"{node}: {rel} ({mine} bytes) is not on {reference}")
+            else:
+                problems.append(
+                    f"{node}: {rel} is {mine} bytes, {reference} has {theirs}"
+                )
+    if len(problems) > MAX_LISTED_PROBLEMS:
+        extra = len(problems) - MAX_LISTED_PROBLEMS
+        problems = problems[:MAX_LISTED_PROBLEMS] + [f"... and {extra} more"]
+    return problems
 
 
 def size_problems(plan: FetchPlan, sizes: Mapping[str, int]) -> list[str]:
@@ -726,8 +805,10 @@ class ModelFetcher:
         small_file_bytes: int = SMALL_FILE_BYTES,
         max_workers: int = DOWNLOAD_MAX_WORKERS,
         labels: Mapping[str, str] | None = None,
+        hf_endpoint: str | None = None,
     ):
         self._cluster = cluster
+        self._hf_endpoint = hf_endpoint  # HF_ENDPOINT for the hub calls, or None
         self._python = python
         self._workdir = workdir.rstrip("/")
         self._hf_cache = hf_cache or f"{self._workdir}/hf-cache"
@@ -785,6 +866,8 @@ class ModelFetcher:
             "HF_HUB_ETAG_TIMEOUT": "60",
             "HF_HUB_DOWNLOAD_TIMEOUT": "120",
         }
+        if self._hf_endpoint:
+            env["HF_ENDPOINT"] = self._hf_endpoint
         assignments = " ".join(f"{k}={shlex.quote(v)}" for k, v in sorted(env.items()))
         unset = " ".join(f"-u {name}" for name in TOKEN_ENV_VARS)
         dirs = " ".join(shlex.quote(d) for d in (state_dir, model_dir, self._hf_cache))
@@ -1205,7 +1288,7 @@ class ModelFetcher:
         ignore_patterns: Sequence[str] = (),
     ) -> FetchPlan:
         """Resolve the commit, list files and shard them (default: all nodes)."""
-        commit, files = list_repo_files(repo_id, revision, token)
+        commit, files = list_repo_files(repo_id, revision, token, self._hf_endpoint)
         kept = [
             f
             for f in files

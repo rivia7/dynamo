@@ -13,8 +13,9 @@ from __future__ import annotations
 import json
 import re
 import shlex
+import time
 from dataclasses import dataclass
-from typing import Mapping, Sequence
+from typing import Callable, Mapping, Sequence
 
 from benchmarks.cluster_bench.ports import Executor
 
@@ -153,11 +154,20 @@ class ContainerState:
     status: str
 
 
+# "docker rm -f" fails while a dying container's processes are still in the
+# kernel (an engine stuck in a GPU driver call): "could not kill container:
+# tried to kill container, but did not receive an exit event". The kill
+# finishes seconds later, so removal is retried before it fails the run.
+REMOVE_ATTEMPTS = 4
+REMOVE_RETRY_S = 15.0
+
+
 class DockerHost:
     """Label-scoped container operations on cluster nodes."""
 
-    def __init__(self, executor: Executor):
+    def __init__(self, executor: Executor, sleep: Callable[[float], None] = time.sleep):
         self._exec = executor
+        self._sleep = sleep
 
     def pull(self, node: str, image: str, timeout: float = 3600) -> None:
         self._exec.run(
@@ -198,15 +208,27 @@ class DockerHost:
         return [line for line in res.stdout.splitlines() if line.strip()]
 
     def remove(self, node: str, labels: Mapping[str, str]) -> list[str]:
+        """Force-remove the labeled containers; the names found first."""
         names = self.names(node, labels)
-        if names:
-            self._exec.run(
+        left = names
+        for attempt in range(1, REMOVE_ATTEMPTS + 1):
+            if not left:
+                break
+            res = self._exec.run(
                 node,
                 "docker rm -f "
-                + " ".join(shlex.quote(n) for n in names)
+                + " ".join(shlex.quote(n) for n in left)
                 + " >/dev/null",
                 timeout=300,
+                check=False,
             )
+            if res.ok:
+                break
+            left = self.names(node, labels)
+            if left and attempt == REMOVE_ATTEMPTS:
+                res.check()
+            if left:
+                self._sleep(REMOVE_RETRY_S)
         return names
 
     def state(self, node: str, name: str) -> ContainerState | None:

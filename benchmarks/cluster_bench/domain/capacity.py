@@ -49,6 +49,7 @@ DEFAULT_TARGET_UTIL = DEFAULT_LINK_TARGET_UTIL
 IDLE_FRACTION = 0.01  # below 1 % of the link's capacity the link is idle
 IDLE_IB_NOTE = "the leader moves almost no data between nodes: one NIC is enough"
 KV_DTYPE_BYTES = {"fp8": 1.0, "fp8_e4m3": 1.0, "fp8_e5m2": 1.0, "fp4_e2m1": 0.5}
+SGLANG_GB = 1 << 30  # SGLang logs memory in "GB" of 1024**3 bytes (memory_pool.GB)
 
 
 # --------------------------------------------------------------------------
@@ -274,7 +275,7 @@ def kv_capacity(
         per_rank = rl.max_total_num_tokens_min or rl.kv_tokens_min
         bpt = None
         if rl.kv_cache_gb_min and rl.kv_tokens_min:
-            bpt = round(rl.kv_cache_gb_min * 1e9 / rl.kv_tokens_min, 1)
+            bpt = round(rl.kv_cache_gb_min * SGLANG_GB / rl.kv_tokens_min, 1)
         hosts = [c.get("hicache-size") for c in cfgs]
         host_gb = _min([float(h) for h in hosts if isinstance(h, (int, float))])
         host_tokens = None

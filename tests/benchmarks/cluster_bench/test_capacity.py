@@ -254,7 +254,8 @@ def test_dp_attention_multiplies_the_pool_of_each_instance():
     assert cap.max_request_tokens == 262_144
     assert (cap.requests_at_p50, cap.requests_at_p90) == (185, 76)
     assert (cap.usage_avg, cap.usage_peak) == (0.71, 0.96)
-    assert agg.bytes_per_token == pytest.approx(25e9 / 360_000, abs=0.1)
+    # SGLang logs the pool in "GB" of 1024**3 bytes
+    assert agg.bytes_per_token == pytest.approx(25 * 2**30 / 360_000, abs=0.1)
     # FP8 KV (kv-cache-dtype fp8_e4m3): 1 byte per element
     assert cap.arch_bytes_per_token == pytest.approx(
         arch.kv_bytes_per_token(1.0), abs=0.1

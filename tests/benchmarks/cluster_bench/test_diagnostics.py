@@ -22,6 +22,7 @@ from benchmarks.cluster_bench.adapters.docker import render_env_file
 from benchmarks.cluster_bench.adapters.engine_sglang import CONTAINER_EXP
 from benchmarks.cluster_bench.adapters.executors import RecordingExecutor
 from benchmarks.cluster_bench.domain.schema import ContainerSpec
+from benchmarks.cluster_bench.domain.steps import StepBreakdown, synthetic_timeline_json
 from benchmarks.cluster_bench.ports import CommandResult
 from tests.benchmarks.cluster_bench.lium_fakes import fixture_text
 
@@ -234,7 +235,13 @@ def test_probe_script_finds_nsys_and_its_version(tmp_path: Path) -> None:
         pytest.skip("bash not available")
     bindir = tmp_path / "bin"
     bindir.mkdir()
-    _write_exe(bindir / "nsys", f"#!/bin/sh\necho '{VERSION_LINE}'\n")
+    # "profile ... -o BASE true" writes BASE.nsys-rep, like a working importer
+    fake = (
+        "#!/bin/sh\n"
+        'if [ "$1" = profile ]; then : > "$6.nsys-rep"; exit 0; fi\n'
+        f"echo '{VERSION_LINE}'\n"
+    )
+    _write_exe(bindir / "nsys", fake)
     env = {"PATH": f"{bindir}:/usr/bin:/bin", "HOME": str(tmp_path)}
     found = subprocess.run(
         [bash, "-c", d.PROBE_SCRIPT],
@@ -248,6 +255,27 @@ def test_probe_script_finds_nsys_and_its_version(tmp_path: Path) -> None:
     assert info.available and info.path == str(bindir / "nsys")
     assert info.version == "2025.6.1.190-256162285624v0"
     assert info.version_tuple == (2025, 6, 1)
+    # Nsight Compute's bundled nsys: captures, but leaves only a .qdstrm
+    qdstrm = (
+        "#!/bin/sh\n"
+        'if [ "$1" = profile ]; then : > "$6.qdstrm"; '
+        "echo 'Generated: check.qdstrm'; exit 0; fi\n"
+        f"echo '{VERSION_LINE}'\n"
+    )
+    _write_exe(bindir / "nsys", qdstrm)
+    stuck = subprocess.run(
+        [bash, "-c", d.PROBE_SCRIPT],
+        env=env,
+        capture_output=True,
+        text=True,
+        timeout=30,
+        check=False,
+    )
+    no_report = d.parse_probe(stuck.stdout, image=IMAGE)
+    assert not no_report.available and no_report.version_tuple == (2025, 6, 1)
+    assert (
+        "cannot write a report: failed: Generated: check.qdstrm" in no_report.notes[0]
+    )
     (bindir / "nsys").unlink()
     missing = subprocess.run(
         [bash, "-c", d.PROBE_SCRIPT],
@@ -278,6 +306,13 @@ def test_parse_probe_failures() -> None:
     )
     assert not broken.available and broken.path == "/usr/local/bin/nsys"
     assert "printed no version" in broken.notes[0]
+    cut = d.parse_probe(
+        f"CB_NSYS_PATH=/usr/local/bin/nsys\n{VERSION_LINE}\n", image=IMAGE
+    )
+    assert not cut.available and cut.version is not None
+    assert cut.notes == (
+        "/usr/local/bin/nsys cannot write a report: the report check did not finish",
+    )
 
 
 def test_diag_dockerfile_follows_the_sglang_recipe() -> None:
@@ -298,7 +333,14 @@ def test_diag_dockerfile_follows_the_sglang_recipe() -> None:
     ) in text
     assert "ubuntu1804/x86_64/7fa2af80.pub" in text  # fallback, same key
     assert "apt-get install -y --no-install-recommends nsight-systems-cli" in text
-    assert "    nsys --version" in lines
+    # the package's nsys replaces whatever the base image links on PATH
+    assert 'ln -sf "$(ls -d /opt/nvidia/nsight-systems*/*/bin/nsys | sort -V' in text
+    assert "    nsys --version; \\" in lines
+    assert f"    {d.REPORT_CHECK}; \\" in lines
+    assert "    test -f /tmp/cb-nsys-check.nsys-rep; \\" in lines
+    assert not any(
+        line.lstrip().startswith("#") for line in text.split("RUN ", 1)[1].splitlines()
+    )
     assert text.endswith("\n")
 
 
@@ -643,7 +685,10 @@ def image_responder(
     def responder(node: str, command: str) -> CommandResult | None:
         if d.PROBE_MARKER in command:
             if f" {tag} " in command or base_has_nsys:
-                out = f"{d.PROBE_MARKER}/usr/local/bin/nsys\n{VERSION_LINE}\n"
+                out = (
+                    f"{d.PROBE_MARKER}/usr/local/bin/nsys\n{VERSION_LINE}\n"
+                    f"{d.REPORT_MARKER}ok\n"
+                )
                 return result(node, command, out=out)
             return result(node, command, out=f"{d.PROBE_MARKER}\n")
         if " docker image inspect " in command and command.endswith(f" {tag}"):
@@ -1262,3 +1307,73 @@ def test_launch_hook_defaults_match_the_adapter() -> None:
         d.NSYS_DEFAULT_FLAGS
     )
     assert os.access(SCRIPT, os.R_OK)
+
+
+def test_stats_with_steps_reduces_the_sqlite_to_a_step_timeline(tmp_path: Path) -> None:
+    report = d.report_path(WORKDIR, EXP, WINDOW, "cb-5d1c-decode0-r0")
+    base = report[: -len(".nsys-rep")]
+    files = stats_fixture_texts(base)
+    files[d.timeline_path(base)] = synthetic_timeline_json("decode", steps=20)
+    rec = Recorder(node_names=NODES, responder=stats_responder(files))
+    tag = d.diag_image_tag(IMAGE)
+    rep = runner(rec, tmp_path).stats(
+        "node1", report, image=tag, expected_devices=8, steps=20
+    )
+    reduce = [c.command for c in rec.commands if d.TIMELINE_AGENT in c.command]
+    assert len(reduce) == 1
+    argv = shlex.split(reduce[0])
+    assert argv[:4] == ["timeout", "-k", "30", "1800"]
+    pairs = set(zip(argv, argv[1:]))
+    assert ("-v", f"{WORKDIR}/src:/bench/src:ro") in pairs
+    assert ("-v", f"{WORKDIR}/experiments:/bench/experiments") in pairs
+    assert "--gpus" not in argv
+    inside = f"/bench/experiments/{EXP}/diagnostics/{WINDOW}/cb-5d1c-decode0-r0"
+    assert argv[-7:] == [
+        "python3",
+        "-I",
+        d.TIMELINE_AGENT,
+        f"{inside}.sqlite",
+        f"{inside}_timeline.json",
+        "--steps",
+        "20",
+    ]
+    # the reducer runs before the SQLite export is removed
+    order = [c.command for c in rec.commands]
+    removed = next(i for i, c in enumerate(order) if f"{base}.sqlite" in c)
+    assert order.index(reduce[0]) < removed
+    timeline = StepBreakdown.model_validate(rep.timeline)
+    assert timeline.steps == 20 and len(timeline.devices) == 8
+    assert timeline.sources == ("cb-5d1c-decode0-r0",)
+    assert sum(timeline.shares.values()) == pytest.approx(1.0, abs=1e-5)
+    assert rep.breakdown is not None and rep.notes == ()
+    saved = tmp_path / "diag" / "stats" / "cb-5d1c-decode0-r0_timeline.json"
+    assert saved.read_text() == files[d.timeline_path(base)]
+
+
+def test_a_failed_step_timeline_is_a_note_and_keeps_the_kernel_breakdown(
+    tmp_path: Path,
+) -> None:
+    report = d.report_path(WORKDIR, EXP, WINDOW, "cb-5d1c-decode0-r0")
+    base = report[: -len(".nsys-rep")]
+    files = stats_fixture_texts(base)
+    stats_only = stats_responder(files)
+
+    def responder(node: str, command: str) -> CommandResult | None:
+        if d.TIMELINE_AGENT in command:
+            return result(node, command, 1, err="sqlite3.OperationalError\n")
+        return stats_only(node, command)
+
+    rec = Recorder(node_names=NODES, responder=responder)
+    tag = d.diag_image_tag(IMAGE)
+    nsd = runner(rec, tmp_path)
+    rep = nsd.stats("node1", report, image=tag, expected_devices=8, steps=20)
+    assert rep.timeline is None and rep.breakdown is not None
+    assert "cb-5d1c-decode0-r0: step timeline failed (exit 1)" in rep.notes
+    # unreadable output is a note too; without steps the reducer never runs
+    files[d.timeline_path(base)] = '{"version": 0}'
+    rec2 = Recorder(node_names=NODES, responder=stats_responder(files))
+    rep2 = runner(rec2, tmp_path).stats("node1", report, image=tag, steps=20)
+    assert "cb-5d1c-decode0-r0: step timeline unreadable" in rep2.notes
+    rec3 = Recorder(node_names=NODES, responder=stats_responder(files))
+    runner(rec3, tmp_path).stats("node1", report, image=tag)
+    assert not any(d.TIMELINE_AGENT in c.command for c in rec3.commands)

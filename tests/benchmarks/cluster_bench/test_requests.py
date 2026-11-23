@@ -139,6 +139,25 @@ def test_goodput_tiers_apply_both_bounds() -> None:
     assert summary.errors == 1 and summary.finished == 4
 
 
+def test_goodput_divides_by_the_aiperf_throughput_duration() -> None:
+    # AIPerf divides its throughput by the profiling phase, grace period
+    # included: here the last request ended 90 s into a 120 s phase.
+    raws = [_record(i, ttft_ms=1000, itl_ms=12, osl=600) for i in range(10)]
+    records = [r for r in (parse_record(x) for x in raws) if r is not None]
+    summary = summarize_requests(
+        records, gpus=8, window=(T0, T0 + 90.0), duration_s=120.0
+    )
+    u20 = summary.tier("u20")
+    assert summary.window_s == 120.0
+    assert u20 is not None and u20.good_fraction == 1.0
+    # every request good: goodput is AIPerf's own throughput, 6000 tokens / 120 s
+    assert u20.good_output_tps == pytest.approx(50.0)
+    assert u20.goodput_rps == pytest.approx(10 / 120.0, abs=1e-4)
+    # without that duration: the request window, as before
+    fallback = summarize_requests(records, gpus=8, window=(T0, T0 + 90.0))
+    assert fallback.window_s == 90.0
+
+
 def test_turn_profile_and_sessions() -> None:
     raws = []
     for s in range(3):
@@ -209,6 +228,8 @@ def test_load_request_summary_reads_the_newest_records_file(tmp_path: Path) -> N
     summary = load_request_summary(tmp_path / "aiperf", gpus=8)
     assert summary is not None and summary.records == 5
     assert summary.tier("u50") is not None and summary.tier("u50").good_requests == 5
+    timed = load_request_summary(tmp_path / "aiperf", gpus=8, duration_s=50.0)
+    assert timed is not None and timed.window_s == 50.0
 
 
 def test_accept_length_prefers_the_request_weighted_counter_ratio(

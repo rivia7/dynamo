@@ -13,14 +13,18 @@ Two patches, then the stock entry point:
    (``FakeKVReceiver`` succeeds at once) and decodes, so the decode stage
    carries its real batch, KV footprint and attention cost; only the KV
    contents (and with them the tokens) are meaningless.
-2. The worker registers as a decode worker that needs no prefill peer
-   (``needs=[]``, the value aggregated workers register), so the frontend
-   reports the model ready and, with no prefill workers discovered, routes
-   requests straight to decode (prefill router not activated).
+2. The worker registers as a decode worker whose one peer is a decode worker
+   (``needs=[[Decode]]``), which it is itself. Dynamo 1.6.2's
+   ``register_model`` refuses an empty ``needs`` on every worker type but
+   Aggregated; the frontend's readiness gate counts an alternative as met when
+   each type in it has a live worker, so the model is ready once the decode
+   workers are. With no prefill worker discovered, the frontend's prefill
+   router stays untargeted and passes each request straight to decode.
 
 ``--check`` installs both patches and exits: preflight runs it in the image.
+It only proves the patched names exist; registration runs at deploy time.
 
-Verified against the Dynamo 1.6.2 / SGLang 0.5.21 sources of the pinned image
+Checked against the Dynamo 1.6.2 / SGLang 0.5.21 sources of the pinned image
 (and SGLang 0.5.23 of the nightly images); any other version that lacks the
 patched names fails here, before serving.
 """
@@ -90,7 +94,7 @@ def install(
 
     async def register(*args: Any, **kwargs: Any) -> Any:
         if kwargs.get("worker_type") == decode_type:
-            kwargs["needs"] = []
+            kwargs["needs"] = [[decode_type]]
         return await original_register(*args, **kwargs)
 
     handler_cls.generate = generate

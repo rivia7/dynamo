@@ -30,7 +30,7 @@ from benchmarks.cluster_bench.domain.schema import (
 
 pytestmark = [pytest.mark.unit, pytest.mark.pre_merge, pytest.mark.gpu_0]
 
-GPUS = ("b200", "b300", "h200", "h100", "rtx_pro_6000")
+GPUS = ("b200", "b300", "h200", "h100", "rtx_pro_6000", "rtx_pro_6000d")
 MODEL_DIR = "/workspace/models/glm"
 
 
@@ -70,6 +70,8 @@ def _worker_configs(plan):
         ("NVIDIA H200", "h200"),
         ("NVIDIA H100 80GB HBM3", "h100"),
         ("NVIDIA RTX PRO 6000 Blackwell Server Edition", "rtx_pro_6000"),
+        ("NVIDIA RTX 6000D", "rtx_pro_6000d"),  # what nvidia-smi prints
+        ("NVIDIA RTX PRO 6000D Blackwell Server Edition", "rtx_pro_6000d"),
     ],
 )
 def test_gpu_detection(name, expected):
@@ -82,6 +84,26 @@ def test_gpu_detection(name, expected):
 def test_gb200_is_not_mistaken_for_b200():
     with pytest.raises(prof.ProfileError):
         prof.detect_gpu_profile("NVIDIA GB200", profile_store.load_gpu_profiles())
+
+
+def test_select_checkpoint_takes_the_request_then_the_gpu_variant():
+    model = profile_store.load_model_profile("glm-5.3")
+    gpus = profile_store.load_gpu_profiles()
+    for name in GPUS:
+        variant, checkpoint = prof.select_checkpoint(model, gpus[name])
+        assert variant == gpus[name].weights_variant
+        assert checkpoint == model.checkpoints[variant]
+    variant, checkpoint = prof.select_checkpoint(
+        model, gpus["rtx_pro_6000d"], "nvfp4-nvidia"
+    )
+    assert (variant, checkpoint.repo) == ("nvfp4-nvidia", "nvidia/GLM-5.3-NVFP4")
+    assert len(checkpoint.revision) == 40
+    assert checkpoint.sglang == {
+        "quantization": "modelopt_mixed",
+        "disable-shared-experts-fusion": True,
+    }
+    with pytest.raises(prof.ProfileError, match="has no checkpoint 'int4'"):
+        prof.select_checkpoint(model, gpus["b200"], "int4")
 
 
 @pytest.mark.parametrize("gpu", GPUS)
@@ -275,6 +297,45 @@ def test_mtp_off_and_simulated_acceptance(tmp_path):
     )
     for spec, _ in _worker_configs(sim):
         assert ("SGLANG_SIMULATE_ACC_LEN" in spec.env) == (spec.role == "decode")
+
+
+def test_the_checkpoint_sglang_config_reaches_every_worker(tmp_path):
+    gpus = profile_store.load_gpu_profiles()
+    deployment = profile_store.load_fitted_profile("glm-5.3", "rtx_pro_6000d", nodes=2)
+    pd = next(f for f in deployment.families if f.id.startswith("pd-"))
+
+    def quantizations(checkpoint: str | None) -> set[str]:
+        plan = SglangEngine().render(
+            Candidate(family_id=pd.id),
+            config=RunConfig(
+                exp_id="exp-1",
+                image="img:1",
+                workdir=str(tmp_path),
+                checkpoint=checkpoint,
+            ),
+            inventory=synthetic_inventory("rtx_pro_6000d", nodes=2),
+            gpu=gpus["rtx_pro_6000d"],
+            model=profile_store.load_model_profile("glm-5.3"),
+            deployment=deployment,
+            model_dir=MODEL_DIR,
+        )
+        return {cfg["quantization"] for _, cfg in _worker_configs(plan)}
+
+    assert quantizations("nvfp4-nvidia") == {"modelopt_mixed"}
+    assert quantizations(None) == {"modelopt_fp4"}  # the recipes' method
+
+
+def test_rtx_pro_6000d_splits_attention_by_tp(tmp_path):
+    # Attention DP8 would put the BF16 attention weights (25.7 GB) on every GPU.
+    deployment = profile_store.load_fitted_profile("glm-5.3", "rtx_pro_6000d", nodes=2)
+    for family in deployment.families:
+        plan = _render(
+            tmp_path, "rtx_pro_6000d", Candidate(family_id=family.id), nodes=2
+        )
+        for spec, cfg in _worker_configs(plan):
+            assert cfg["tensor-parallel-size"] == 8, family.id
+            assert "data-parallel-size" not in cfg and "enable-dp-lm-head" not in cfg
+            assert "--enable-dp-attention" not in spec.command
 
 
 def test_ladder_rungs_apply(tmp_path):

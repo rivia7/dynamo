@@ -18,7 +18,20 @@ token are counted from the architecture:
   counted (MFU counts the useful work of the target model);
 * attention dot products: 2 x heads x (qk_dim + v_dim) per attended token and
   layer; with DSA a query attends at most ``index_topk`` tokens while the
-  indexer scores every previous token.
+  indexer scores every previous token (one pooled key per ``index_kpool``
+  tokens when it pools them, as GLM-5.3-Flash does);
+* hybrid linear attention (``linear_attn_config``, e.g. the KDA layers of
+  GLM-5.3-Flash): only the ``full_attn_layers`` it lists have the attention
+  above and a per-token KV cache; the other layers have linear-attention
+  projections (q, k, v, o and low-rank gates) and a recurrent state update of
+  about 6 x heads x head_dim^2 FLOPs per token.
+
+Memory bandwidth utilization (MBU) is measured, not counted: the NVML GPM
+DRAM bandwidth utilization of each role's GPUs over the point (telemetry
+agent), and that share of the GPU profile's memory bandwidth in TB/s. The
+bytes a decode step reads depend on which experts the batch routes to, on KV
+replicated across TP ranks, on the DSA indexer scan and on speculative
+decoding, which a formula from config.json would not get right.
 
 All counts are per token and per model replica (the whole model), i.e. the
 FLOPs one GPU would do if it held the model alone. Pure: no I/O and no
@@ -67,6 +80,16 @@ class ModelArch(Frozen):
     shared_experts: int = 0
     dense_layers: int = 0  # layers with a dense FFN (all of them without MoE)
     mtp_layers: int = 0
+    # DSA indexer key pooling: the indexer scores one key per index_kpool tokens;
+    # index_kpool_compress is recorded as configured (the KV cache keeps every
+    # token's key either way, see kv_bytes_per_token)
+    index_kpool: int = 1
+    index_kpool_compress: bool = False
+    # Hybrid linear attention: layers outside full_attention_layers are linear
+    # (KDA) with linear_heads x linear_head_dim q/k/v; None = every layer is full.
+    full_attention_layers: int | None = None
+    linear_heads: int | None = None
+    linear_head_dim: int | None = None
 
     @property
     def mla(self) -> bool:
@@ -75,6 +98,21 @@ class ModelArch(Frozen):
     @property
     def moe_layers(self) -> int:
         return max(0, self.layers - self.dense_layers) if self.routed_experts else 0
+
+    @property
+    def attention_layers(self) -> int:
+        """Layers with softmax attention and a per-token KV cache."""
+        if self.full_attention_layers is None:
+            return self.layers
+        return min(self.layers, self.full_attention_layers)
+
+    @property
+    def linear_layers(self) -> int:
+        return self.layers - self.attention_layers
+
+    def _linear_shape(self) -> tuple[float, float]:
+        heads = float(self.linear_heads or self.heads)
+        return heads, float(self.linear_head_dim or self.head_dim)
 
     @property
     def qk_dim(self) -> int:
@@ -111,6 +149,17 @@ class ModelArch(Frozen):
         kv = 2.0 * h * self.kv_heads * self.head_dim
         return q + kv + self.heads * self.head_dim * h
 
+    def linear_attention_params(self) -> float:
+        """Projection weights of one linear-attention (KDA) layer: q, k, v and o,
+        the low-rank decay and output gates (hidden -> head_dim -> heads x
+        head_dim) and the per-head beta gate."""
+        if not self.linear_layers:
+            return 0.0
+        h = float(self.hidden)
+        heads, dim = self._linear_shape()
+        inner = heads * dim
+        return 4.0 * h * inner + 2.0 * (h * dim + dim * inner) + h * heads
+
     def active_params(self) -> float:
         """Weights one token is multiplied with (embedding excluded, LM head in)."""
         h = float(self.hidden)
@@ -119,7 +168,8 @@ class ModelArch(Frozen):
             self.moe_intermediate or 0
         ) + h * self.routed_experts
         return (
-            self.layers * self.attention_params()
+            self.attention_layers * self.attention_params()
+            + self.linear_layers * self.linear_attention_params()
             + self.dense_layers * dense_ffn
             + self.moe_layers * moe_ffn
             + h * self.vocab
@@ -140,25 +190,40 @@ class ModelArch(Frozen):
         full = attended_sum(start, n, None)
         attended = attended_sum(start, n, self.index_topk) if self.index_topk else full
         flops = n * self.linear_flops_per_token()
-        flops += 2.0 * self.heads * (self.qk_dim + self.v_dim) * attended * self.layers
+        layers = self.attention_layers
+        flops += 2.0 * self.heads * (self.qk_dim + self.v_dim) * attended * layers
         if self.index_heads and self.index_head_dim:
-            flops += 2.0 * self.index_heads * self.index_head_dim * full * self.layers
+            scored = full / self.index_kpool if self.index_kpool > 1 else full
+            flops += 2.0 * self.index_heads * self.index_head_dim * scored * layers
+        if self.linear_layers:
+            heads, dim = self._linear_shape()
+            flops += n * 6.0 * heads * dim * dim * self.linear_layers
         return flops
 
     def kv_bytes_per_token(self, dtype_bytes: float = 2.0) -> float:
         """KV cache bytes of one token in one model replica (all layers).
 
-        MLA keeps one latent (kv_lora + rope) per layer, plus the DSA indexer
-        key (FP8); GQA keeps K and V for every KV head.
+        MLA keeps one latent (kv_lora + rope) per layer; with DSA, SGLang
+        stores an FP8 cache in FlashMLA's layout (the latent in FP8 with an
+        FP32 scale per 128 values, the RoPE part in BF16: 656 B for 512 + 64)
+        and adds the indexer key: FP8 with an FP32 scale per 128 values, kept
+        per token even when the indexer scores pooled keys. On SGLang 0.5.21
+        this matches the pools exactly: GLM-5.3 (FP8) 248,192 tokens in
+        14.21 GiB, GLM-5.3-Flash (BF16) 1,576,832 tokens in 18.67 GiB. GQA
+        keeps K and V for every KV head. Linear-attention layers keep a
+        per-request state instead.
         """
         if self.mla:
-            per_layer = (
-                (self.kv_lora_rank or 0) + (self.qk_rope_dim or 0)
-            ) * dtype_bytes
+            latent = float(self.kv_lora_rank or 0)
+            rope = float(self.qk_rope_dim or 0)
+            if self.index_head_dim and dtype_bytes == 1.0:
+                per_layer = latent * (1.0 + 4.0 / 128) + rope * 2.0
+            else:
+                per_layer = (latent + rope) * dtype_bytes
             if self.index_head_dim:
-                per_layer += float(self.index_head_dim)  # FP8 indexer key
-            return per_layer * self.layers
-        return 2.0 * self.kv_heads * self.head_dim * dtype_bytes * self.layers
+                per_layer += self.index_head_dim * (1.0 + 4.0 / 128)
+            return per_layer * self.attention_layers
+        return 2.0 * self.kv_heads * self.head_dim * dtype_bytes * self.attention_layers
 
 
 def attended_sum(start: float, n: float, cap: int | None) -> float:
@@ -217,6 +282,14 @@ def arch_from_config(
     dense_layers = layers
     if routed:
         dense_layers = _int(cfg, "first_k_dense_replace", default=0) or 0
+    full_attention = linear_heads = linear_dim = None
+    linear = cfg.get("linear_attn_config")
+    if isinstance(linear, Mapping) and isinstance(
+        linear.get("full_attn_layers"), (list, tuple)
+    ):
+        full_attention = len(linear["full_attn_layers"])
+        linear_heads = _int(linear, "num_heads")
+        linear_dim = _int(linear, "head_dim")
     return ModelArch(
         source=source,
         model_type=str(cfg.get("model_type")) if cfg.get("model_type") else None,
@@ -241,6 +314,11 @@ def arch_from_config(
         shared_experts=shared if routed else 0,
         dense_layers=dense_layers,
         mtp_layers=_int(cfg, "num_nextn_predict_layers", default=0) or 0,
+        index_kpool=_int(cfg, "index_kpool", default=1) or 1,
+        index_kpool_compress=bool(cfg.get("index_kpool_compress")),
+        full_attention_layers=full_attention,
+        linear_heads=linear_heads,
+        linear_head_dim=linear_dim,
     )
 
 
@@ -279,21 +357,28 @@ SIMULATED_CONFIG: dict[str, Any] = {
 class RoleMfu(Frozen):
     role: str  # "agg" | "prefill" | "decode"
     gpus: int
-    flops: float  # model FLOPs done in the window
-    tflops_per_gpu: float  # achieved
+    flops: float | None = None  # model FLOPs done in the window (None: unknown)
+    tflops_per_gpu: float | None = None  # achieved
     mfu: float | None = None  # achieved / peak (0..1)
     tensor_active: float | None = None  # NVML GPM tensor pipes active, mean (0..1)
+    # MBU, measured: NVML GPM DRAM bandwidth utilization of the role's GPUs,
+    # window mean (0..1), and that share of the profile's memory bandwidth
+    mbu: float | None = None
+    mem_tbs_per_gpu: float | None = None
 
 
 class MfuResult(Frozen):
-    """Model FLOPs utilization of one measured point."""
+    """Model FLOPs (MFU) and memory bandwidth (MBU) utilization of one point."""
 
     precision: str  # GEMM precision of the checkpoint ("fp4" | "fp8" | "bf16")
     peak_tflops_per_gpu: float | None = None  # dense peak at that precision
-    window_s: float
+    window_s: float | None = None  # None: model FLOPs unknown (MBU only)
     roles: tuple[RoleMfu, ...] = ()
     total_mfu: float | None = None  # all GPUs together
     total_tflops_per_gpu: float | None = None
+    peak_mem_tbs_per_gpu: float | None = None  # memory bandwidth, MBU denominator
+    total_mbu: float | None = None  # GPU-weighted over the roles
+    total_mem_tbs_per_gpu: float | None = None
     cache_source: str = "none"  # where cached prompt tokens came from
     notes: tuple[str, ...] = Field(default_factory=tuple)
 
@@ -303,56 +388,103 @@ class MfuResult(Frozen):
 
 def compute_mfu(
     *,
-    flops_prefill: float,
-    flops_decode: float,
-    window_s: float,
+    flops_prefill: float | None,
+    flops_decode: float | None,
+    window_s: float | None,
     role_gpus: Mapping[str, int],
     precision: str,
     peak_tflops: float | None,
     tensor_active: Mapping[str, float] | None = None,
+    dram_active: Mapping[str, float] | None = None,
+    peak_mem_tbs: float | None = None,
     cache_source: str = "none",
 ) -> MfuResult | None:
-    """Per-role MFU; PD splits prefill and decode FLOPs over their own GPUs."""
-    if window_s <= 0:
-        return None
+    """Per-role MFU from model FLOPs and MBU from measured DRAM bandwidth.
+
+    PD splits prefill and decode FLOPs over their own GPUs. MBU is NVML GPM
+    ``DRAM_BW_UTIL`` (bandwidth used / the GPU's maximum), not a bytes model:
+    the experts a batch routes to, KV replicated across TP ranks, the DSA
+    indexer scan and speculative decoding change the bytes a step reads.
+    None when neither the FLOPs (with a window) nor DRAM samples are known.
+    """
     total_gpus = sum(role_gpus.values())
     if total_gpus <= 0:
         return None
+    window = window_s if window_s is not None and window_s > 0 else 0.0
+    known = flops_prefill is not None and window > 0
+    dram = {r: v for r, v in (dram_active or {}).items() if r in role_gpus}
+    if not known and not dram:
+        return None
     notes: list[str] = []
-    if peak_tflops is None:
+    # D-Only: the KV arrives by a fake transfer, so no GPU runs the prefill
+    decode_only = set(role_gpus) == {"decode"}
+    if not known:
+        notes.append("model FLOPs unknown: MFU not computed")
+    elif peak_tflops is None:
         notes.append(f"no dense {precision} peak in the GPU profile: MFU not computed")
-    if cache_source == "none":
+    if known and cache_source == "none" and not decode_only:
         notes.append(
             "cached prompt tokens unknown: prefill FLOPs (and MFU) are an upper bound"
         )
+    if not dram:
+        notes.append("no NVML GPM DRAM bandwidth samples: MBU not measured")
+    elif not peak_mem_tbs:
+        notes.append(
+            "no memory bandwidth in the GPU profile: MBU not converted to TB/s"
+        )
     tensor_active = tensor_active or {}
+    pre, dec = flops_prefill or 0.0, flops_decode or 0.0
 
     def role(name: str, flops: float) -> RoleMfu:
         gpus = role_gpus[name]
-        tflops = flops / window_s / gpus / 1e12
+        tflops = flops / window / gpus / 1e12 if known else None
+        mbu = dram.get(name)
         return RoleMfu(
             role=name,
             gpus=gpus,
-            flops=flops,
-            tflops_per_gpu=round(tflops, 3),
-            mfu=round(tflops / peak_tflops, 5) if peak_tflops else None,
+            flops=flops if known else None,
+            tflops_per_gpu=round(tflops, 3) if tflops is not None else None,
+            mfu=round(tflops / peak_tflops, 5)
+            if tflops is not None and peak_tflops
+            else None,
             tensor_active=tensor_active.get(name),
+            mbu=mbu,
+            mem_tbs_per_gpu=round(mbu * peak_mem_tbs, 4)
+            if mbu is not None and peak_mem_tbs
+            else None,
         )
 
     roles: list[RoleMfu] = []
+    computed = pre + dec
     if "prefill" in role_gpus and "decode" in role_gpus:
-        roles = [role("prefill", flops_prefill), role("decode", flops_decode)]
+        roles = [role("prefill", pre), role("decode", dec)]
+    elif decode_only:
+        roles = [role("decode", dec)]
+        computed = dec
     else:
         main = "agg" if "agg" in role_gpus else next(iter(role_gpus))
-        roles = [role(main, flops_prefill + flops_decode)]
-    total = (flops_prefill + flops_decode) / window_s / total_gpus / 1e12
+        roles = [role(main, computed)]
+    total = computed / window / total_gpus / 1e12 if known else None
+    weighted = [(r.mbu, r.gpus) for r in roles if r.mbu is not None]
+    total_mbu = None
+    if weighted and len(weighted) == len(roles):
+        total_mbu = round(
+            sum(m * g for m, g in weighted) / sum(g for _, g in weighted), 4
+        )
     return MfuResult(
         precision=precision,
         peak_tflops_per_gpu=peak_tflops,
-        window_s=round(window_s, 3),
+        window_s=round(window, 3) if known else None,
         roles=tuple(roles),
-        total_mfu=round(total / peak_tflops, 5) if peak_tflops else None,
-        total_tflops_per_gpu=round(total, 3),
+        total_mfu=round(total / peak_tflops, 5)
+        if total is not None and peak_tflops
+        else None,
+        total_tflops_per_gpu=round(total, 3) if total is not None else None,
+        peak_mem_tbs_per_gpu=peak_mem_tbs,
+        total_mbu=total_mbu,
+        total_mem_tbs_per_gpu=round(total_mbu * peak_mem_tbs, 4)
+        if total_mbu is not None and peak_mem_tbs
+        else None,
         cache_source=cache_source,
         notes=tuple(notes),
     )

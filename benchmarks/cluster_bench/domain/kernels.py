@@ -28,7 +28,7 @@ import csv
 import math
 import re
 from dataclasses import dataclass
-from typing import Iterable, Literal, Sequence
+from typing import Any, Iterable, Literal, Sequence
 
 from benchmarks.cluster_bench.domain.base import Frozen
 
@@ -166,10 +166,27 @@ RULES: tuple[KernelRule, ...] = (
     KernelRule(
         "sparse_indexer",
         "attention",
+        # sglang::topk_main_kernel: as many calls as the indexer's
+        # paged_mqa_logits in GLM-5.3 traces, far fewer than the MoE layers'
         r"mqa_logits|clean_logits|fast_topk|topk_transform|page_table_transform"
-        r"|ragged_transform|TopKPageTable|indexer",
+        r"|ragged_transform|TopKPageTable|indexer|(?:^|::)topk_main_kernel",
         guess=True,
     ),
+    # Sequence mixing of the linear-attention / state-space layers of hybrid
+    # models (KDA, gated DeltaNet, Mamba) is those layers' attention.
+    KernelRule(
+        "linear_attention",
+        "attention",
+        r"(?i)delta_rule|gated_delta|(?:^|_)kda_|replayssm|causal_conv1d"
+        r"|selective_(?:state|scan)|mamba|lightning_attn|linear_attn"
+        r"|fused_recurrent|chunk_(?:gla|rwkv|simple_gla)",
+        guess=True,
+    ),
+    # TileLang names a kernel after its prim_func, "main" by default. In SGLang
+    # traces that is the DSA sparse MLA attention of the tilelang backend (it
+    # runs right after the indexer's top-k); other TileLang kernels can share
+    # the name, hence a guess.
+    KernelRule("tilelang_main", "attention", r"^main_kernel$", guess=True),
     KernelRule(
         "triton_attention",
         "attention",
@@ -190,7 +207,7 @@ RULES: tuple[KernelRule, ...] = (
         r"|ep_scatter|ep_gather|src2dst|seg_indptr"
         r"|deepep_(?:permute|post_reorder|run_moe)"
         r"|(?:^|_|::)(?:un)?permute(?:_|<|\(|$)|pad_topk|packed_topk|hash_topk"
-        r"|eplb|moe::dev::finalize",
+        r"|eplb|moe::dev::finalize|buildexpertmaps|sortfirsttoken",
         guess=True,
     ),
     KernelRule(
@@ -228,6 +245,9 @@ RULES: tuple[KernelRule, ...] = (
         r"nvjet|xmma_\w*gemm|cublas|gemv|splitKreduce|gemmSN|gemmk1"
         r"|(?:ampere|hopper|volta|turing|sm\d+)_\w*gemm",
     ),
+    # CuTe DSL kernels are named "kernel_cutlass_<function>..."; FlashInfer's
+    # fused add + RMSNorm is one, so the name says norm before cutlass counts
+    KernelRule("cute_dsl_norm", "norm_act", r"(?i)^kernel_cutlass_\w*norm", guess=True),
     KernelRule(
         "gemm", "dense_gemm", r"(?i)gemm|matmul|scaled_mm|\bbmm|cutlass", guess=True
     ),
@@ -238,9 +258,12 @@ RULES: tuple[KernelRule, ...] = (
         r"(?i)quant|cvt_\w*fp4|nvfp4|mxfp|transform_sf|sf_layout|ue8m0",
         guess=True,
     ),
-    # ---- norms, activations, rotary
+    # ---- norms, activations, rotary, hyper-connection mixing (mHC)
     KernelRule(
         "norm", "norm_act", r"(?i)rms_?norm|layer_?norm|group_?norm|norm_?kernel"
+    ),
+    KernelRule(
+        "hyper_connection", "norm_act", r"(?i)(?:^|_)mhc_|hyper_?conn", guess=True
     ),
     KernelRule(
         "activation",
@@ -319,8 +342,17 @@ def _truncate(text: str, max_len: int) -> str:
     return text if len(text) <= max_len else text[: max_len - 1] + "…"
 
 
+# CuTe DSL kernels spell their argument types into the name:
+# kernel_cutlass_<function>_tensorptri32gmemo2624..._tensorptrbf16gmemo...
+_CUTE_DSL_ARGS = re.compile(r"^(kernel_cutlass_\w+?)_[Tt]ensor")
+
+
 def short_kernel_name(name: str, max_len: int = SHORT_MAX) -> str:
-    """Display form: no ``void``, template arguments collapsed, no parameters."""
+    """Display form: no ``void``, template arguments collapsed, no parameters
+    (for a CuTe DSL kernel, no argument types)."""
+    cute = _CUTE_DSL_ARGS.match(name.strip())
+    if cute:
+        return _truncate(cute[1] + "…", max_len)
     text = _VOID.sub("", name.strip())
     previous = None
     while previous != text:
@@ -502,6 +534,7 @@ class KernelReport(Frozen):
     source: str  # container name
     report: str  # host path of the .nsys-rep
     breakdown: KernelBreakdown | None = None
+    timeline: dict[str, Any] | None = None  # domain/steps.StepBreakdown as JSON
     files: tuple[str, ...] = ()  # host paths of the CSVs that were read
     notes: tuple[str, ...] = ()
 

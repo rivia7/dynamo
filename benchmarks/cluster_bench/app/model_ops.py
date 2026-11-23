@@ -58,6 +58,9 @@ CONFIG_KEYS = (
     "index_topk",
     "index_n_heads",
     "index_head_dim",
+    "index_kpool",
+    "index_kpool_compress",
+    "linear_attn_config",
     "num_nextn_predict_layers",
     "max_position_embeddings",
     "torch_dtype",
@@ -77,6 +80,11 @@ def record_model_arch(ctx: RunContext, model_dir: str) -> ModelArch | None:
         ctx.note(f"model config unreadable ({path}): {exc}")
         return None
     subset = {k: cfg[k] for k in CONFIG_KEYS if k in cfg}
+    text = cfg.get("text_config")
+    if isinstance(text, dict):  # a multimodal config nests the language model's
+        subset.update(
+            {k: text[k] for k in CONFIG_KEYS if k in text and k not in subset}
+        )
     ctx.store.append(
         EventType.MODEL_ARCH,
         {"arch": arch.model_dump(mode="json"), "config": subset, "path": path},
@@ -110,26 +118,37 @@ def point_mfu(
     requests: RequestSummary | None,
     state: PointState | None,
 ) -> MfuResult | None:
-    """MFU of one point from its request workload (None without FLOPs or window)."""
-    if requests is None or requests.flops_prefill is None or not requests.window_s:
-        return None
+    """MFU (config.json FLOPs) and MBU (NVML GPM DRAM bandwidth) of one point.
+
+    None when the point has neither FLOPs with a window nor GPM DRAM samples.
+    """
     precision = precision_of(variant)
     tensor: dict[str, float] = {}
+    dram: dict[str, float] = {}
     activity = state.stress.activity if state and state.stress else None
     if activity is not None:
         for role, row in activity.roles.items():
             if row.tensor_pct_mean is not None:
                 tensor[role] = round(row.tensor_pct_mean / 100.0, 4)
+            if row.dram_pct_mean is not None:
+                dram[role] = round(row.dram_pct_mean / 100.0, 4)
     gpus = role_gpus(plan)
     if not gpus:
         return None
+    known = (
+        requests is not None
+        and requests.flops_prefill is not None
+        and bool(requests.window_s)
+    )
     return compute_mfu(
-        flops_prefill=requests.flops_prefill,
-        flops_decode=requests.flops_decode or 0.0,
-        window_s=requests.window_s,
+        flops_prefill=requests.flops_prefill if known and requests else None,
+        flops_decode=(requests.flops_decode or 0.0) if known and requests else None,
+        window_s=requests.window_s if known and requests else None,
         role_gpus=gpus,
         precision=precision,
         peak_tflops=gpu.peak_dense_tflops.get(precision),
         tensor_active=tensor,
-        cache_source=requests.cache_source,
+        dram_active=dram,
+        peak_mem_tbs=gpu.hbm_tbs,
+        cache_source=requests.cache_source if requests is not None else "none",
     )

@@ -19,6 +19,8 @@ from benchmarks.cluster_bench.adapters import aiperf as aiperf_adapter
 from benchmarks.cluster_bench.adapters import profile_store
 from benchmarks.cluster_bench.adapters.docker import Mount, docker_run_argv
 from benchmarks.cluster_bench.adapters.engine_sglang import CONTAINER_SRC
+from benchmarks.cluster_bench.agents.sglang_hotfix import ENV_VAR as HOTFIX_ENV
+from benchmarks.cluster_bench.agents.sglang_hotfix import parse_ids as parse_hotfixes
 from benchmarks.cluster_bench.app.context import RunContext
 from benchmarks.cluster_bench.app.facts_ops import collect_preflight
 from benchmarks.cluster_bench.domain import profiles as prof
@@ -61,6 +63,14 @@ MULTINODE_KEYS = ("nnodes", "node-rank", "dist-init-addr")
 
 class PreflightError(RuntimeError):
     pass
+
+
+def profile_hotfixes(
+    model: ModelProfile, deployment: DeploymentProfile
+) -> tuple[str, ...]:
+    """SGLang hotfix ids the model env and the families' role envs name, in order."""
+    envs = [model.env] + [r.env for f in deployment.families for r in f.roles]
+    return parse_hotfixes(",".join(e.get(HOTFIX_ENV, "") for e in envs))
 
 
 def collect_family_flags(
@@ -208,15 +218,31 @@ def restore(ctx: RunContext) -> None:
         ctx.model_dir = downloads[-1].data["model_dir"]
 
 
+def replicate_code(ctx: RunContext) -> list[str]:
+    """Copy node0's harness code (agents, launch script) to every peer."""
+    peers = ctx.node_names[1:]
+    if peers:
+        ctx.status(step="replicating harness code to peers")
+        ctx.cluster.push_tree(Path(ctx.src_dir), peers, ctx.config.workdir)
+    return peers
+
+
+def resume(ctx: RunContext) -> None:
+    """Start of every run: the state the log holds; on a resumed run (past
+    preflight) the code is replicated again, since the runner may now carry
+    newer code (agents, launch script) than the peers got at preflight."""
+    restore(ctx)
+    if ctx.store.of_type(EventType.INVENTORY):
+        replicate_code(ctx)
+
+
 class PreflightPhase:
     name = "preflight"
 
     def run(self, ctx: RunContext, rt: object) -> None:
         cfg = ctx.config
-        peers = ctx.node_names[1:]
+        peers = replicate_code(ctx)
         if peers:
-            ctx.status(step="replicating harness code to peers")
-            ctx.cluster.push_tree(Path(ctx.src_dir), peers, cfg.workdir)
             boot = (
                 f"bash {shlex.quote(ctx.src_dir)}/benchmarks/cluster_bench/scripts/bootstrap_node.sh "
                 f"--workdir {shlex.quote(cfg.workdir)} --minimal"
@@ -249,15 +275,18 @@ class PreflightPhase:
                 )
 
         gpu, model, deployment = resolve_profiles(ctx, inventory)
-        checkpoint = model.checkpoints[
-            gpu.weights_variant
-            if gpu.weights_variant in model.checkpoints
-            else next(iter(model.checkpoints))
-        ]
-        need = int(checkpoint.approx_size_gb * 1e9 * WEIGHTS_HEADROOM)
-        model_root = pick_model_root(
-            inventory.nodes, need, cfg.model_root, platform=cfg.platform
-        )
+        try:
+            _, checkpoint = prof.select_checkpoint(model, gpu, cfg.checkpoint)
+        except prof.ProfileError as exc:
+            raise PreflightError(str(exc)) from exc
+        model_root: str | None = None
+        if not cfg.model_path:
+            # --model-path weights are already on every node: no space needed;
+            # the download phase checks that the copies agree.
+            need = int(checkpoint.approx_size_gb * 1e9 * WEIGHTS_HEADROOM)
+            model_root = pick_model_root(
+                inventory.nodes, need, cfg.model_root, platform=cfg.platform
+            )
         ctx.store.append(
             EventType.INVENTORY,
             {
@@ -305,6 +334,36 @@ class PreflightPhase:
                 f"(rc {res.rc}): {(res.stdout + res.stderr).strip()[-600:]}"
             )
 
+    def _check_sglang_hotfixes(
+        self, ctx: RunContext, model: ModelProfile, deployment: DeploymentProfile
+    ) -> None:
+        """Hotfixes edit SGLang sources at launch: prove each fits this image."""
+        ids = profile_hotfixes(model, deployment)
+        if not ids:
+            return
+        tool = f"{CONTAINER_SRC}/benchmarks/cluster_bench/agents/sglang_hotfix.py"
+        argv = docker_run_argv(
+            name=f"cb-hotfix-{ctx.config.exp_id[:8]}",
+            image=ctx.config.image,
+            command=["python3", "-P", tool, "check", ",".join(ids)],
+            gpus=None,
+            mounts=(Mount(f"{ctx.config.workdir}/src", CONTAINER_SRC, read_only=True),),
+            detach=False,
+            remove=True,
+            rdma=False,
+        )
+        res = ctx.cluster.run(
+            ctx.node0, shlex.join(argv) + " 2>&1", timeout=600, check=False
+        )
+        atomic_write_text(
+            ctx.exp_dir / "preflight" / "sglang_hotfixes.txt", res.stdout + res.stderr
+        )
+        if res.rc != 0:
+            raise PreflightError(
+                f"SGLang hotfixes {','.join(ids)} do not fit this image "
+                f"(rc {res.rc}): {(res.stdout + res.stderr).strip()[-600:]}"
+            )
+
     def _check_flags(
         self, ctx: RunContext, model: ModelProfile, deployment: DeploymentProfile
     ) -> None:
@@ -341,6 +400,7 @@ class PreflightPhase:
         atomic_write_text(out_dir / "dynamo_sglang_help.txt", help_text)
         if ctx.config.stage == "decode":
             self._check_decode_only_shim(ctx)
+        self._check_sglang_hotfixes(ctx, model, deployment)
         flags = collect_family_flags(deployment, model, profile_store.RecipeLoader())
         baseline = min(deployment.families, key=lambda f: f.priority)
         for family in deployment.families:

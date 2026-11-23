@@ -61,14 +61,14 @@ families:
         env: {MC_FORCE_HCA: "1", SGLANG_DISAGGREGATION_WAITING_TIMEOUT: "3600"}
 
 ladder:
-  - id: sm120-dsa-tilelang
+  # With no --dsa-*-backend, SGLang 0.5.21 serves GlmMoeDsaForCausalLM with an
+  # FP8 KV cache on SM12x through flashinfer_sparse_mla. TileLang needs a BF16
+  # KV cache on CUDA, and FlashMLA is Hopper/SM100-only.
+  - id: sm120-dsa-tilelang-bf16-kv
     when: kernel_unsupported
     extra_args: [--dsa-prefill-backend, tilelang, --dsa-decode-backend, tilelang]
     drop_args: [--dsa-prefill-backend, --dsa-decode-backend]
-  - id: sm120-dsa-flashmla
-    when: kernel_unsupported
-    extra_args: [--dsa-prefill-backend, flashmla_kv, --dsa-decode-backend, flashmla_kv]
-    drop_args: [--dsa-prefill-backend, --dsa-decode-backend]
+    sglang: {kv-cache-dtype: bfloat16}
   - id: sm120-no-spec
     when: kernel_unsupported
     sglang:

@@ -174,6 +174,16 @@ class ActivityAggregate(Frozen):
     regime: Regime = "unknown"
     reason: str = ""
 
+    def layers(self) -> tuple[float, float, float] | None:
+        """Percent of the time with the SMs at work, with a kernel running but
+        its SMs idle, and with no kernel at all: SM activity, graphics-engine
+        activity minus it, and the rest. None without both metrics."""
+        if self.gr_pct_mean is None or self.sm_pct_mean is None:
+            return None
+        gr = min(max(self.gr_pct_mean, 0.0), 100.0)
+        sm = min(max(self.sm_pct_mean, 0.0), gr)
+        return sm, gr - sm, 100.0 - gr
+
 
 class RoleActivity(ActivityAggregate):
     """GPM aggregate of the GPUs serving one role ("agg", "prefill", ...)."""

@@ -7,7 +7,8 @@
 # (UNVERIFIED): https://www.nvidia.com/en-us/data-center/rtx-pro-6000-blackwell-server-edition/ .
 # GDDR7 1,597 GB/s (the Workstation card's 1,792 GB/s does not apply).
 name: rtx_pro_6000
-match: ['RTX PRO 6000', 'RTX Pro 6000']
+# Case-insensitive; (?!D) leaves the China-market RTX PRO 6000D to its profile.
+match: ['RTX PRO 6000(?!D)']
 arch: sm120
 hbm_gb: 96
 nvlink: false

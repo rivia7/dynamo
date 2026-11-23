@@ -103,9 +103,12 @@ def test_export_writes_records_and_views(tmp_path, kb, h200, plan_lookup):
     assert exp["kv_total_tokens"] == 4 * 381_000 and exp["kv_requests_at_p50"] == 24
     assert exp["leader_mfu_total"] == pytest.approx(0.106, abs=1e-3)
     assert exp["mfu_precision"] == "fp8" and exp["peak_tflops_per_gpu"] == 1979.0
+    assert exp["leader_mbu_total"] == pytest.approx(0.657)
+    assert exp["peak_mem_tbs_per_gpu"] == 4.8
     resources = _generated(kb / "clusters" / h200.fingerprint / "resources.md")
     assert "| 4 (on disagg-1p1d) | 1 |" in resources
     assert "| 1.52M | 262K |" in resources and "| 10.6% |" in resources
+    assert "| 65.7% |" in resources  # the leader's MBU
     assert (exp["nvlink_off_method"], exp["nvlink_off_path"]) == ("bw_mode_off", "pcie")
     assert (
         exp["nvlink_off_delta_pct"] == -33.63

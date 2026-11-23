@@ -577,6 +577,11 @@ def render_resources(experiments: Sequence[ExperimentRecord]) -> str:
                 _pct(e.leader_mfu_prefill),
                 _pct(e.leader_mfu_decode),
                 _pct(e.leader_mfu_total),
+                num(e.peak_mem_tbs_per_gpu, 3, dash=NA),
+                num(e.leader_mem_tbs_per_gpu, 2, dash=NA),
+                _pct(e.leader_mbu_prefill),
+                _pct(e.leader_mbu_decode),
+                _pct(e.leader_mbu_total),
             )
         )
         kv.append(
@@ -599,7 +604,9 @@ def render_resources(experiments: Sequence[ExperimentRecord]) -> str:
         "the leader has no cross-node traffic, and estimated from the leader's "
         "own IB traffic), model FLOPs "
         "utilization (config.json FLOPs of useful tokens / dense peak at the "
-        "checkpoint's GEMM precision) and KV cache capacity (per-rank pool x "
+        "checkpoint's GEMM precision), memory bandwidth utilization (MBU: NVML "
+        "GPM DRAM bandwidth, measured; TB/s = MBU x the GPU profile's memory "
+        "bandwidth) and KV cache capacity (per-rank pool x "
         "attention-DP ranks x instances of the serving role).",
         "## Interconnect",
         md_table(
@@ -640,7 +647,7 @@ def render_resources(experiments: Sequence[ExperimentRecord]) -> str:
             ),
             nvlink,
         ),
-        "## Model FLOPs utilization",
+        "## Model FLOPs and memory bandwidth utilization",
         md_table(
             (
                 "Experiment",
@@ -652,6 +659,11 @@ def render_resources(experiments: Sequence[ExperimentRecord]) -> str:
                 "MFU prefill",
                 "MFU decode",
                 "MFU total",
+                "Peak TB/s/GPU",
+                "Achieved TB/s/GPU",
+                "MBU prefill",
+                "MBU decode",
+                "MBU total",
             ),
             compute,
         ),

@@ -80,6 +80,11 @@ def rendezvous_port(base: int, key: str, span: int = PORT_SPAN) -> int:
     return base + offset
 
 
+# torch's launcher as a module: sglang-runtime 1.6.2 ships torch in /opt/sglang
+# without a torchrun script on PATH; "python3 -m" finds it in every image.
+TORCHRUN = ("python3", "-m", "torch.distributed.run")
+
+
 def build_torchrun_command(
     script: str,
     script_args: Sequence[str],
@@ -90,13 +95,13 @@ def build_torchrun_command(
     master_addr: str | None = None,
     master_port: int | None = None,
 ) -> list[str]:
-    """``torchrun`` argv: standalone on one node, static rendezvous otherwise."""
+    """torchrun argv (``TORCHRUN``): standalone on one node, static rendezvous otherwise."""
     if nproc_per_node <= 0 or nnodes <= 0 or not 0 <= node_rank < nnodes:
         raise ValueError(
             f"bad torchrun layout: nnodes={nnodes} node_rank={node_rank} "
             f"nproc_per_node={nproc_per_node}"
         )
-    argv = ["torchrun"]
+    argv = list(TORCHRUN)
     if master_addr is None:
         if nnodes != 1:
             raise ValueError("multi-node torchrun needs master_addr and master_port")
@@ -460,6 +465,29 @@ def parse_nccl_net_log(text: str) -> NcclNetEvidence:
     return NcclNetEvidence(tuple(sorted(devices)), gdr, staged, socket_count)
 
 
+# "Channel 00/0 : 0[0] -> 1[1] via P2P/CUMEM", "Channel 01 : 3[3] -> 4[4] via
+# SHM/direct" (NCCL 2.30 prints no "/n" for SHM): rank[CUDA device] pairs
+_NCCL_HOP_RE = re.compile(
+    r"Channel \d+(?:/\d+)? : \d+\[(?P<src>\d+)\] -> \d+\[(?P<dst>\d+)\]"
+    r"(?: \[(?:send|receive)\])? via (?P<via>\S+)"
+)
+
+
+def parse_nccl_hops(text: str) -> dict[str, list[str]]:
+    """Intra-node hops of NCCL INFO output: "a->b" (CUDA devices of the
+    processes) -> the transports NCCL set up for it, such as "P2P/CUMEM" (GPU
+    to GPU) or "SHM/direct" (through host memory). Hops to another node
+    ("via NET/...") are left out."""
+    hops: dict[tuple[int, int], set[str]] = {}
+    for match in _NCCL_HOP_RE.finditer(text):
+        via = match.group("via")
+        if via.startswith("NET/"):
+            continue
+        key = (int(match.group("src")), int(match.group("dst")))
+        hops.setdefault(key, set()).add("/".join(via.split("/")[:2]))
+    return {f"{a}->{b}": sorted(v) for (a, b), v in sorted(hops.items())}
+
+
 # --------------------------------------------------------------------------
 # Runner
 # --------------------------------------------------------------------------
@@ -626,13 +654,13 @@ class MicrobenchRunner:
         command = build_torchrun_command(
             NCCL_SCRIPT, args, nproc_per_node=len(self._gpus(node))
         )
-        return self._job(
-            node,
-            "cb-mb-nccl-intra",
-            command,
-            remote_out,
-            self._nccl_env(cross_node=False),
-        )
+        env = {
+            **self._nccl_env(cross_node=False),
+            # INIT names the transport of every hop ("via P2P/CUMEM", "via SHM")
+            "NCCL_DEBUG": "INFO",
+            "NCCL_DEBUG_SUBSYS": "INIT",
+        }
+        return self._job(node, "cb-mb-nccl-intra", command, remote_out, env)
 
     def _multinode_jobs(
         self,
@@ -846,11 +874,16 @@ class MicrobenchRunner:
                 )
                 for node in nodes
             }
-            self._run_group(jobs)
+            logs = self._run_group(jobs)
             for node in nodes:
                 obj = self._fetch_json(node, output_path(remote_out, f"intra-{node}"))
+                hops = parse_nccl_hops(logs.get(node) or "")
                 results += parse_nccl(
-                    obj, node, intra_plane=planes[node], command=jobs[node].command
+                    obj,
+                    node,
+                    intra_plane=planes[node],
+                    command=jobs[node].command,
+                    details={"nccl_hops": hops} if hops else None,
                 )
         if inter and len(nodes) > 1:
             out = output_path(remote_out, "inter")

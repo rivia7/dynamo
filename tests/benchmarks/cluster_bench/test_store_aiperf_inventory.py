@@ -169,6 +169,9 @@ def test_parse_profile_export_and_window(tmp_path):
         "time_to_first_token": {"p50": 900.0, "p99": 4000.0},
         "inter_token_latency": {"p50": 22.0, "p99": 60.0},
         "benchmark_duration": {"avg": 481.0},
+        # The profiling phase, grace period included: 490 s.
+        "start_time": "2026-11-23T02:08:24.695435",
+        "end_time": "2026-11-23T02:16:34.695435",
         "error_summary": [
             {"count": 10, "error_details": {"type": "ContextLengthExceeded"}}
         ],
@@ -207,9 +210,27 @@ def test_parse_profile_export_and_window(tmp_path):
     assert metrics.error_rate == pytest.approx(0.01)
     assert metrics.error_types == {"ContextLengthExceeded": 10}
     assert (metrics.window_start_ns, metrics.window_end_ns) == (100, 900)
+    assert metrics.duration_s == 481.0 and metrics.phase_s == pytest.approx(490.0)
     # No --scenario, no metadata block: no verdict either way.
     assert metrics.scenario is None and metrics.submission_valid is None
     assert metrics.is_complete is None
+
+
+def test_phase_falls_back_to_the_output_throughput_total():
+    # Without start_time / end_time, total OSL over the output throughput gives
+    # back the time AIPerf divided by (GLM-5.3 at C=8: 510 s, 483 s of requests).
+    report = {
+        "output_token_throughput": {"avg": 180.9449471854132},
+        "total_osl": {"avg": 92282},
+        "benchmark_duration": {"avg": 483.22},
+    }
+    metrics = aiperf.parse_profile_export(report)
+    assert metrics.phase_s == pytest.approx(510.0, abs=1e-3)
+    assert metrics.duration_s == 483.22
+    assert (
+        aiperf.parse_profile_export({"benchmark_duration": {"avg": 1.0}}).phase_s
+        is None
+    )
 
 
 def test_parse_profile_export_reads_the_scenario_verdict(tmp_path):

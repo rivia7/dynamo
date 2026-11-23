@@ -157,6 +157,14 @@ kernel_category:
   elementwise: "elementwise"
   other: "其他"
 
+step_group:
+  communication: "通信（NCCL / all-reduce）"
+  attention: "attention"
+  moe: "MoE（GEMM + 路由）"
+  dense_gemm: "dense GEMM"
+  other: "其他 kernel 和拷贝"
+  idle: "空闲（GPU 上没有任何 kernel）"
+
 role:
   agg: "聚合（agg）"
   prefill: "prefill"
@@ -328,17 +336,70 @@ runtime:
   good_fraction: "达标请求占比"
   goodput_rps: "goodput 请求/s"
   good_tps_gpu: "达标输出 tok/s/GPU"
-  goodput_caption: "最优配置的 goodput（只算达标请求的吞吐；由 AIPerf 逐请求记录事后计算，共 {n} 个请求，出错 {errors} 个）"
+  goodput_caption: "最优配置的 goodput（只算达标请求的吞吐，和吞吐除同一个时长；由 AIPerf 逐请求记录事后计算，共 {n} 个请求，出错 {errors} 个）"
   diag_intro: "诊断时段（不计入正式结果）：最优配置 {family} 在 C={c} 下打开诊断选项重新部署（SGLang 的 MFU 估算、GPU forward 计时和专家负载均衡指标）；Nsight Systems：{nsys}（{version}）。"
   diag_category: "kernel 类别"
   diag_caption: "各角色的 GPU 时间占比（Nsight Systems 抓 {steps} 个 forward step，用 --cuda-graph-trace=node 展开 CUDA graph）"
   diag_kernel: "kernel"
   diag_share: "时间占比"
-  diag_top_caption: "各角色耗时最多的 kernel"
+  diag_top_caption: "各角色耗时最多的 kernel（整个抓取窗口的 GPU 时间；“解读”是按名字做的猜测，原始名字在 kernel 列；每步每卡次数 = 调用次数 ÷ step 数 ÷ GPU 数）"
+  diag_group: "时间去向"
+  diag_step_ms: "一步平均时长 ms"
+  diag_steps_caption: "一个 forward step 的墙钟时间去向（{steps} 个 step、{gpus} 张 GPU 的平均；几个 kernel 同时在跑时平分这段时间；空闲 = 这张 GPU 上没有任何 kernel 或拷贝在跑，包括 kernel 之间的启动空隙和 step 之间 CPU 调度的时间；等待其他 GPU 的 NCCL kernel 算作通信，其中超出这个 kernel 中位耗时的部分单列一行）"
+  diag_gap: "空闲间隙长度"
+  diag_gap_count: "每步个数"
+  diag_gap_time: "每步合计 µs"
+  diag_gpu: "GPU"
+  diag_at: "时刻 ms"
+  diag_len: "长度 µs"
+  diag_before: "之前的 kernel"
+  diag_after: "之后的 kernel"
+  diag_wait: "其中超出中位耗时的部分（多半在等别的 GPU）"
+  diag_steady_caption: "去掉停顿之后的时间去向：单次 ≥ {stall_ms} ms 的空闲或通信调用算停顿（一个 decode step 本身才几十 ms），从每张 GPU 的窗口里扣掉，扣得最多的角色平均每张 GPU 扣掉 {cut_ms} ms。停顿常出在抓取刚开始（nsys 开始记录时，一个实例的进程会一起卡一下），也可能来自 CPU 调度或别的进程；这张表更接近平常一个 step"
+  diag_len_ms: "长度 ms"
+  diag_calls_caption: "最长的几次通信 kernel（≥ 1 ms）。一次 all-reduce 平常只要几十 µs，这么长是在等同一实例里别的 GPU 跟上；和上表同一时刻的空闲对照，就能看出是哪张卡拖慢了大家"
+  diag_bubbles_caption: "最长的几段空闲（这张 GPU 上什么都没跑）和它前后的 kernel；时刻从这个实例（同一份报告）最早的 kernel 算起，同一实例的 GPU 可以互相对照。长空闲多半是 CPU 在两个 step 之间调度，或者在等别的进程"
+  diag_gap_caption: "空闲按间隙长度分组（每张 GPU 每步的平均）：短间隙是 kernel 之间的启动空隙，长间隙多半是 step 之间 CPU 在调度。nsys 展开 CUDA graph 的每个节点，会把短间隙拉长一些"
   diag_tflops: "SGLang 估算算力 TFLOP/s/GPU"
   diag_mem: "SGLang 估算显存流量 GB/s/GPU"
   diag_busy: "GPU 忙于 forward 的时间占比"
   diag_eplb: "MoE 专家负载均衡度（平均/最大，1 为完全均衡）"
+  diag_label: "解读"
+  diag_avg_us: "平均 µs"
+  diag_per_step: "每步每卡次数"
+  diag_chart_whole: "{role} · 整个窗口"
+  diag_chart_steady: "{role} · 去掉停顿"
+  diag_chart_tip: "{group}：每步 {ms} ms（{share}）"
+  diag_chart_total: "{ms} ms"
+  diag_chart_ms: "时间 ms"
+  diag_chart_us: "时间 µs"
+  diag_chart_steps_title: "一个 forward step 的时间去向"
+  diag_chart_steps_caption: "上面的表画成条：一个 step 按 kernel 类别拆开，条下的数字是 ms，灰色是 GPU 上没有任何 kernel 的时间。有停顿时，每个角色的下一行是去掉停顿之后的"
+  diag_chart_idle_title: "{role} 每张 GPU 的抓取窗口"
+  diag_chart_idle_shade: "GPU 空闲（灰色越浓越空）"
+  diag_chart_idle_mark: "≥ {ms} ms 的通信调用"
+  diag_chart_idle_tip: "{gpu}，{a}–{b} ms：空闲 {idle}"
+  diag_chart_call_tip: "{kernel}：从 {at} ms 起，长 {ms} ms"
+  diag_chart_idle_caption: "每行一张 GPU，横轴从这个实例（同一份报告）最早的 kernel 算起，同一实例的 GPU 可以上下对照。灰色越浓，那一小段里 GPU 空着的时间越多；蓝条是 ≥ 1 ms 的通信调用，平常一次只要几十 µs，这么长是在等同一实例里别的 GPU。同一时刻有的卡是灰块、有的卡是蓝条，就是一次停顿"
+  diag_chart_strip_title: "{role} 平常的一段时间线"
+  diag_chart_bin_tip: "{a}–{b} ms：{parts}"
+  diag_chart_strip_caption: "{gpu} 在抓取窗口中间的 {ms} ms（约两个 step），每 {bin_us} µs 一格：每一格里各类 kernel 占的时间比例从下往上叠起来，最上面的灰色是空闲。CUDA graph 里 kernel 一个接一个地跑，灰色很少；冒出来的灰柱就是一个气泡"
+  diag_chart_zoom_title: "{role} 再放大：{us} µs 里的每个 kernel"
+  diag_chart_seg_tip: "{category}：{a}–{b} µs（{us} µs）"
+  diag_chart_zoom_caption: "同一段时间线里从一个 attention kernel 开始的 {us} µs，按真实时间画出 {n} 段（相邻的同类 kernel 合成一段），空白是 kernel 之间的空隙"
+  layers_role: "GPU 时间分三层（{role}，GPM 平均）"
+  layers_value: "SM 在算 {sm}，有 kernel 但 SM 空着 {gap}，没有 kernel {none}"
+  pcie_role: "PCIe 流量（{role}，GPM 平均）"
+  pcie_value: "每卡发送 {tx} GB/s、接收 {rx} GB/s；{gpus} 张卡合计，每个输出 token 发送 {mb} MB"
+  pcie_value_prefill: "每卡发送 {tx} GB/s、接收 {rx} GB/s；{gpus} 张卡合计，每个输入 token 发送 {mb} MB"
+  layers_title: "{family} 每个测量点的 GPU 时间（{role}）"
+  layers_sm: "SM 在算"
+  layers_gap: "有 kernel，但 SM 空着"
+  layers_none: "没有 kernel"
+  layers_x: "占时间 %"
+  layers_tip: "{part}：{pct}"
+  layers_note: "PCIe {mb} MB/token"
+  layers_caption: "最优拓扑每个测量点上，{role} 各卡的 NVML GPM 平均。SM 在算 = SM activity；有 kernel 但 SM 空着 = 图形引擎忙（GR activity）减去 SM activity，多是只占几个 SM 的通信 kernel，或者 batch 太小、占不满 SM 的 GEMM；没有 kernel = 100% − GR activity。nsys 时间线上没有空隙，不等于 GPU 用满了：中间那一段是资源上的气泡。条末是 PCIe 发送字节折合到每个 token，同一种部署基本不变，说明流量来自每个 token 都要做的通信（比如 TP 的 all-reduce）"
   accuracy: "准确率（95% CI）"
   accuracy_value: "{acc}（{lo}–{hi}）"
   accuracy_n: "作答 / 出错"
@@ -682,8 +743,13 @@ resources:
   nvlink_needed: "机内互联：GPU 之间的 p99 流量需要 {need} GB/s，超过一条 PCIe 的 {pcie} GB/s，这个部署需要 NVLink。"
   nvlink_optional: "机内互联：GPU 之间的 p99 流量只需 {need} GB/s，一条 PCIe（{pcie} GB/s）就能承载，不一定需要 NVLink。"
   nvlink_none: "机内互联：没有 NVLink 流量数据（纯 PCIe 机型，或计数器不可用）。"
+  hop: "GPU 之间"
+  hop_topo: "nvidia-smi topo"
+  hop_via: "NCCL 走的路"
+  hops_caption: "NCCL 在 {node} 上连接 GPU 时每一跳走的路（机内 NCCL 微基准的 INFO 日志）：P2P 是 GPU 之间直接读写，SHM 经过主机内存"
+  hops_shm: "有的跳 NCCL 走了 SHM（经过主机内存），多出现在跨 CPU socket（topo 为 SYS）的一跳。TP 组跨过这一跳时，每次 all-reduce 都要经过主机内存：可以 A/B 试 NCCL_P2P_LEVEL=SYS 让它也走 P2P，或者让 TP 组留在一个 socket 里。"
   no_bw: "最优配置没有带宽监控数据，无法评估最低互联配置。"
-  mfu_heading: "2.3 算力使用率（MFU）"
+  mfu_heading: "2.3 算力和显存带宽使用率（MFU / MBU）"
   mfu_intro: "MFU = 模型实际完成的计算量 ÷（统计时长 × GPU 数 × 每卡峰值算力）。计算量按 config.json 里的模型结构算（每个 token 约 {gflops} GFLOPs，激活参数约 {params}B），只算有效 token：命中前缀缓存的输入和 MTP 草稿都不计入。峰值取 {gpu} 在 {precision} 下的稠密峰值 {peak} TFLOPS。"
   mfu_intro_nopeak: "MFU = 模型实际完成的计算量 ÷（统计时长 × GPU 数 × 每卡峰值算力）。计算量按 config.json 里的模型结构算（每个 token 约 {gflops} GFLOPs）。GPU 配置文件里没有 {precision} 峰值算力，这里只给出实际算力。"
   role: "角色"
@@ -691,12 +757,17 @@ resources:
   tflops: "实际算力 TFLOP/s/卡"
   mfu: "MFU"
   tensor: "Tensor Core 忙碌（GPM）"
-  mfu_caption: "最优配置满载时的算力使用率"
-  mfu_curve_caption: "{family} 的 MFU 随并发变化（搜索阶段的测量点）"
+  mbu: "MBU（GPM 实测）"
+  mem_tbs: "显存带宽 TB/s/卡"
+  mfu_caption: "最优配置满载时的算力和显存带宽使用率"
+  mfu_curve_caption: "{family} 的 MFU 和 MBU 随并发变化（搜索阶段的测量点）"
   concurrency: "并发"
   tps: "tok/s/GPU"
   mfu_total: "总 MFU"
-  no_mfu: "没有 MFU 数据（缺少 config.json，或测量点没有逐请求记录）。"
+  no_mfu: "没有 MFU 和 MBU 数据（没有 config.json 或逐请求记录，NVML GPM 也没有显存带宽数据）。"
+  mbu_intro: "MBU = 显存带宽使用率，是实测值，不是估算：NVML GPM 每秒读一次每张卡的 {metric}（用掉的显存带宽 ÷ 这张卡的最大显存带宽），取测量窗口内的平均。折算成带宽 = MBU × 每卡 {peak} TB/s（GPU 配置文件）。MBU 不按模型公式算：一个 batch 用到哪些专家、KV 在 TP 各卡上的复制、DSA indexer 的扫描和 MTP 都会改变每一步读的字节数。"
+  mbu_intro_nopeak: "MBU = 显存带宽使用率，是实测值：NVML GPM 每秒读一次每张卡的 {metric}，取测量窗口内的平均。GPU 配置文件里没有显存带宽，所以没有折算成 TB/s。"
+  no_mbu: "没有 MBU：NVML GPM 没有给出显存带宽数据（GPM 需要 Hopper 或更新的 GPU，并且遥测要开着）。"
   kv_heading: "2.4 KV cache 容量"
   kv_intro: "能同时放下的上下文 = 每个 rank 的 KV 池（启动日志里的 max_total_num_tokens）× attention DP 数 × 实例数。PD 分离时，正在生成的请求的 KV 放在 decode 实例上；prefill 实例里的 KV 只是临时的，另外存前缀缓存。"
   kv_role: "角色"
@@ -723,6 +794,10 @@ resources:
   kpi_mfu: "MFU（{role}）"
   kpi_mfu_total: "MFU（全部 GPU）"
   kpi_mfu_detail: "实际 {tflops} TFLOP/s/卡"
+  kpi_mbu: "MBU（{role}）"
+  kpi_mbu_total: "MBU（全部 GPU）"
+  kpi_mbu_detail: "实测 {tbs} / {peak} TB/s/卡"
+  kpi_mbu_detail_nopeak: "NVML GPM 实测"
   kpi_kv: "KV 可放下的上下文"
   kpi_kv_detail: "单请求最长 {max} · 约 {n} 个请求（按 p50 上下文）"
   nvl_heading: "2.2 禁用 NVLink 改走 PCIe 的对比"
@@ -777,6 +852,38 @@ link_status:
 # P-Only / D-Only (domain/stages.py). Per stage: replace = [old, new] text
 # replacements over every template; overrides = dotted key -> template.
 # E2E uses the table as is.
+# Display labels of kernel names (Python regular expressions searched in the
+# demangled name; the first match wins): a reading of the name, shown next to
+# it in the diagnostic window's kernel table.
+kernel_labels:
+  - ['ncclDevKernel_AllReduce', "NCCL all-reduce"]
+  - ['ncclDevKernel_AllGather', "NCCL all-gather"]
+  - ['ncclDevKernel_ReduceScatter', "NCCL reduce-scatter"]
+  - ['ncclDevKernel_Broadcast', "NCCL broadcast"]
+  - ['GroupProblemShape.*BlockScaled|BlockScaled.*GroupProblemShape', "MoE 分组 GEMM（block-scaled，CUTLASS）"]
+  - ['MoeFCGemm', "MoE GEMM（CUTLASS SM80 MoeFCGemm）"]
+  - ['^main_kernel$', "TileLang main_kernel（多为 DSA 稀疏 attention）"]
+  - ['paged_mqa_logits', "DSA indexer 打分（DeepGEMM）"]
+  - ['topk_transform|topk_main_kernel', "DSA top-k 选 token"]
+  - ['sparse_mla', "稀疏 MLA attention（FlashInfer，DSA）"]
+  - ['dsv3_fused_a_gemm', "MLA 输入投影 GEMM（q_a + kv_a 合并）"]
+  - ['fused_add_rmsnorm|FusedAddRMSNorm', "残差相加 + RMSNorm（FlashInfer）"]
+  - ['gemvx', "cuBLAS GEMV"]
+  - ['delta_rule_update', "KDA 状态更新（gated delta rule）"]
+  - ['replayssm', "KDA 状态回放（MTP 验证后）"]
+  - ['causal_conv1d', "短卷积（causal conv1d）"]
+  - ['layer_norm_gated', "gated LayerNorm"]
+  - ['hc_prenorm_gemm', "mHC prenorm GEMM（DeepGEMM）"]
+  - ['mhc_pre', "mHC 混合（pre）"]
+  - ['mhc_post', "mHC 混合（post）"]
+  - ['cutlass_80_\w*tensorop_bf16_s16816gemm|cutlass_80_\w*wmma_tensorop\w*bf16', "BF16 GEMM（CUTLASS SM80）"]
+  - ['cutlass_80_wmma_tensorop_s161616gemm', "BF16 GEMM（CUTLASS SM80，FP32 累加）"]
+  - ['splitKreduce', "cuBLASLt split-K 归约"]
+  - ['finalizeMoeRouting', "MoE 结果合并（TRT-LLM）"]
+  - ['expandInputRows', "MoE 按专家重排（TRT-LLM）"]
+  - ['BatchMLAPagedAttention|mla::|FlashMLA|flash_mla', "MLA attention"]
+  - ['nvjet', "cuBLAS GEMM（nvjet）"]
+
 stages:
   label:
     e2e: "E2E（完整部署）"

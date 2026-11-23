@@ -11,12 +11,17 @@
    in minutes, not after a 700 GB download;
 5. wait, NCCL-broadcast the missing shards over the RDMA fabric, verify
    sha256 everywhere and write the completion marker.
+
+With --model-path the weights are already on every node: steps 1-3 and 5
+become one check that every node holds the same files with the same sizes
+(no hashing); the GPU work of step 4 still runs.
 """
 
 from __future__ import annotations
 
 import json
 import logging
+import re
 import shlex
 
 from benchmarks.cluster_bench.adapters.aiperf import PUBLIC_DATASET_REPOS
@@ -24,6 +29,9 @@ from benchmarks.cluster_bench.adapters.hf_fetch import (
     FetchPlan,
     ModelFetcher,
     ModelFetchError,
+    completion_probe_command,
+    local_copy_problems,
+    local_file_sizes,
     model_dir_for,
 )
 from benchmarks.cluster_bench.app.context import RunContext
@@ -47,6 +55,7 @@ from benchmarks.cluster_bench.fsutil import atomic_write_json
 logger = logging.getLogger(__name__)
 
 DOWNLOAD_TIMEOUT_S = 4 * 3600
+COMMIT_RE = re.compile(r"[0-9a-f]{40}")
 SMOKE_SUFFIX = "@smoke"
 
 
@@ -161,22 +170,58 @@ def early_gpu_work(ctx: RunContext, rt: PhaseRuntime) -> None:
     kernel_smoke(ctx, rt)
 
 
+def prefetch_dataset_command(
+    repo: str,
+    *,
+    python: str,
+    hf_home: str,
+    log_dir: str,
+    hf_endpoint: str | None = None,
+) -> str:
+    """Background ``snapshot_download`` of an AIPerf dataset repo into ``hf_home``."""
+    code = (
+        "from huggingface_hub import snapshot_download; "
+        f"snapshot_download(repo_id={repo!r}, repo_type='dataset')"
+    )
+    env = f"HF_HOME={shlex.quote(hf_home)}"
+    if hf_endpoint:
+        env += f" HF_ENDPOINT={shlex.quote(hf_endpoint)}"
+    log = shlex.quote(f"{log_dir}/dataset_prefetch.log")
+    # The subshell makes "&" background the download alone: "mkdir && cmd &"
+    # backgrounds the whole list, whose shell keeps the caller's stdout open
+    # until the download ends (node0 runs this as a local subprocess that
+    # reads its output to EOF).
+    return (
+        f"mkdir -p {shlex.quote(log_dir)} && "
+        f"({env} setsid nohup {shlex.quote(python)} -c "
+        f"{shlex.quote(code)} > {log} 2>&1 < /dev/null &)"
+    )
+
+
 def prefetch_dataset(ctx: RunContext) -> None:
     """Warm node0's HF cache with the AIPerf corpus (best effort, background)."""
     repo = PUBLIC_DATASET_REPOS.get(ctx.config.dataset)
     if repo is None:
         return
-    code = (
-        "from huggingface_hub import snapshot_download; "
-        f"snapshot_download(repo_id={repo!r}, repo_type='dataset')"
-    )
-    log = shlex.quote(str(ctx.exp_dir / "download" / "dataset_prefetch.log"))
-    cmd = (
-        f"mkdir -p {shlex.quote(str(ctx.exp_dir / 'download'))} && "
-        f"HF_HOME={shlex.quote(ctx.hf_home)} setsid nohup {shlex.quote(ctx.python)} -c "
-        f"{shlex.quote(code)} > {log} 2>&1 < /dev/null &"
+    cmd = prefetch_dataset_command(
+        repo,
+        python=ctx.python,
+        hf_home=ctx.hf_home,
+        log_dir=str(ctx.exp_dir / "download"),
+        hf_endpoint=ctx.config.hf_endpoint,
     )
     ctx.cluster.run(ctx.node0, cmd, check=False)
+
+
+def index_shards(ctx: RunContext, model_dir: str) -> list[str]:
+    """Shard files named by ``model.safetensors.index.json`` on node0 ([] if none)."""
+    index = shlex.quote(f"{model_dir.rstrip('/')}/model.safetensors.index.json")
+    res = ctx.cluster.run(ctx.node0, f"cat {index} 2>/dev/null", check=False)
+    try:
+        weight_map = json.loads(res.stdout or "{}").get("weight_map") or {}
+    except (json.JSONDecodeError, AttributeError):
+        return []
+    return sorted({str(name) for name in weight_map.values()})
 
 
 class DownloadPhase:
@@ -192,7 +237,9 @@ class DownloadPhase:
         )
         nodes = ctx.node_names
         if ctx.simulator is not None:
-            ctx.model_dir = model_dir_for(model_root, checkpoint.repo, "0" * 40)
+            ctx.model_dir = cfg.model_path or model_dir_for(
+                model_root, checkpoint.repo, "0" * 40
+            )
             early_gpu_work(ctx, rt)
             collect_disk(ctx, ctx.model_dir)
             ctx.store.append(
@@ -206,6 +253,9 @@ class DownloadPhase:
             )
             record_model_arch(ctx, ctx.model_dir)
             return
+        if cfg.model_path:
+            self._local_weights(ctx, rt, cfg.model_path, checkpoint.repo, revision)
+            return
 
         fetcher = ModelFetcher(
             ctx.cluster,
@@ -218,6 +268,7 @@ class DownloadPhase:
                 for n in ctx.require_hardware().inventory.nodes
             },
             clock=ctx.clock,
+            hf_endpoint=cfg.hf_endpoint,
         )
         plan_path = ctx.exp_dir / "download" / "plan.json"
         token = ctx.secrets.hf_token
@@ -281,6 +332,53 @@ class DownloadPhase:
                 "commit": plan.commit,
                 "model_dir": model_dir,
                 "report": report,
+            },
+        )
+        record_model_arch(ctx, model_dir)
+
+    def _local_weights(
+        self,
+        ctx: RunContext,
+        rt: PhaseRuntime,
+        model_dir: str,
+        repo: str,
+        revision: str,
+    ) -> None:
+        """--model-path: the weights are on every node already; check the copies."""
+        nodes = ctx.node_names
+        ctx.status(step=f"checking the weights in {model_dir} on {len(nodes)} nodes")
+        listings = ctx.cluster.fanout(
+            nodes,
+            lambda node: ctx.cluster.run(
+                node, completion_probe_command(model_dir), check=False
+            ),
+        )
+        sizes = {node: local_file_sizes(res.stdout) for node, res in listings.items()}
+        problems = local_copy_problems(
+            sizes, ctx.node0, index_shards(ctx, model_dir), model_dir
+        )
+        if problems:
+            raise ModelFetchError(
+                f"--model-path {model_dir} is not the same complete model on every node",
+                problems=problems,
+            )
+        ctx.model_dir = model_dir
+        prefetch_dataset(ctx)
+        early_gpu_work(ctx, rt)
+        collect_disk(ctx, model_dir)
+        files = sizes[ctx.node0] or {}
+        ctx.store.append(
+            EventType.DOWNLOAD,
+            {
+                "repo": repo,
+                # The user's copy: its commit is known only when pinned.
+                "commit": revision if COMMIT_RE.fullmatch(revision) else "local",
+                "model_dir": model_dir,
+                "report": {
+                    "local": True,
+                    "files": len(files),
+                    "total_bytes": sum(files.values()),
+                },
             },
         )
         record_model_arch(ctx, model_dir)

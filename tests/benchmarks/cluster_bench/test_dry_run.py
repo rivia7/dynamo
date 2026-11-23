@@ -7,6 +7,7 @@ from __future__ import annotations
 import json
 
 import pytest
+import yaml
 
 from benchmarks.cluster_bench.app.store import EventStore
 from benchmarks.cluster_bench.cli import main
@@ -67,8 +68,12 @@ def test_full_pipeline_simulated(tmp_path, gpu):
     lead = summary.point(summary.leader_point_id)
     assert lead is not None and lead.mfu is not None
     assert lead.mfu.total_tflops_per_gpu and lead.mfu.total_tflops_per_gpu > 0
+    # MBU: the measured GPM DRAM bandwidth, in the same result as the MFU
+    assert lead.mfu.total_mbu is not None and 0 < lead.mfu.total_mbu < 1
+    assert lead.mfu.total_mem_tbs_per_gpu
     report = (exp / "report" / "report.zh-CN.md").read_text()
     assert "## 2 带宽、算力与 KV 容量" in report
+    assert "MFU / MBU" in report and "DRAM_BW_UTIL" in report
     assert "### 2.4 KV cache 容量" in report and "可同时放下的上下文" in report
     # NVLink off vs on: hardware switch on Hopper, NCCL without P2P on
     # Blackwell (no -sBwMode, no width 0), nothing on PCIe-only GPUs
@@ -170,12 +175,15 @@ def test_kernel_ladder_finds_working_rung(tmp_path):
             "--fake-gpu",
             "rtx_pro_6000",
             "--fake-needs-rungs",
-            "sm120-dsa-tilelang",
+            "sm120-dsa-tilelang-bf16-kv",
         )
         == 0
     )
     summary = _summary(tmp_path)
-    assert summary.leader is not None and "sm120-dsa-tilelang" in summary.leader.rungs
+    assert (
+        summary.leader is not None
+        and "sm120-dsa-tilelang-bf16-kv" in summary.leader.rungs
+    )
 
 
 def test_unsupported_verdict_when_every_kernel_fallback_fails(tmp_path):
@@ -198,6 +206,64 @@ def test_confirm_duration_is_configurable_above_the_agentx_floor(tmp_path):
     assert _run(tmp_path, "--fake-gpu", "h200", "--confirm-duration-s", "3600") == 0
     confirm = [p for p in _summary(tmp_path).points if p.key.purpose == "confirm"]
     assert confirm and all(p.metrics.duration_s == 3600 for p in confirm)
+
+
+@pytest.mark.parametrize(
+    ("extra", "message"),
+    [
+        (("--model-path", "models/glm"), "--model-path must be an absolute path"),
+        (("--hf-endpoint", "hf-mirror.com"), r"--hf-endpoint must be an http\(s\) URL"),
+        (
+            ("--checkpoint", "nvfp4", "--model-repo", "org/m", "--model-size-gb", "10"),
+            "--checkpoint picks a tuned profile's checkpoint",
+        ),
+    ],
+)
+def test_weight_source_options_are_checked(tmp_path, extra, message):
+    with pytest.raises(SystemExit, match=message):
+        _run(tmp_path, "--fake-gpu", "h200", *extra)
+
+
+def test_d_only_on_rtx_pro_6000d_with_weights_on_every_node(tmp_path):
+    model_path = "/data/models/GLM-5.3-NVFP4"
+    assert (
+        _run(
+            tmp_path,
+            "--fake-gpu",
+            "rtx_pro_6000d",
+            "--fake-nodes",
+            "2",
+            "--stage",
+            "d-only",
+            "--checkpoint",
+            "nvfp4-nvidia",
+            "--model-path",
+            model_path,
+            "--hf-endpoint",
+            "https://hf-mirror.com",
+        )
+        == 0
+    )
+    summary = _summary(tmp_path)
+    assert summary.verdict in ("ok", "partial")
+    measured = [f.family_id for f in summary.families if f.status == "measured"]
+    assert measured == ["d-only-tp8x2"]
+    exp = tmp_path / "experiments" / "t1"
+    decode = [
+        yaml.safe_load(content)
+        for plan in (exp / "deployments").glob("*/plan.json")
+        for spec in json.loads(plan.read_text())["containers"]
+        if spec["role"] == "decode"
+        for path, content in spec["files"].items()
+        if path.endswith(".yaml")
+    ]
+    assert decode
+    for cfg in decode:
+        assert cfg["model-path"] == model_path
+        assert cfg["quantization"] == "modelopt_mixed"
+        assert cfg["disable-shared-experts-fusion"] is True
+        assert cfg["disaggregation-transfer-backend"] == "fake"
+        assert "data-parallel-size" not in cfg
 
 
 def test_budget_exhaustion_yields_partial_report(tmp_path):
@@ -267,6 +333,85 @@ def test_diagnostic_window_records_kernels_without_touching_the_ranking(tmp_path
     assert "诊断时段（不计入正式结果）" in report and "DeepEP all-to-all" in report
     index = next((tmp_path / "kb").rglob("index.jsonl")).read_text()
     assert '"diag_nsys":"ok"' in index.replace(" ", "")
+
+
+def test_redo_adds_a_diagnostic_window_to_a_finished_run(tmp_path):
+    assert _run(tmp_path, "--fake-gpu", "b200") == 0
+    exp = tmp_path / "experiments" / "t1"
+    before = _summary(tmp_path)
+    assert before.diagnostics is None
+    store = EventStore(exp / "events.jsonl")
+    measured = len(store.of_type(EventType.POINT))
+    # without --diagnose, or on an experiment that never ran: refused
+    with pytest.raises(SystemExit, match="needs --diagnose"):
+        _run(tmp_path, "--fake-gpu", "b200", "--redo", "diagnose")
+    with pytest.raises(SystemExit, match="cannot redo"):
+        _run(tmp_path, "--fake-gpu", "b200", "--redo", "search")
+    with pytest.raises(SystemExit, match="has not run"):
+        main(
+            [
+                "dry-run",
+                "--workdir",
+                str(tmp_path),
+                "--exp-id",
+                "t2",
+                "--diagnose",
+                "--redo",
+                "diagnose",
+                "--log-level",
+                "WARNING",
+            ]
+        )
+    assert _run(tmp_path, "--fake-gpu", "b200", "--diagnose", "--redo", "diagnose") == 0
+    after = _summary(tmp_path)
+    diag = after.diagnostics
+    assert diag is not None and diag.nsys == "ok" and diag.kernels
+    lead = before.point(before.leader_point_id)
+    assert lead is not None and diag.family_id == lead.candidate.family_id
+    store = EventStore(exp / "events.jsonl")
+    points = store.of_type(EventType.POINT)
+    # one more point, the window's own load; nothing else is measured again
+    assert len(points) == measured + 1
+    assert points[-1].data["result"]["key"]["purpose"] == "diagnose"
+    phases = [e.data["phase"] for e in store.of_type(EventType.PHASE_DONE)]
+    assert phases.count("search") == 1 and phases.count("confirm") == 1
+    assert phases.count("diagnose") == 2 and phases.count("finalize") == 2
+    assert after.leader_point_id == before.leader_point_id
+    assert any("(--redo)" in n.data["text"] for n in store.of_type(EventType.NOTE))
+    # a resumed run gives the peers this runner's code again
+    pushed = (exp / "dry_run_commands.txt").read_text()
+    assert "<push " in pushed
+    report = (exp / "report" / "report.zh-CN.md").read_text()
+    assert "诊断时段（不计入正式结果）" in report
+    # the wall-time split of the captured steps, per role
+    assert diag.capture_steps == 10 and diag.timeline
+    for raw in diag.timeline.values():
+        assert sum(raw["shares"].values()) == pytest.approx(1.0, abs=1e-4)
+        assert raw["step_ms"] > 0 and raw["sample"]
+    assert "一个 forward step 的墙钟时间去向" in report
+    assert "最长的几段空闲" in report
+    assert "其中超出中位耗时的部分" in report and "最长的几次通信 kernel" in report
+    assert "去掉停顿之后的时间去向" in report
+    # the same split drawn: bars per role, then per role every GPU's window,
+    # a stretch of the timeline and one layer of it
+    assert "](figures/fig-diag-steps.svg)" in report
+    for role in diag.timeline:
+        for chart in ("idle", "strip", "zoom"):
+            assert f"](figures/fig-diag-{chart}-{role}.svg)" in report
+    # a second redo reads the window's reports again: no deployment, no load
+    assert _run(tmp_path, "--fake-gpu", "b200", "--diagnose", "--redo", "diagnose") == 0
+    again = _summary(tmp_path).diagnostics
+    assert again is not None and again.kernels == diag.kernels
+    assert again.timeline == diag.timeline
+    assert any("re-analyzed" in n for n in again.notes)
+    # a third one replaces the second one's note instead of adding to it
+    assert _run(tmp_path, "--fake-gpu", "b200", "--diagnose", "--redo", "diagnose") == 0
+    third = _summary(tmp_path).diagnostics
+    assert third is not None and third.notes == again.notes
+    store = EventStore(exp / "events.jsonl")
+    assert len(store.of_type(EventType.POINT)) == measured + 1
+    assert _run(tmp_path, "--fake-gpu", "b200", "--redo", "finalize") == 0
+    assert _summary(tmp_path).diagnostics == again
 
 
 @pytest.mark.parametrize("extra", [(), ("--diagnose",)])
@@ -351,3 +496,35 @@ def test_p_only_and_d_only_dry_runs_give_the_kb_a_pd_split(tmp_path):
     index = (tmp_path / "kb" / "INDEX.md").read_text()
     assert "## PD split from P-Only and D-Only" in index
     assert "`p1` / `d1`" in index and " : 1 |" in index
+
+
+def test_glm_5_3_flash_d_only_checks_its_sglang_hotfix(tmp_path):
+    model_path = "/data/models/GLM-5.3-Flash-NVFP4"
+    assert (
+        _run(
+            tmp_path,
+            "--fake-gpu",
+            "rtx_pro_6000d",
+            "--fake-nodes",
+            "2",
+            "--stage",
+            "d-only",
+            "--model",
+            "glm-5.3-flash",
+            "--checkpoint",
+            "nvfp4-nvidia",
+            "--model-path",
+            model_path,
+            "--hf-endpoint",
+            "https://hf-mirror.com",
+        )
+        == 0
+    )
+    summary = _summary(tmp_path)
+    assert summary.verdict in ("ok", "partial")
+    measured = {f.family_id for f in summary.families if f.status == "measured"}
+    assert measured and measured <= {"d-only-tp4x4", "d-only-tp8x2"}
+    exp = tmp_path / "experiments" / "t1"
+    assert (exp / "preflight" / "sglang_hotfixes.txt").exists()
+    commands = (exp / "dry_run_commands.txt").read_text()
+    assert "sglang_hotfix.py check sm120-tilelang-dsa-v1-one-stage" in commands

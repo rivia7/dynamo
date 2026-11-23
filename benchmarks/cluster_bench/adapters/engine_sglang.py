@@ -21,7 +21,7 @@ from __future__ import annotations
 import math
 import re
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, Mapping
 
 import yaml
 
@@ -43,6 +43,7 @@ from benchmarks.cluster_bench.domain.profiles import (
     drop_flags,
     fit_family,
     merge_config,
+    select_checkpoint,
 )
 from benchmarks.cluster_bench.domain.schema import (
     Candidate,
@@ -349,10 +350,18 @@ class SglangEngine:
         rendered: dict[str, dict[str, Any]] = {}
         ranks_per_node = self._hicache_ranks(placements)
 
+        _, checkpoint = select_checkpoint(model, gpu, config.checkpoint)
         for gidx, placement in enumerate(placements):
             role = placement.role
             cfg, args, env = self._role_config(
-                candidate, role, model, deployment, model_dir, rungs, family.stage
+                candidate,
+                role,
+                model,
+                deployment,
+                model_dir,
+                rungs,
+                family.stage,
+                checkpoint.sglang,
             )
             leader_node, _ = placement.ranks[0]
             leader_addr = inventory.node(leader_node).address
@@ -526,9 +535,12 @@ class SglangEngine:
         model_dir: str,
         rungs: dict[str, LadderRung],
         stage: Stage = "e2e",
+        checkpoint_sglang: Mapping[str, Any] | None = None,
     ) -> tuple[dict[str, Any], tuple[str, ...], dict[str, str]]:
         cfg: dict[str, Any] = self.recipes.config(role.base) if role.base else {}
         cfg = merge_config(cfg, role.sglang)
+        # What the served checkpoint needs (e.g. its quantization method).
+        cfg = merge_config(cfg, checkpoint_sglang or {})
         cfg.update(
             {
                 "model-path": model_dir,

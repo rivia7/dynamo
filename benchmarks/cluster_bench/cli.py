@@ -56,9 +56,9 @@ from benchmarks.cluster_bench.app.phases.planned import (
 from benchmarks.cluster_bench.app.phases.preflight import (
     PreflightPhase,
     collect_family_flags,
-    restore,
+    resume,
 )
-from benchmarks.cluster_bench.app.pipeline import Pipeline
+from benchmarks.cluster_bench.app.pipeline import Pipeline, rerun_phases
 from benchmarks.cluster_bench.app.simulate import (
     SimClock,
     Simulator,
@@ -174,12 +174,33 @@ def _add_run_args(p: argparse.ArgumentParser) -> None:
     p.add_argument(
         "--gpu-profile",
         default=None,
-        help="override GPU auto-detection (b200, b300, h200, h100, rtx_pro_6000)",
+        help="override GPU auto-detection (b200, b300, h200, h100, rtx_pro_6000, "
+        "rtx_pro_6000d)",
     )
     p.add_argument(
         "--model-root",
         default=None,
         help="local directory for weights (default: largest local disk)",
+    )
+    p.add_argument(
+        "--model-path",
+        default=None,
+        help="weights already at this absolute path on every node (the same "
+        "path everywhere): no Hugging Face download; the copies must match in "
+        "file names and sizes. Pin --model-revision to record their commit",
+    )
+    p.add_argument(
+        "--checkpoint",
+        default=None,
+        help="checkpoint variant of the tuned model profile, e.g. nvfp4-nvidia "
+        "(default: the GPU profile's weights variant)",
+    )
+    p.add_argument(
+        "--hf-endpoint",
+        default=None,
+        help="Hugging Face endpoint (HF_ENDPOINT) for node-side downloads, i.e. "
+        "model files and the AIPerf dataset; e.g. https://hf-mirror.com where "
+        "huggingface.co is unreachable",
     )
     p.add_argument("--budget-hours", type=float, default=9.5)
     p.add_argument(
@@ -285,6 +306,15 @@ def _add_run_args(p: argparse.ArgumentParser) -> None:
     )
     p.add_argument("--frontend-port", type=int, default=8000)
     p.add_argument("--only", default="", help="debug: run only these phases")
+    p.add_argument(
+        "--redo",
+        default="",
+        help="run these phases of a finished experiment again, with every "
+        "phase after them: 'diagnose' adds the diagnostic window (with the "
+        "--diagnose options given now) to a run that had none, or summarizes "
+        "the reports of its window again (no new capture); 'finalize' "
+        "rebuilds its summary, report and KB export",
+    )
     p.add_argument("--log-level", default="INFO")
 
 
@@ -309,6 +339,15 @@ def _config(args: argparse.Namespace, dry_run: bool) -> RunConfig:
         check_extra_args(aiperf_args)
     except ValueError as exc:
         raise SystemExit(f"cluster_bench: {exc}") from exc
+    if args.model_path and not args.model_path.startswith("/"):
+        raise SystemExit("cluster_bench: --model-path must be an absolute path")
+    if args.hf_endpoint and not args.hf_endpoint.startswith(("http://", "https://")):
+        raise SystemExit("cluster_bench: --hf-endpoint must be an http(s) URL")
+    if args.checkpoint and args.model_repo:
+        raise SystemExit(
+            "cluster_bench: --checkpoint picks a tuned profile's checkpoint; "
+            "--model-repo already names the weights"
+        )
     prefix = f"{STAGE_PREFIX[stage]}-" if STAGE_PREFIX[stage] else ""
     return RunConfig(
         exp_id=args.exp_id or time.strftime(f"cb-{prefix}%Y%m%d-%H%M%S"),
@@ -321,6 +360,9 @@ def _config(args: argparse.Namespace, dry_run: bool) -> RunConfig:
         image=args.image,
         workdir=args.workdir,
         model_root=args.model_root,
+        model_path=(args.model_path.rstrip("/") or "/") if args.model_path else None,
+        checkpoint=args.checkpoint,
+        hf_endpoint=args.hf_endpoint.rstrip("/") if args.hf_endpoint else None,
         budget=BudgetConfig(total_hours=args.budget_hours),
         families=_csv(args.families),
         nic_counts=tuple(int(n) for n in _csv(args.nic_counts)),
@@ -365,12 +407,32 @@ def _config(args: argparse.Namespace, dry_run: bool) -> RunConfig:
     )
 
 
-def _resume_config(store: EventStore, fresh: RunConfig) -> RunConfig:
-    """A resumed experiment keeps its original configuration."""
+def _resume_config(
+    store: EventStore, fresh: RunConfig, redo: tuple[str, ...] = ()
+) -> RunConfig:
+    """A resumed experiment keeps its original configuration; ``--redo
+    diagnose`` takes the diagnostic window's options given now."""
     starts = store.of_type(EventType.RUN_START)
     if not starts:
+        if redo:
+            raise SystemExit(
+                f"cluster_bench: --redo needs a finished experiment; {fresh.exp_id} "
+                "has not run"
+            )
         return fresh
     original = RunConfig.model_validate(starts[0].data["config"])
+    if "diagnose" in redo:
+        if not fresh.diagnose.enabled:
+            raise SystemExit("cluster_bench: --redo diagnose needs --diagnose")
+        original = original.model_copy(
+            update={
+                "diagnose": fresh.diagnose,
+                "bench_specs": {
+                    **original.bench_specs,
+                    "diagnose": fresh.bench_specs["diagnose"],
+                },
+            }
+        )
     if original.model_dump(exclude={"exp_id"}) != fresh.model_dump(exclude={"exp_id"}):
         logger.warning(
             "resuming %s with its original configuration; new CLI options are ignored",
@@ -424,12 +486,17 @@ def cmd_run(args: argparse.Namespace, dry_run: bool = False) -> int:
         level=args.log_level, format="%(asctime)s %(levelname)s %(name)s: %(message)s"
     )
     fresh = _config(args, dry_run)
+    redo = _csv(args.redo)
+    try:
+        rerun_phases(redo)
+    except ValueError as exc:
+        raise SystemExit(f"cluster_bench: --redo: {exc}") from exc
     exp_dir = Path(fresh.workdir) / "experiments" / fresh.exp_id
     redactor = Redactor.from_env()
     if dry_run:
         clock = SimClock()
         store = EventStore(exp_dir / "events.jsonl", now=clock.now)
-        config = _resume_config(store, fresh)
+        config = _resume_config(store, fresh, redo)
         gpu_name = args.fake_gpu
         inventory = synthetic_inventory(gpu_name, nodes=args.fake_nodes)
         gpu = profile_store.load_gpu_profiles()[gpu_name]
@@ -451,7 +518,7 @@ def cmd_run(args: argparse.Namespace, dry_run: bool = False) -> int:
     else:
         clock = SystemClock()
         store = EventStore(exp_dir / "events.jsonl", now=clock.now)
-        config = _resume_config(store, fresh)
+        config = _resume_config(store, fresh, redo)
         nodes = _real_nodes(args)
         cluster = ClusterExecutor.from_addresses(nodes, exp_dir / ".ssh", redactor)
         simulator = None
@@ -470,7 +537,7 @@ def cmd_run(args: argparse.Namespace, dry_run: bool = False) -> int:
     if simulator is not None:
         simulator.help_text = lambda: _simulated_help(ctx)
     print(f"experiment: {config.exp_id}  dir: {exp_dir}", flush=True)
-    rc = Pipeline(ctx, _phases(), restore).run(only=_csv(args.only))
+    rc = Pipeline(ctx, _phases(), resume).run(only=_csv(args.only), redo=redo)
     if dry_run:
         dump = exp_dir / "dry_run_commands.txt"
         dump.write_text(

@@ -43,6 +43,8 @@ from benchmarks.cluster_bench.adapters.hf_fetch import (
     download_stdin,
     glob_escape,
     list_repo_files,
+    local_copy_problems,
+    local_file_sizes,
     marker_matches,
     model_dir_for,
     parse_completion_probe,
@@ -58,6 +60,7 @@ from benchmarks.cluster_bench.adapters.hf_fetch import (
 from benchmarks.cluster_bench.adapters.microbench import (
     DEFAULT_PORT_BASE,
     GATHER_SCRIPT,
+    TORCHRUN,
     rendezvous_port,
 )
 from benchmarks.cluster_bench.ports import CommandResult
@@ -84,6 +87,7 @@ class FakeApi:
     def __init__(self, info: ModelInfo):
         self.info = info
         self.calls: list[dict] = []
+        self.endpoints: list[str | None] = []  # HfApi(endpoint=...) per call
 
     def model_info(self, repo_id, *, revision=None, files_metadata=False, token=None):
         self.calls.append(
@@ -99,7 +103,12 @@ class FakeApi:
 
 def install_api(monkeypatch, info: ModelInfo) -> FakeApi:
     api = FakeApi(info)
-    monkeypatch.setattr(hf_fetch, "HfApi", lambda: api)
+
+    def make_api(endpoint=None):
+        api.endpoints.append(endpoint)
+        return api
+
+    monkeypatch.setattr(hf_fetch, "HfApi", make_api)
     return api
 
 
@@ -585,6 +594,73 @@ def test_download_script_background_detaches_and_writes_status(tmp_path):
 # --------------------------------------------------------------------------
 
 
+def test_list_repo_files_asks_the_given_endpoint(monkeypatch):
+    api = install_api(monkeypatch, glm_info())
+    list_repo_files("zai-org/GLM-5.3", "main", "", "https://hf-mirror.com")
+    list_repo_files("zai-org/GLM-5.3", "main", "")
+    assert api.endpoints == ["https://hf-mirror.com", None]
+
+
+def test_downloads_use_the_hf_endpoint(monkeypatch):
+    api = install_api(monkeypatch, tiny_info())
+    plan = tiny_plan()
+    model_dir = model_dir_for("/root/models", "org/tiny-model", COMMIT)
+    rec, _ = make_cluster(plan, model_dir)
+    fetcher(rec, hf_endpoint="https://hf-mirror.com").fetch(
+        "org/tiny-model", "main", model_dir, NODES, TOKEN, IMAGE
+    )
+    assert set(api.endpoints) == {"https://hf-mirror.com"}
+    launches = [c for c in rec.commands if "HF_XET_HIGH_PERFORMANCE=1" in c.command]
+    assert launches
+    assert all("HF_ENDPOINT=https://hf-mirror.com" in c.command for c in launches)
+
+
+def test_local_file_sizes_skip_the_marker_and_hub_metadata():
+    listing = "\n".join(
+        [
+            "10\tconfig.json",
+            f"5\t{MARKER_NAME}",
+            "7\t.cache/huggingface/download/config.json.metadata",
+            "100\tmodel-00001-of-00002.safetensors",
+        ]
+    )
+    stdout = f"\n{FILES_SEPARATOR}\n{listing}\n"
+    assert local_file_sizes(stdout) == {
+        "config.json": 10,
+        "model-00001-of-00002.safetensors": 100,
+    }
+    assert local_file_sizes("ls: cannot access") is None
+
+
+def test_local_copies_must_match_node0():
+    shards = ["model-00001-of-00002.safetensors", "model-00002-of-00002.safetensors"]
+    ref = {"config.json": 10, shards[0]: 100, shards[1]: 200}
+    assert (
+        local_copy_problems({"node0": ref, "node1": dict(ref)}, "node0", shards) == []
+    )
+    torn = {"config.json": 10, shards[1]: 150, f"{shards[1]}.aria2": 1}
+    problems = local_copy_problems(
+        {"node0": ref, "node1": torn, "node2": None},
+        "node0",
+        [*shards, "model-00003-of-00003.safetensors"],
+        "/data/m",
+    )
+    assert problems == [
+        "node0: model-00003-of-00003.safetensors is in the safetensors index but missing",
+        f"node1: {shards[1]}.aria2 looks like an unfinished download",
+        f"node1: {shards[0]} is missing (node0 has 100 bytes)",
+        f"node1: {shards[1]} is 150 bytes, node0 has 200",
+        f"node1: {shards[1]}.aria2 (1 bytes) is not on node0",
+        "node2: /data/m is missing or unreadable",
+    ]
+    assert local_copy_problems({"node0": {}}, "node0") == [
+        "node0: the model directory is missing, empty or unreadable"
+    ]
+    assert local_copy_problems({"node0": {shards[0]: 1}}, "node0") == [
+        "node0: no config.json in the model directory"
+    ]
+
+
 def test_fetch_runs_every_step_and_never_exposes_the_token(monkeypatch):
     install_api(monkeypatch, tiny_info())
     plan = tiny_plan()
@@ -625,8 +701,8 @@ def test_fetch_runs_every_step_and_never_exposes_the_token(monkeypatch):
         assert argv[:3] == ["docker", "run", "--rm"] and "-d" not in argv
         assert argv[argv.index("--gpus") + 1] == "'\"device=0\"'"
         inner = argv[argv.index(IMAGE) + 1 :]
-        assert inner[:9] == [
-            "torchrun",
+        assert inner[:11] == [
+            *TORCHRUN,
             "--nnodes",
             "4",
             "--node-rank",

@@ -63,7 +63,9 @@ def test_decode_requests_get_the_fake_bootstrap() -> None:
     assert collect(prefill.generate({"token_ids": [1]}, None)) == [{"token_ids": [1]}]
 
 
-def test_decode_workers_register_without_a_prefill_peer() -> None:
+def test_decode_workers_register_with_only_a_decode_peer() -> None:
+    # Dynamo 1.6.2 refuses needs=[] on a Decode worker; [[Decode]] is met by
+    # the worker itself, so no prefill peer is waited for.
     module = init_module()
     shim.install(type("H", (Handler,), {}), module, "decode", "Decode", FAKE_HOST)
     asyncio.run(
@@ -77,7 +79,7 @@ def test_decode_workers_register_without_a_prefill_peer() -> None:
         )
     )
     assert module.seen == [
-        {"worker_type": "Decode", "needs": []},
+        {"worker_type": "Decode", "needs": [["Decode"]]},
         {"worker_type": "Prefill", "needs": ["x"]},
     ]
 

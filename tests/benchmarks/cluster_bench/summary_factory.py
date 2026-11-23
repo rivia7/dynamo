@@ -291,8 +291,10 @@ def disagg_bandwidth(load: float) -> tuple[BandwidthStat, ...]:
     )
 
 
-def point_mfu(point: PointResult, tensor: float | None = None) -> MfuResult | None:
-    """MFU of an aggregated point from its request counts (as ``point_mfu``)."""
+def point_mfu(
+    point: PointResult, tensor: float | None = None, dram: float | None = None
+) -> MfuResult | None:
+    """MFU and MBU of an aggregated point (as ``point_mfu``): requests and GPM."""
     m = point.metrics
     if m is None or not m.duration_s or not m.request_count:
         return None
@@ -307,6 +309,8 @@ def point_mfu(point: PointResult, tensor: float | None = None) -> MfuResult | No
         precision="fp8",
         peak_tflops=H200_PROFILE.peak_dense_tflops["fp8"],
         tensor_active={"agg": tensor} if tensor is not None else {},
+        dram_active={"agg": dram} if dram is not None else {},
+        peak_mem_tbs=H200_PROFILE.hbm_tbs,
         cache_source="usage",
     )
 
@@ -435,7 +439,9 @@ def h200_points(scale: float = 1.0) -> dict[str, PointResult]:
         )
         point = pts[f"agg-{c}"]
         tensor = round(0.08 + 0.0009 * c, 3) if c >= 128 else None
-        pts[f"agg-{c}"] = point.model_copy(update={"mfu": point_mfu(point, tensor)})
+        dram = round(0.35 + 0.0012 * c, 3) if c >= 128 else None
+        mfu = point_mfu(point, tensor, dram)
+        pts[f"agg-{c}"] = point.model_copy(update={"mfu": mfu})
     for c, tps, user, cross in DIS_CURVE:
         status = "valid_with_recovery" if c == 512 else "valid"
         reasons = ("worker restart recovered; 2 requests retried",) if c == 512 else ()

@@ -372,7 +372,7 @@ def _decide_family(
         return CloseFamily(
             family.id,
             "pruned",
-            f"no valid measurement ({'; '.join(last.audit.reasons)[:200]})",
+            f"no valid measurement ({'; '.join(last.audit.reasons)[:400]})",
         )
 
     best = max(valid, key=lambda p: p.tps_per_gpu or 0.0)

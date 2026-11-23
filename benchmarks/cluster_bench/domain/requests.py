@@ -139,7 +139,7 @@ class RequestSummary(Frozen):
     finished: int = 0  # without error
     errors: int = 0
     cancelled: int = 0
-    window_s: float | None = None
+    window_s: float | None = None  # what the rates divide by (summarize_requests)
     tiers: tuple[GoodputTier, ...] = ()
     turns: tuple[TurnBucket, ...] = ()
     sessions: SessionStats | None = None
@@ -373,6 +373,7 @@ def summarize_requests(
     gpus: int,
     tiers: Sequence[SloTier] | None = None,
     window: tuple[float, float] | None = None,
+    duration_s: float | None = None,
     cancelled: int = 0,
     unreadable: int = 0,
     arch: ModelArch | None = None,
@@ -380,8 +381,11 @@ def summarize_requests(
 ) -> RequestSummary:
     """Goodput tiers, turn profile, sessions and workload of one point's records.
 
-    ``window`` (unix seconds) is the measurement window; without it the span
-    from the first request start to the last request end is used. With
+    Rates divide by ``duration_s``, the time AIPerf divides its own throughputs
+    by (the profiling phase, grace period included), so goodput never exceeds
+    the throughput it is compared with. Without it they divide by ``window``
+    (unix seconds), else by the span from the first request start to the last
+    request end. With
     ``arch`` the model FLOPs of the uncached prompt tokens and of the
     generated tokens are summed; cached prompt tokens come from the
     per-request usage, else from the server-side ``cached_fraction``.
@@ -391,8 +395,10 @@ def summarize_requests(
         notes.append(f"{unreadable} unreadable record line(s) skipped")
     if not records:
         return RequestSummary(cancelled=cancelled, notes=tuple(notes))
-    if window is not None and window[1] > window[0]:
-        window_s: float | None = window[1] - window[0]
+    if duration_s is not None and duration_s > 0:
+        window_s: float | None = duration_s
+    elif window is not None and window[1] > window[0]:
+        window_s = window[1] - window[0]
     else:
         span = (max(r.end_ns for r in records) - min(r.start_ns for r in records)) / 1e9
         window_s = span if span > 0 else None

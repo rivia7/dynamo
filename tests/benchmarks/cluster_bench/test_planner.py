@@ -161,7 +161,7 @@ def test_kernel_failure_walks_ladder_then_marks_unsupported():
         detail="no kernel image",
     )
     nxt = search.decide_search(ctx, search.History(deploys=(failed,)), BIG)
-    assert nxt.candidate.rungs == ("sm120-dsa-tilelang",)
+    assert nxt.candidate.rungs == ("sm120-dsa-tilelang-bf16-kv",)
     deploys = [failed]
     cand = base
     for rung in [r.id for r in dep.ladder if r.when == "kernel_unsupported"]:
@@ -177,9 +177,9 @@ def test_kernel_failure_walks_ladder_then_marks_unsupported():
 
 def test_kernel_rungs_found_once_are_inherited():
     ctx = _ctx("rtx_pro_6000")
-    smoke = Candidate(family_id="agg-dtp8@smoke", rungs=("sm120-dsa-tilelang",))
+    smoke = Candidate(family_id="agg-dtp8@smoke", rungs=("sm120-dsa-tilelang-bf16-kv",))
     action = search.decide_search(ctx, search.History(deploys=(ok_deploy(smoke),)), BIG)
-    assert action.candidate.rungs == ("sm120-dsa-tilelang",)
+    assert action.candidate.rungs == ("sm120-dsa-tilelang-bf16-kv",)
 
 
 def test_budget_skips_family():

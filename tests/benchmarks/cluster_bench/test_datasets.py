@@ -4,12 +4,16 @@
 
 from __future__ import annotations
 
+import os
 import shlex
+import subprocess
+import time
 from typing import Any
 
 import pytest
 
 from benchmarks.cluster_bench.adapters import aiperf
+from benchmarks.cluster_bench.app.phases.download import prefetch_dataset_command
 from benchmarks.cluster_bench.domain.datasets import (
     DEFAULT_DATASET,
     DatasetError,
@@ -32,6 +36,47 @@ COMMON: dict[str, Any] = dict(
     cpu_count=64,
     hf_home="/w/hf",
 )
+
+
+def test_hf_endpoint_reaches_aiperf_and_the_dataset_prefetch():
+    dataset = parse_dataset(DEFAULT_DATASET)
+    mirror = "https://hf-mirror.com"
+    cmd = aiperf.build_profile_command(dataset=dataset, hf_endpoint=mirror, **COMMON)
+    assert f"HF_ENDPOINT={mirror}" in cmd
+    assert "HF_ENDPOINT" not in aiperf.build_profile_command(dataset=dataset, **COMMON)
+    prefetch = prefetch_dataset_command(
+        "org/ds",
+        python="/v/bin/python",
+        hf_home="/w/hf",
+        log_dir="/w/exp/download",
+        hf_endpoint=mirror,
+    )
+    lexer = shlex.shlex(prefetch, posix=True, punctuation_chars=True)
+    lexer.whitespace_split = True
+    argv = list(lexer)
+    assert f"HF_ENDPOINT={mirror}" in argv and "HF_HOME=/w/hf" in argv
+    assert "repo_id='org/ds'" in argv[argv.index("-c") + 1]
+    plain = prefetch_dataset_command("org/ds", python="p", hf_home="h", log_dir="/l")
+    assert "HF_ENDPOINT" not in plain
+
+
+def test_dataset_prefetch_returns_while_the_download_runs(tmp_path):
+    # Stand-ins: a "python" that downloads for 3 s, and setsid (absent on macOS).
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    for name, body in (("setsid", 'exec "$@"'), ("python", "sleep 3")):
+        (bin_dir / name).write_text(f"#!/bin/sh\n{body}\n")
+        (bin_dir / name).chmod(0o755)
+    cmd = prefetch_dataset_command(
+        "org/ds",
+        python=str(bin_dir / "python"),
+        hf_home=str(tmp_path / "hf"),
+        log_dir=str(tmp_path / "download"),
+    )
+    env = {**os.environ, "PATH": f"{bin_dir}:{os.environ['PATH']}"}
+    started = time.monotonic()
+    subprocess.run(["bash", "-c", cmd], capture_output=True, env=env, check=True)
+    assert time.monotonic() - started < 2, "the caller waited for the download"
 
 
 def argv_of(dataset: str, **kwargs: Any) -> list[str]:

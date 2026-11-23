@@ -176,6 +176,11 @@ class RunRecord(KbRecord):
     mfu_decode: float | None = None
     achieved_tflops_per_gpu: float | None = None
     mfu_precision: str | None = None
+    # Memory bandwidth utilization, measured (NVML GPM DRAM bandwidth).
+    mbu_total: float | None = None
+    mbu_prefill: float | None = None
+    mbu_decode: float | None = None
+    achieved_mem_tbs_per_gpu: float | None = None
 
 
 class PeakRecord(KbRecord):
@@ -466,6 +471,11 @@ class ExperimentRecord(KbRecord):
     leader_tflops_per_gpu: float | None = None
     mfu_precision: str | None = None
     peak_tflops_per_gpu: float | None = None
+    leader_mbu_total: float | None = None
+    leader_mbu_prefill: float | None = None
+    leader_mbu_decode: float | None = None
+    leader_mem_tbs_per_gpu: float | None = None
+    peak_mem_tbs_per_gpu: float | None = None
     kv_total_tokens: int | None = None
     kv_max_request_tokens: int | None = None
     kv_context_p50: float | None = None
@@ -673,10 +683,13 @@ def _point_extras(point: PointResult) -> dict[str, Any]:
         out["mfu_total"] = _round(m.total_mfu, 5)
         out["achieved_tflops_per_gpu"] = _round(m.total_tflops_per_gpu, 3)
         out["mfu_precision"] = m.precision
+        out["mbu_total"] = _round(m.total_mbu, 4)
+        out["achieved_mem_tbs_per_gpu"] = _round(m.total_mem_tbs_per_gpu, 4)
         for role in ("prefill", "decode"):
             r = m.role(role)
             if r is not None:
                 out[f"mfu_{role}"] = _round(r.mfu, 5)
+                out[f"mbu_{role}"] = _round(r.mbu, 4)
     state = point.state
     if state is not None:
         role = _serving_role(state)
@@ -1102,6 +1115,15 @@ def _resources_extras(
             leader_tflops_per_gpu=_round(m.total_tflops_per_gpu, 3),
             mfu_precision=m.precision,
             peak_tflops_per_gpu=m.peak_tflops_per_gpu,
+            leader_mbu_total=_round(m.total_mbu, 4),
+            leader_mbu_prefill=_round(m.role("prefill").mbu, 4)
+            if m.role("prefill")
+            else None,
+            leader_mbu_decode=_round(m.role("decode").mbu, 4)
+            if m.role("decode")
+            else None,
+            leader_mem_tbs_per_gpu=_round(m.total_mem_tbs_per_gpu, 4),
+            peak_mem_tbs_per_gpu=m.peak_mem_tbs_per_gpu,
         )
     kv = summary.kv_capacity
     if kv is not None:

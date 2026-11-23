@@ -25,7 +25,7 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass
-from typing import Sequence
+from typing import Callable, Sequence
 
 from benchmarks.cluster_bench.report.doc import esc
 
@@ -95,6 +95,42 @@ class Bar:
     value_label: str = ""
     tip: str = ""
     muted: bool = False
+
+
+@dataclass(frozen=True)
+class Stack:
+    """One stacked horizontal bar: ``values[i]`` belongs to part ``i``."""
+
+    label: str
+    values: tuple[float | None, ...]
+    tips: tuple[str, ...] = ()
+    note: str = ""  # after the bar's end, e.g. its total
+
+
+@dataclass(frozen=True)
+class HeatRow:
+    """One row of cells on a shared axis: ``values`` (0..1) shade cells
+    ``cell`` wide from ``offset`` on; ``marks`` are (start, end, tip) drawn
+    on top of them."""
+
+    label: str
+    offset: float
+    cell: float
+    values: tuple[float, ...]
+    marks: tuple[tuple[float, float, str], ...] = ()
+
+
+@dataclass(frozen=True)
+class LaneSpan:
+    """A stretch of one part on a lane, filling ``lo``..``hi`` of its height
+    (0 is the bottom)."""
+
+    start: float
+    end: float
+    part: int
+    lo: float = 0.0
+    hi: float = 1.0
+    tip: str = ""
 
 
 # --------------------------------------------------------------------------
@@ -277,6 +313,68 @@ def _bar_path(x0: float, x1: float, y: float, h: float) -> str:
         f"V{_f(y + h - r)}Q{_f(x1)},{_f(y + h)} {_f(x1 - r)},{_f(y + h)}"
         f"H{_f(x0)}Z"
     )
+
+
+def _rect_path(x0: float, x1: float, y: float, h: float) -> str:
+    return f"M{_f(x0)},{_f(y)}H{_f(x1)}V{_f(y + h)}H{_f(x0)}Z"
+
+
+Paint = tuple[str, str, float]  # (class, light colour, opacity)
+
+
+def _part_paint(
+    count: int, muted: Sequence[int] = (), faded: Sequence[int] = ()
+) -> list[Paint]:
+    """The paint of each part: the categorical slots in order, the neutral
+    gray for ``muted`` parts; a ``faded`` part is the part before it at a
+    lighter opacity (a second step of that series, not another hue)."""
+    paints: list[Paint] = []
+    slot = -1
+    for index in range(count):
+        if index in muted:
+            paints.append(("mut", MUTED[0], 1.0))
+        elif index in faded and slot >= 0:
+            paints.append((f"s{slot + 1}", SERIES[slot][0], 0.45))
+        else:
+            slot += 1
+            if slot >= MAX_SERIES:
+                raise ValueError(f"more than {MAX_SERIES} coloured parts")
+            paints.append((f"s{slot + 1}", SERIES[slot][0], 1.0))
+    return paints
+
+
+def _paint_attrs(paint: Paint) -> str:
+    cls, color, opacity = paint
+    faded = f' fill-opacity="{_f(opacity)}"' if opacity < 1 else ""
+    return f'class="mk {cls}" fill="{color}"{faded}'
+
+
+def _swatches(
+    names: Sequence[str], paints: Sequence[Paint], x0: float, x1: float, y: float
+) -> tuple[str, int]:
+    """A legend of filled swatches, left to right, wrapping rows; returns
+    (svg, rows)."""
+    if len(names) < 2:
+        return "", 0
+    parts: list[str] = []
+    cx, row = x0, 0
+    for name, paint in zip(names, paints):
+        item_w = 26 + text_width(name, LABEL_FS) + 18
+        if cx + item_w > x1 and cx > x0:
+            cx, row = x0, row + 1
+        cy = y + row * 20
+        parts.append(
+            f'<rect {_paint_attrs(paint)} x="{_f(cx + 4)}" y="{_f(cy - 6)}" '
+            'width="12" height="12" rx="3"/>'
+        )
+        parts.append(_text(cx + 26, cy + 4, name, size=LABEL_FS, tone="tx1"))
+        cx += item_w
+    return "".join(parts), row + 1
+
+
+def _titled(tip: str, body: str, cls: str = "bar") -> str:
+    title = f"<title>{esc(tip)}</title>" if tip else ""
+    return f'<g class="{cls}">{title}{body}</g>'
 
 
 # --------------------------------------------------------------------------
@@ -544,6 +642,338 @@ def grouped_bar_chart(
     return "".join(parts)
 
 
+def stacked_hbar_chart(
+    chart_id: str,
+    parts: Sequence[str],
+    stacks: Sequence[Stack],
+    *,
+    title: str,
+    x_label: str,
+    muted: Sequence[int] = (),
+    faded: Sequence[int] = (),
+    digits: int = 1,
+    empty_text: str = "",
+    width: float = 720.0,
+) -> str:
+    """Horizontal stacked bars on one baseline: a bar's parts run left to
+    right in ``parts`` order with a 2px surface gap between them, and only
+    the bar's end is rounded. A part wide enough for its value carries it
+    under the bar; a stack's ``note`` follows the bar's end."""
+    totals = [sum(v for v in st.values if v is not None and v > 0) for st in stacks]
+    if not stacks or not parts or not any(t > 0 for t in totals):
+        return _empty(chart_id, title, empty_text, width)
+    paints = _part_paint(len(parts), muted, faded)
+    row_h, thick = 44.0, 18.0
+    label_w = max(text_width(st.label, LABEL_FS) for st in stacks)
+    note_w = max((text_width(st.note, TICK_FS) for st in stacks if st.note), default=0)
+    x0 = 12 + label_w + 12
+    x1 = width - 16 - (note_w + 8 if note_w else 0)
+    legend_svg, rows = _swatches(parts, paints, 12, width - 16, 14)
+    top = 14 + rows * 20 + (6 if rows else 0)
+    y_end = top + row_h * len(stacks)
+    height = y_end + 46
+    ticks = nice_ticks(0.0, max(totals))
+    x_max = ticks[-1]
+
+    def sx(v: float) -> float:
+        return x0 + max(v, 0.0) / x_max * (x1 - x0)
+
+    out = _open(chart_id, title, width, height)
+    out.append(legend_svg)
+    for t in ticks:
+        out.append(_line(sx(t), top, sx(t), y_end, "axis" if t == 0 else "grid"))
+        out.append(_text(sx(t), y_end + 16, tick_label(t, ticks), anchor="middle"))
+    for index, (stack, total) in enumerate(zip(stacks, totals)):
+        y = top + row_h * index + 6
+        out.append(
+            _text(
+                x0 - 8,
+                y + thick / 2 + 4,
+                stack.label,
+                size=LABEL_FS,
+                anchor="end",
+                tone="tx1",
+            )
+        )
+        drawn = [
+            (i, v)
+            for i, v in enumerate(stack.values[: len(parts)])
+            if v is not None and v > 0
+        ]
+        acc = 0.0
+        for n, (i, v) in enumerate(drawn):
+            a, b = sx(acc), sx(acc + v)
+            acc += v
+            last = n == len(drawn) - 1
+            right = b if last else max(a + 0.5, b - 2.0)
+            path = (
+                _bar_path(a, right, y, thick)
+                if last
+                else _rect_path(a, right, y, thick)
+            )
+            tip = stack.tips[i] if i < len(stack.tips) else ""
+            out.append(_titled(tip, f'<path {_paint_attrs(paints[i])} d="{path}"/>'))
+            text = f"{v:.{digits}f}"
+            if right - a >= text_width(text, TICK_FS) + 6:
+                out.append(
+                    _text((a + right) / 2, y + thick + 13, text, anchor="middle")
+                )
+        if stack.note:
+            out.append(_text(sx(total) + 6, y + thick / 2 + 4, stack.note))
+    out.append(
+        _text((x0 + x1) / 2, height - 10, x_label, size=LABEL_FS, anchor="middle")
+    )
+    out.append("</svg>")
+    return "".join(out)
+
+
+def heat_rows_chart(
+    chart_id: str,
+    rows: Sequence[HeatRow],
+    *,
+    title: str,
+    x_label: str,
+    shade_name: str,
+    mark_name: str = "",
+    tip: Callable[[str, float, float, float], str] | None = None,
+    levels: int = 10,
+    empty_text: str = "",
+    width: float = 720.0,
+) -> str:
+    """Rows of cells on one axis, each shaded by its value in one gray, light
+    to dark (``levels`` steps; equal neighbours merge into one rect and zero
+    leaves the row's light band showing), with marks in the first series
+    colour on top. ``tip(row label, start, end, mean value)`` titles a cell
+    run."""
+    usable = [r for r in rows if r.values and r.cell > 0]
+    if not usable:
+        return _empty(chart_id, title, empty_text, width)
+    row_h, cell_h = 16.0, 12.0
+    label_w = max(text_width(r.label, TICK_FS) for r in usable)
+    x0 = 12 + label_w + 10
+    x1 = width - 16
+    ticks = nice_ticks(0.0, max(r.offset + r.cell * len(r.values) for r in usable))
+    x_max = ticks[-1]
+
+    def sx(v: float) -> float:
+        return x0 + min(max(v, 0.0), x_max) / x_max * (x1 - x0)
+
+    names: list[str] = [shade_name]
+    paints: list[Paint] = [("heat", INK2[0], 0.6)]
+    if mark_name:
+        names.append(mark_name)
+        paints.append(("s1", SERIES[0][0], 1.0))
+    legend_svg, legend_rows = _swatches(names, paints, 12, x1, 14)
+    top = 14 + legend_rows * 20 + (6 if legend_rows else 0)
+    y_end = top + row_h * len(usable)
+    height = y_end + 46
+    out = _open(chart_id, title, width, height)
+    out.append(legend_svg)
+    for t in ticks:
+        out.append(_line(sx(t), top, sx(t), y_end, "axis" if t == 0 else "grid"))
+        out.append(_text(sx(t), y_end + 16, tick_label(t, ticks), anchor="middle"))
+    for index, row in enumerate(usable):
+        y = top + row_h * index + (row_h - cell_h) / 2
+        out.append(_text(x0 - 6, y + cell_h - 2, row.label, anchor="end", tone="tx1"))
+        end = row.offset + row.cell * len(row.values)
+        out.append(
+            f'<rect class="band" x="{_f(sx(row.offset))}" y="{_f(y)}" '
+            f'width="{_f(max(sx(end) - sx(row.offset), 0.5))}" '
+            f'height="{_f(cell_h)}" fill="{GRID[0]}"/>'
+        )
+        steps = [round(min(max(v, 0.0), 1.0) * levels) / levels for v in row.values]
+        i = 0
+        while i < len(steps):
+            j = i
+            while j + 1 < len(steps) and steps[j + 1] == steps[i]:
+                j += 1
+            if steps[i] > 0:
+                a = row.offset + row.cell * i
+                b = row.offset + row.cell * (j + 1)
+                run = [min(max(v, 0.0), 1.0) for v in row.values[i : j + 1]]
+                mean = sum(run) / len(run)
+                body = (
+                    f'<rect class="heat" x="{_f(sx(a))}" y="{_f(y)}" '
+                    f'width="{_f(max(sx(b) - sx(a), 0.5))}" height="{_f(cell_h)}" '
+                    f'fill="{INK2[0]}" fill-opacity="{_f(steps[i])}"/>'
+                )
+                out.append(
+                    _titled(tip(row.label, a, b, mean) if tip else "", body, "pt")
+                )
+            i = j + 1
+        for a, b, mark_tip in row.marks:
+            body = (
+                f'<rect class="mk s1" x="{_f(sx(a))}" y="{_f(y + cell_h * 0.3)}" '
+                f'width="{_f(max(sx(b) - sx(a), 1.5))}" height="{_f(cell_h * 0.4)}" '
+                f'fill="{SERIES[0][0]}"/>'
+            )
+            out.append(_titled(mark_tip, body))
+    out.append(
+        _text((x0 + x1) / 2, height - 10, x_label, size=LABEL_FS, anchor="middle")
+    )
+    out.append("</svg>")
+    return "".join(out)
+
+
+def lane_chart(
+    chart_id: str,
+    parts: Sequence[str],
+    spans: Sequence[LaneSpan],
+    length: float,
+    *,
+    title: str,
+    x_label: str,
+    muted: Sequence[int] = (),
+    empty_text: str = "",
+    width: float = 720.0,
+    lane_h: float = 40.0,
+) -> str:
+    """One lane along 0..``length``: each span fills ``lo``..``hi`` of the
+    lane's height in its part's colour. No gaps are added: a lane is a
+    timeline, and blank is time with nothing on it. Neighbouring spans with
+    the same start and end share one hover title (the first one given)."""
+    drawn = [
+        sp
+        for sp in spans
+        if sp.end > sp.start and sp.hi > sp.lo and 0 <= sp.part < len(parts)
+    ]
+    if not drawn or length <= 0:
+        return _empty(chart_id, title, empty_text, width)
+    paints = _part_paint(len(parts), muted)
+    x0, x1 = 16.0, width - 16
+    used = sorted({sp.part for sp in drawn})
+    legend_svg, rows = _swatches(
+        [parts[i] for i in used], [paints[i] for i in used], x0, x1, 14
+    )
+    top = 14 + rows * 20 + (8 if rows else 0)
+    y_end = top + lane_h
+    height = y_end + 46
+    ticks = tuple(t for t in nice_ticks(0.0, length) if t <= length + 1e-9)
+
+    def sx(v: float) -> float:
+        return x0 + min(max(v, 0.0), length) / length * (x1 - x0)
+
+    out = _open(chart_id, title, width, height)
+    out.append(legend_svg)
+    for t in ticks:
+        out.append(_line(sx(t), top, sx(t), y_end, "axis" if t == 0 else "grid"))
+        out.append(_text(sx(t), y_end + 16, tick_label(t, ticks), anchor="middle"))
+    group: list[str] = []
+    group_tip, group_at = "", (None, None)
+    for sp in drawn:
+        if (sp.start, sp.end) != group_at and group:
+            out.append(_titled(group_tip, "".join(group)))
+            group, group_tip = [], ""
+        group_at = (sp.start, sp.end)
+        group_tip = group_tip or sp.tip
+        a, b = sx(sp.start), sx(sp.end)
+        group.append(
+            f'<rect {_paint_attrs(paints[sp.part])} x="{_f(a)}" '
+            f'y="{_f(top + lane_h * (1 - sp.hi))}" width="{_f(max(b - a, 0.6))}" '
+            f'height="{_f(lane_h * (sp.hi - sp.lo))}"/>'
+        )
+    if group:
+        out.append(_titled(group_tip, "".join(group)))
+    out.append(
+        _text((x0 + x1) / 2, height - 10, x_label, size=LABEL_FS, anchor="middle")
+    )
+    out.append("</svg>")
+    return "".join(out)
+
+
+def stacked_area_chart(
+    chart_id: str,
+    parts: Sequence[str],
+    step: float,
+    bins: Sequence[Sequence[float | None]],
+    *,
+    title: str,
+    x_label: str,
+    tips: Sequence[str] = (),
+    muted: Sequence[int] = (),
+    empty_text: str = "",
+    width: float = 720.0,
+    plot_h: float = 110.0,
+) -> str:
+    """Shares of ``parts`` over time, stacked bottom to top in ``parts`` order.
+    Bin ``i`` covers ``i * step`` to ``(i + 1) * step``; its values are fractions
+    of the bin (the stack is capped at 1, the y axis runs 0-100 %). Each part
+    is one area, straight between bin centres; each bin is a hover target
+    titled ``tips[i]``."""
+    if not bins or step <= 0 or not parts:
+        return _empty(chart_id, title, empty_text, width)
+    count = len(bins)
+    length = step * count
+    paints = _part_paint(len(parts), muted)
+    tops: list[list[float]] = []
+    for values in bins:
+        acc, column = 0.0, []
+        for k in range(len(parts)):
+            v = values[k] if k < len(values) else None
+            acc = min(acc + max(v or 0.0, 0.0), 1.0)
+            column.append(acc)
+        tops.append(column)
+    used = [
+        k
+        for k in range(len(parts))
+        if any(tops[i][k] > (tops[i][k - 1] if k else 0.0) for i in range(count))
+    ]
+    if not used:
+        return _empty(chart_id, title, empty_text, width)
+    y_ticks = (0.0, 0.5, 1.0)
+    x0 = 12 + text_width("100%", TICK_FS) + 8
+    x1 = width - 16
+    legend_svg, rows = _swatches(
+        [parts[k] for k in used], [paints[k] for k in used], 12, x1, 14
+    )
+    top = 14 + rows * 20 + (8 if rows else 0)
+    y_end = top + plot_h
+    height = y_end + 46
+    ticks = tuple(t for t in nice_ticks(0.0, length) if t <= length + 1e-9)
+
+    def sx(v: float) -> float:
+        return x0 + min(max(v, 0.0), length) / length * (x1 - x0)
+
+    def sy(v: float) -> float:
+        return y_end - v * plot_h
+
+    out = _open(chart_id, title, width, height)
+    out.append(legend_svg)
+    for t in y_ticks:
+        out.append(_line(x0, sy(t), x1, sy(t), "axis" if t == 0 else "grid"))
+        out.append(_text(x0 - 6, sy(t) + 4, f"{t * 100:.0f}%", anchor="end"))
+    for t in ticks:
+        out.append(_text(sx(t), y_end + 16, tick_label(t, ticks), anchor="middle"))
+    # Each part fills from the axis up to its cumulative top; drawn top part
+    # first, every lower part covers the one above down to its own top.
+    for k in reversed(used):
+        edge = [(0.0, tops[0][k])]
+        edge += [((i + 0.5) * step, tops[i][k]) for i in range(count)]
+        edge.append((length, tops[-1][k]))
+        path = f"M{_f(sx(0.0))},{_f(sy(0.0))}" + "".join(
+            f"L{_f(sx(x))},{_f(sy(y))}" for x, y in edge
+        )
+        out.append(
+            f'<path {_paint_attrs(paints[k])} d="{path}L{_f(sx(length))},'
+            f'{_f(sy(0.0))}Z"/>'
+        )
+    for i in range(count):
+        tip = tips[i] if i < len(tips) else ""
+        if not tip:
+            continue
+        a, b = sx(i * step), sx((i + 1) * step)
+        out.append(
+            f'<g class="pt"><title>{esc(tip)}</title><rect x="{_f(a)}" '
+            f'y="{_f(top)}" width="{_f(b - a)}" height="{_f(plot_h)}" '
+            f'fill="#000" fill-opacity="0"/></g>'
+        )
+    out.append(
+        _text((x0 + x1) / 2, height - 10, x_label, size=LABEL_FS, anchor="middle")
+    )
+    out.append("</svg>")
+    return "".join(out)
+
+
 def standalone(svg: str) -> str:
     """Turn an inline chart into a standalone ``.svg`` document."""
     if not svg.startswith("<svg "):
@@ -565,6 +995,8 @@ def theme_css() -> str:
         f".viz .tx{{fill:{INK2[1]}}}",
         f".viz .tx1{{fill:{INK[1]}}}",
         f".viz .mut,.viz .mk.mut{{fill:{MUTED[1]}}}",
+        f".viz .band{{fill:{GRID[1]}}}",
+        f".viz .heat{{fill:{INK2[1]}}}",
     ]
     for slot, (_, color) in enumerate(SERIES, start=1):
         dark.append(f".viz .ln.s{slot}{{stroke:{color}}}")

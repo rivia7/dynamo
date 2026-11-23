@@ -11,6 +11,7 @@ missing tools and old summaries are normal).
 from __future__ import annotations
 
 import re
+from dataclasses import replace
 from statistics import median
 from typing import TYPE_CHECKING, Sequence
 
@@ -19,15 +20,30 @@ from benchmarks.cluster_bench.domain.fabric import (
     LinkFinding,
     LinkMatrix,
 )
+from benchmarks.cluster_bench.domain.gpuactivity import ActivityAggregate
 from benchmarks.cluster_bench.domain.kernels import KernelBreakdown
 from benchmarks.cluster_bench.domain.pointstate import PointState
 from benchmarks.cluster_bench.domain.schema import PointResult
+from benchmarks.cluster_bench.domain.steps import (
+    GROUP_OF,
+    GROUP_ORDER,
+    LONG_CALL_US,
+    STALL_US,
+    DeviceTimeline,
+    GapBucket,
+    StepBreakdown,
+    longest_calls,
+    longest_gaps,
+    strip_bins,
+    zoom_segments,
+)
 from benchmarks.cluster_bench.domain.switchload import LinkClassLoad
-from benchmarks.cluster_bench.report import facts
+from benchmarks.cluster_bench.report import facts, svg
 from benchmarks.cluster_bench.report.doc import (
     Block,
     Bullets,
     Cell,
+    Figure,
     Heading,
     Inline,
     Paragraph,
@@ -502,6 +518,165 @@ def _pct_text(value: float | None) -> str:
     return DASH if value is None else f"{value:.0f}%"
 
 
+def _token_rate(ctx: Ctx, point: PointResult, role: str) -> float | None:
+    """Tokens/s a role's PCIe traffic is counted against: prompt tokens for
+    prefill work (a prefill role, or any role of a P-Only run), output tokens
+    otherwise."""
+    m = point.metrics
+    if m is None:
+        return None
+    if role == "prefill" or ctx.summary.stage == "prefill":
+        return m.input_tps
+    return m.output_tps
+
+
+def _pcie_mb_per_token(
+    ctx: Ctx, point: PointResult, role: str, agg: ActivityAggregate
+) -> float | None:
+    """MB the role's GPUs send over PCIe per token: GPM TX per GPU times the
+    GPUs sampled, over the point's token rate. Per-token work such as the
+    tensor-parallel all-reduce keeps it constant across load for one
+    deployment."""
+    rate = _token_rate(ctx, point, role)
+    if not rate or agg.pcie_tx_gbs_mean is None or not agg.gpus_sampled:
+        return None
+    return agg.pcie_tx_gbs_mean * agg.gpus_sampled * 1e3 / rate
+
+
+def _layer_rows(
+    ctx: Ctx, point: PointResult, role: str, agg: ActivityAggregate
+) -> list[tuple[Cell, ...]]:
+    """GPM time layers and PCIe traffic of one role."""
+    s = ctx.s
+    who = s.label("role", role)
+    rows: list[tuple[Cell, ...]] = []
+    layers = agg.layers()
+    if layers is not None:
+        rows.append(
+            (
+                s.t("runtime.layers_role", role=who),
+                s.t(
+                    "runtime.layers_value",
+                    sm=_pct_text(layers[0]),
+                    gap=_pct_text(layers[1]),
+                    none=_pct_text(layers[2]),
+                ),
+            )
+        )
+    if agg.pcie_tx_gbs_mean is not None:
+        rows.append(
+            (
+                s.t("runtime.pcie_role", role=who),
+                s.t(
+                    "runtime.pcie_value_prefill"
+                    if role == "prefill"
+                    else "runtime.pcie_value",
+                    tx=num(agg.pcie_tx_gbs_mean, 2),
+                    rx=num(agg.pcie_rx_gbs_mean, 2),
+                    gpus=str(agg.gpus_sampled),
+                    mb=num(_pcie_mb_per_token(ctx, point, role, agg), 1),
+                ),
+            )
+        )
+    return rows
+
+
+LAYER_POINTS_MAX = 24
+LAYER_SKIP = ("smoke", "nic", "diagnose")
+
+
+def _activity_figure(ctx: Ctx, lead: PointResult) -> Figure | None:
+    """GPM time layers of every measured point of the leader's family: how
+    the time with a kernel but idle SMs, and with no kernel at all, changes
+    with load."""
+    s, sm = ctx.s, ctx.summary
+    st = lead.state.stress if lead.state else None
+    act = st.activity if st else None
+    role = next(
+        (r for r in ("decode", "agg", "prefill") if act and r in act.roles), None
+    )
+    if role is None:
+        return None
+    names = (
+        s.t("runtime.layers_sm"),
+        s.t("runtime.layers_gap"),
+        s.t("runtime.layers_none"),
+    )
+    points = sorted(
+        (
+            p
+            for p in sm.points
+            if p.candidate.family_id == lead.candidate.family_id
+            and p.key.purpose not in LAYER_SKIP
+            and not p.candidate.diag
+        ),
+        key=lambda p: (
+            p.key.concurrency,
+            p.key.purpose != "search",
+            p.key.purpose,
+            p.key.rep,
+            p.key.spec,
+        ),
+    )
+    stacks: list[svg.Stack] = []
+    seen: dict[str, int] = {}
+    for p in points:
+        pst = p.state.stress if p.state else None
+        agg = pst.activity.roles.get(role) if pst and pst.activity else None
+        layers = agg.layers() if agg else None
+        if agg is None or layers is None:
+            continue
+        label = f"C={p.key.concurrency}"
+        if p.key.purpose != "search":
+            label += f" · {s.label('purpose', p.key.purpose)}"
+        if not p.candidate.mtp and p.key.purpose != "mtp_ablation":
+            label += f" · {s.t('variant.mtp_off')}"
+        seen[label] = seen.get(label, 0) + 1
+        mb = _pcie_mb_per_token(ctx, p, role, agg)
+        stacks.append(
+            svg.Stack(
+                label,
+                layers,
+                tips=tuple(
+                    s.t("runtime.layers_tip", part=name, pct=_pct_text(v))
+                    for name, v in zip(names, layers)
+                ),
+                note=s.t("runtime.layers_note", mb=num(mb, 0))
+                if mb is not None
+                else "",
+            )
+        )
+    if not stacks:
+        return None
+    # repeated measurements of one point: number them in run order
+    counts = dict(seen)
+    for i, stack in enumerate(stacks):
+        if counts.get(stack.label, 0) > 1:
+            seen[stack.label] -= 1
+            n = counts[stack.label] - seen[stack.label]
+            stacks[i] = replace(stack, label=f"{stack.label} #{n}")
+    chart_id = "fig-gpm-layers"
+    who = s.label("role", role)
+    return Figure(
+        chart_id,
+        svg.stacked_hbar_chart(
+            chart_id,
+            names,
+            stacks[:LAYER_POINTS_MAX],
+            title=s.t(
+                "runtime.layers_title",
+                family=ctx.family(lead.candidate.family_id),
+                role=who,
+            ),
+            x_label=s.t("runtime.layers_x"),
+            faded=(1,),
+            muted=(2,),
+            digits=0,
+        ),
+        s.t("runtime.layers_caption", role=who),
+    )
+
+
 def _activity_rows(ctx: Ctx, point: PointResult) -> list[tuple[Cell, ...]]:
     """NVML GPM regime per serving role, and GPM availability."""
     s = ctx.s
@@ -527,6 +702,7 @@ def _activity_rows(ctx: Ctx, point: PointResult) -> list[tuple[Cell, ...]]:
                 ),
             )
         )
+        rows.extend(_layer_rows(ctx, point, role, agg))
     missing = {k: v for k, v in act.availability.items() if k != "ok"}
     if missing:
         rows.append(
@@ -788,6 +964,9 @@ def runtime_section(ctx: Ctx) -> list[Block]:
     )
     if stress:
         out.append(Table((s.t("runtime.metric"), s.t("runtime.value")), tuple(stress)))
+    layers = _activity_figure(ctx, lead)
+    if layers is not None:
+        out.append(layers)
     out.extend(_goodput_blocks(ctx, lead))
     out.extend(_accuracy_blocks(ctx))
     out.extend(_diagnostics_blocks(ctx))
@@ -807,8 +986,413 @@ def _diag_steps(ctx: Ctx) -> int:
     return cfg.diagnose.steps if cfg is not None else 10
 
 
+def _gap_label(gap: GapBucket) -> str:
+    def span(us: float) -> str:
+        return f"{us / 1000:g} ms" if us >= 1000 else f"{us:g} µs"
+
+    if gap.hi_us is None:
+        return f"≥ {span(gap.lo_us)}"
+    if gap.lo_us <= 0:
+        return f"< {span(gap.hi_us)}"
+    return f"{span(gap.lo_us)} – {span(gap.hi_us)}"
+
+
+_INSTANCE = re.compile(r"-((?:agg|prefill|decode)\d+)-r(\d+)$")
+
+
+def _source_label(source: str | None, device: int | None) -> str:
+    match = _INSTANCE.search(source or "")
+    where = f"{match[1]}" if match else (source or DASH)
+    return f"{where} · GPU {DASH if device is None else device}"
+
+
+def _gpu_label(d: DeviceTimeline) -> str:
+    return _source_label(d.source, d.device)
+
+
+IDLE_PART = GROUP_ORDER.index("idle")
+
+
+def _group_names(ctx: Ctx) -> list[str]:
+    return [ctx.s.label("step_group", g) for g in GROUP_ORDER]
+
+
+def _split_figure(
+    ctx: Ctx, roles: Sequence[str], timelines: dict[str, StepBreakdown]
+) -> Figure | None:
+    """The step split tables as bars: per role the whole window and, when
+    stalls were cut, the steady step under it."""
+    s = ctx.s
+    stacks: list[svg.Stack] = []
+    for role in roles:
+        b = timelines[role]
+        variants = [("runtime.diag_chart_whole", b.shares, b.step_ms)]
+        if b.stall_ms > 0:
+            variants.append(
+                ("runtime.diag_chart_steady", b.steady_shares, b.steady_step_ms)
+            )
+        for key, shares, step_ms in variants:
+            if not step_ms or not shares:
+                continue
+            values = tuple(shares.get(g, 0.0) * step_ms for g in GROUP_ORDER)
+            stacks.append(
+                svg.Stack(
+                    s.t(key, role=s.label("role", role)),
+                    values,
+                    tips=tuple(
+                        s.t(
+                            "runtime.diag_chart_tip",
+                            group=s.label("step_group", g),
+                            ms=num(v, 2),
+                            share=ratio_pct(shares.get(g, 0.0)),
+                        )
+                        for g, v in zip(GROUP_ORDER, values)
+                    ),
+                    note=s.t("runtime.diag_chart_total", ms=num(step_ms, 1)),
+                )
+            )
+    if not stacks:
+        return None
+    chart_id = "fig-diag-steps"
+    return Figure(
+        chart_id,
+        svg.stacked_hbar_chart(
+            chart_id,
+            _group_names(ctx),
+            stacks,
+            title=s.t("runtime.diag_chart_steps_title"),
+            x_label=s.t("runtime.diag_chart_ms"),
+            muted=(IDLE_PART,),
+        ),
+        s.t("runtime.diag_chart_steps_caption"),
+    )
+
+
+def _idle_figure(ctx: Ctx, role: str, b: StepBreakdown) -> Figure | None:
+    """Every GPU's capture window: idle per bin, long collectives on top."""
+    s = ctx.s
+    rows: list[svg.HeatRow] = []
+    for d in b.devices:
+        if not d.idle_bins or not d.bin_ms:
+            continue
+        marks = tuple(
+            (
+                c.at_ms,
+                c.at_ms + c.us / 1000,
+                s.t(
+                    "runtime.diag_chart_call_tip",
+                    kernel=c.name or DASH,
+                    at=num(c.at_ms, 1),
+                    ms=num(c.us / 1000, 1),
+                ),
+            )
+            for c in d.longest
+            if c.us >= LONG_CALL_US and GROUP_OF.get(c.category) == "communication"
+        )
+        rows.append(
+            svg.HeatRow(
+                _gpu_label(d),
+                d.offset_ms,
+                d.bin_ms,
+                tuple(v / 1000 for v in d.idle_bins),
+                marks,
+            )
+        )
+    if not rows:
+        return None
+
+    def tip(label: str, start: float, end: float, value: float) -> str:
+        return s.t(
+            "runtime.diag_chart_idle_tip",
+            gpu=label,
+            a=num(start, 1),
+            b=num(end, 1),
+            idle=ratio_pct(value, 0),
+        )
+
+    chart_id = f"fig-diag-idle-{role}"
+    return Figure(
+        chart_id,
+        svg.heat_rows_chart(
+            chart_id,
+            rows,
+            title=s.t("runtime.diag_chart_idle_title", role=s.label("role", role)),
+            x_label=s.t("runtime.diag_chart_ms"),
+            shade_name=s.t("runtime.diag_chart_idle_shade"),
+            mark_name=s.t(
+                "runtime.diag_chart_idle_mark", ms=num(LONG_CALL_US / 1000, 0)
+            ),
+            tip=tip,
+        ),
+        s.t("runtime.diag_chart_idle_caption"),
+    )
+
+
+def _strip_figure(ctx: Ctx, role: str, b: StepBreakdown) -> Figure | None:
+    """The sample in bins: the share of each group per bin, idle on top."""
+    s = ctx.s
+    width_us, bins = strip_bins(b)
+    if not bins:
+        return None
+    values = [tuple(min(shares[g], 1.0) for g in GROUP_ORDER) for shares in bins]
+    tips = [
+        s.t(
+            "runtime.diag_chart_bin_tip",
+            a=num(i * width_us / 1000, 2),
+            b=num((i + 1) * width_us / 1000, 2),
+            parts="；".join(
+                f"{s.label('step_group', g)} {ratio_pct(v, 0)}"
+                for g, v in zip(GROUP_ORDER, row)
+                if v >= 0.005
+            ),
+        )
+        for i, row in enumerate(values)
+    ]
+    chart_id = f"fig-diag-strip-{role}"
+    return Figure(
+        chart_id,
+        svg.stacked_area_chart(
+            chart_id,
+            _group_names(ctx),
+            width_us / 1000,
+            values,
+            title=s.t("runtime.diag_chart_strip_title", role=s.label("role", role)),
+            x_label=s.t("runtime.diag_chart_ms"),
+            tips=tips,
+            muted=(IDLE_PART,),
+        ),
+        s.t(
+            "runtime.diag_chart_strip_caption",
+            gpu=_source_label(b.sample_source, b.sample_device),
+            ms=num(b.sample_us / 1000, 1),
+            bin_us=num(width_us, 0),
+        ),
+    )
+
+
+def _zoom_figure(ctx: Ctx, role: str, b: StepBreakdown) -> Figure | None:
+    """About one layer of the sample, every kernel at its real time."""
+    s = ctx.s
+    length, segs = zoom_segments(b)
+    if not segs:
+        return None
+    spans = [
+        svg.LaneSpan(
+            seg.start_us,
+            seg.end_us,
+            GROUP_ORDER.index(GROUP_OF.get(seg.category, "other")),
+            tip=s.t(
+                "runtime.diag_chart_seg_tip",
+                category=s.label("kernel_category", seg.category),
+                a=num(seg.start_us, 1),
+                b=num(seg.end_us, 1),
+                us=num(seg.end_us - seg.start_us, 1),
+            ),
+        )
+        for seg in segs
+    ]
+    chart_id = f"fig-diag-zoom-{role}"
+    return Figure(
+        chart_id,
+        svg.lane_chart(
+            chart_id,
+            _group_names(ctx),
+            spans,
+            length,
+            title=s.t(
+                "runtime.diag_chart_zoom_title",
+                role=s.label("role", role),
+                us=num(length, 0),
+            ),
+            x_label=s.t("runtime.diag_chart_us"),
+            muted=(IDLE_PART,),
+        ),
+        s.t("runtime.diag_chart_zoom_caption", us=num(length, 0), n=str(len(segs))),
+    )
+
+
+def _step_blocks(ctx: Ctx) -> list[Block]:
+    """Wall-time split of one forward step per role, and its idle gaps."""
+    s, diag = ctx.s, ctx.summary.diagnostics
+    timelines = {
+        role: StepBreakdown.model_validate(raw)
+        for role, raw in ((diag.timeline if diag else None) or {}).items()
+    }
+    roles = [r for r in (*SERVING, "unknown") if r in timelines]
+    if not roles:
+        return []
+
+    def split_rows(steady: bool) -> tuple[tuple[str, ...], ...]:
+        """One row per group: share (ms per step), then the step length."""
+
+        def pick(b: StepBreakdown) -> tuple[dict[str, float], float, float | None]:
+            if steady:
+                return b.steady_shares, b.steady_wait_share, b.steady_step_ms
+            return b.shares, b.wait_share, b.step_ms
+
+        def cell(b: StepBreakdown, share: float) -> str:
+            step_ms = pick(b)[2]
+            if step_ms is None:
+                return ratio_pct(share)
+            return f"{ratio_pct(share)}（{num(share * step_ms, 2)} ms）"
+
+        rows: list[tuple[str, ...]] = []
+        for g in GROUP_ORDER:
+            shares = [pick(timelines[r])[0].get(g, 0.0) for r in roles]
+            if not any(v > 0 for v in shares):
+                continue
+            rows.append(
+                (
+                    s.label("step_group", g),
+                    *(cell(timelines[r], v) for r, v in zip(roles, shares)),
+                )
+            )
+            waits = [pick(timelines[r])[1] for r in roles]
+            if g == "communication" and any(v > 0 for v in waits):
+                rows.append(
+                    (
+                        s.t("runtime.diag_wait"),
+                        *(cell(timelines[r], v) for r, v in zip(roles, waits)),
+                    )
+                )
+        rows.append(
+            (
+                s.t("runtime.diag_step_ms"),
+                *(num(pick(timelines[r])[2], 2) for r in roles),
+            )
+        )
+        return tuple(rows)
+
+    head = (s.t("runtime.diag_group"), *(s.label("role", r) for r in roles))
+    out: list[Block] = [
+        Table(
+            head,
+            split_rows(False),
+            tuple(range(1, len(roles) + 1)),
+            s.t(
+                "runtime.diag_steps_caption",
+                steps=timelines[roles[0]].steps,
+                gpus=sum(len(timelines[r].devices) for r in roles),
+            ),
+        )
+    ]
+    stalled = [timelines[r].stall_ms for r in roles if timelines[r].stall_ms > 0]
+    if stalled:
+        out.append(
+            Table(
+                head,
+                split_rows(True),
+                tuple(range(1, len(roles) + 1)),
+                s.t(
+                    "runtime.diag_steady_caption",
+                    stall_ms=num(STALL_US / 1000, 0),
+                    cut_ms=num(max(stalled), 1),
+                ),
+            )
+        )
+    split = _split_figure(ctx, roles, timelines)
+    if split is not None:
+        out.append(split)
+    for role in roles:
+        for build in (_idle_figure, _strip_figure, _zoom_figure):
+            figure = build(ctx, role, timelines[role])
+            if figure is not None:
+                out.append(figure)
+    gap_rows = [
+        (s.label("role", r), _gap_label(g), num(g.count, 1), num(g.total_us, 1))
+        for r in roles
+        for g in timelines[r].gaps
+        if g.count > 0
+    ]
+    if gap_rows:
+        out.append(
+            Table(
+                (
+                    s.t("runtime.role"),
+                    s.t("runtime.diag_gap"),
+                    s.t("runtime.diag_gap_count"),
+                    s.t("runtime.diag_gap_time"),
+                ),
+                tuple(gap_rows),
+                (2, 3),
+                s.t("runtime.diag_gap_caption"),
+            )
+        )
+    bubble_rows = [
+        (
+            s.label("role", r),
+            _gpu_label(dev),
+            num(gap.at_ms, 1),
+            num(gap.us, 0),
+            code(gap.before) if gap.before else DASH,
+            code(gap.after) if gap.after else DASH,
+        )
+        for r in roles
+        for dev, gap in longest_gaps(timelines[r], 5)
+    ]
+    if bubble_rows:
+        out.append(
+            Table(
+                (
+                    s.t("runtime.role"),
+                    s.t("runtime.diag_gpu"),
+                    s.t("runtime.diag_at"),
+                    s.t("runtime.diag_len"),
+                    s.t("runtime.diag_before"),
+                    s.t("runtime.diag_after"),
+                ),
+                tuple(bubble_rows),
+                (2, 3),
+                s.t("runtime.diag_bubbles_caption"),
+            )
+        )
+    call_rows = [
+        (
+            s.label("role", r),
+            _gpu_label(dev),
+            num(call.at_ms, 1),
+            num(call.us / 1000, 1),
+            code(call.name) if call.name else DASH,
+        )
+        for r in roles
+        for dev, call in longest_calls(timelines[r], 5)
+    ]
+    if call_rows:
+        out.append(
+            Table(
+                (
+                    s.t("runtime.role"),
+                    s.t("runtime.diag_gpu"),
+                    s.t("runtime.diag_at"),
+                    s.t("runtime.diag_len_ms"),
+                    s.t("runtime.diag_kernel"),
+                ),
+                tuple(call_rows),
+                (2, 3),
+                s.t("runtime.diag_calls_caption"),
+            )
+        )
+    return out
+
+
+TOP_KERNELS = 8
+
+
+def _kernel_label_rules(ctx: Ctx) -> tuple[tuple[re.Pattern[str], str], ...]:
+    """The locale's display labels of kernel names: (pattern, label), first
+    match wins."""
+    return tuple(
+        (re.compile(pattern), label) for pattern, label in ctx.s.raw("kernel_labels")
+    )
+
+
+def _kernel_label(rules: Sequence[tuple[re.Pattern[str], str]], name: str) -> str:
+    return next((label for pattern, label in rules if pattern.search(name)), "")
+
+
 def _diagnostics_blocks(ctx: Ctx) -> list[Block]:
-    """Opt-in diagnostic window: kernel-time shares per role, engine metrics."""
+    """Opt-in diagnostic window: kernel-time shares and the wall-time split of
+    a step per role, engine metrics."""
     s, diag = ctx.s, ctx.summary.diagnostics
     if diag is None:
         return []
@@ -850,15 +1434,27 @@ def _diagnostics_blocks(ctx: Ctx) -> list[Block]:
                 s.t("runtime.diag_caption", steps=_diag_steps(ctx)),
             )
         )
+        rules = _kernel_label_rules(ctx)
+        steps = diag.capture_steps or _diag_steps(ctx)
         top_rows = []
         for role in roles:
-            for kern in kernels[role].top[:5]:
+            kb = kernels[role]
+            gpus = sum(len(c.devices) for c in kb.coverage)
+            for kern in kb.top[:TOP_KERNELS]:
+                per_step = (
+                    kern.instances / (steps * gpus)
+                    if kern.instances and steps and gpus
+                    else None
+                )
                 top_rows.append(
                     (
                         s.label("role", role),
+                        _kernel_label(rules, kern.name) or DASH,
                         code(kern.short),
                         s.label("kernel_category", kern.category),
                         ratio_pct(kern.share),
+                        num(kern.avg_us, 1),
+                        num(per_step, 1),
                     )
                 )
         if top_rows:
@@ -866,15 +1462,19 @@ def _diagnostics_blocks(ctx: Ctx) -> list[Block]:
                 Table(
                     (
                         s.t("runtime.role"),
+                        s.t("runtime.diag_label"),
                         s.t("runtime.diag_kernel"),
                         s.t("runtime.diag_category"),
                         s.t("runtime.diag_share"),
+                        s.t("runtime.diag_avg_us"),
+                        s.t("runtime.diag_per_step"),
                     ),
                     tuple(top_rows),
-                    (3,),
+                    (4, 5, 6),
                     s.t("runtime.diag_top_caption"),
                 )
             )
+    out.extend(_step_blocks(ctx))
     engine_rows = []
     for key, label, digits in ENGINE_LABELS:
         for role in (*SERVING,):

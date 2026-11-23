@@ -176,6 +176,9 @@ class Checkpoint(Frozen):
     repo: str
     revision: str = "main"
     approx_size_gb: float
+    # SGLang config this checkpoint needs in every role (e.g. its quantization
+    # method), merged over the recipe and the family overrides.
+    sglang: dict[str, Any] = Field(default_factory=dict)
 
 
 class ModelProfile(Frozen):
@@ -549,7 +552,10 @@ class PointMetrics(Frozen):
     itl_p50_ms: float | None = None
     itl_p99_ms: float | None = None
     request_throughput: float | None = None
-    duration_s: float | None = None
+    duration_s: float | None = None  # AIPerf benchmark_duration: requests' span
+    # Wall time of the profiling phase, its grace period included: AIPerf divides
+    # its throughputs by it, and the goodput and MFU of the records divide by it too.
+    phase_s: float | None = None
     isl_avg: float | None = None
     osl_avg: float | None = None
     error_types: dict[str, int] = Field(default_factory=dict)
@@ -750,7 +756,7 @@ class KvRoleCapacity(Frozen):
     instance_tokens: int | None = None  # per_rank_tokens x dp_ranks
     total_tokens: int | None = None  # over all instances of the role
     kv_gb_per_rank: float | None = None
-    bytes_per_token: float | None = None  # measured: KV GB / KV tokens
+    bytes_per_token: float | None = None  # measured: KV pool bytes / KV tokens
     host_gb_per_rank: float | None = None  # HiCache host memory
     host_tokens_total: int | None = None
     max_running_requests: int | None = None  # per instance
@@ -933,6 +939,9 @@ class DiagnosticsResult(Frozen):
     nsys: str = "off"  # off | unavailable | ok | failed
     nsys_version: str | None = None
     kernels: Any = None  # domain/kernels.KernelBreakdown (as JSON)
+    # role -> domain/steps.StepBreakdown (as JSON): wall-time split of the steps
+    timeline: Any = None
+    capture_steps: int | None = None  # forward steps start_profile captured
     engine: dict[str, float] = Field(default_factory=dict)  # role.metric -> value
     output_tps: float | None = None  # inside the window (overhead included)
     notes: tuple[str, ...] = ()
@@ -1126,6 +1135,15 @@ class RunConfig(Frozen):
     model_revision: str = "main"
     model_size_gb: float | None = None
     served_context: int | None = None  # overrides the profile's served context
+    # Checkpoint variant (a key of the model profile's ``checkpoints``); None
+    # picks the GPU profile's weights_variant.
+    checkpoint: str | None = None
+    # Weights already at this absolute path on every node (--model-path): no
+    # Hugging Face download; the copies must agree in file names and sizes.
+    model_path: str | None = None
+    # HF_ENDPOINT for node-side Hugging Face downloads (model files, the AIPerf
+    # dataset), e.g. a mirror where huggingface.co is unreachable.
+    hf_endpoint: str | None = None
     # Control-plane NIC: "auto" finds the interface that holds each node's
     # control address (wg0 on Lium); a name applies to every node.
     control_interface: str = "auto"

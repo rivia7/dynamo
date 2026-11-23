@@ -6,6 +6,18 @@ name: glm-5.3
 served_model_name: zai-org/GLM-5.3
 checkpoints:
   nvfp4: {repo: RadixArk/GLM-5.3-NVFP4, revision: main, approx_size_gb: 430}
+  # NVIDIA's ModelOpt export (--checkpoint nvfp4-nvidia): MIXED_PRECISION, i.e.
+  # NVFP4 routed experts, FP8 dense MLPs, BF16 attention, shared experts and
+  # MTP layer (exclude_modules: model.layers.78*), FP8 KV cache. SGLang 0.5.21
+  # loads it as modelopt_mixed (the recipes say modelopt_fp4), and must not
+  # fuse the BF16 shared expert into the NVFP4 routed experts: with the
+  # flashinfer_cutlass MoE runner it does, and loading fails (3072 vs 6144
+  # columns in w13).
+  nvfp4-nvidia:
+    repo: nvidia/GLM-5.3-NVFP4
+    revision: e3b8f9f2fad29727dfa95e766c5cac18ea1414bf
+    approx_size_gb: 464
+    sglang: {quantization: modelopt_mixed, disable-shared-experts-fusion: true}
   fp8: {repo: zai-org/GLM-5.3, revision: main, approx_size_gb: 756}
 worker_args: [--dyn-tool-call-parser, glm47, --dyn-reasoning-parser, glm45, --reasoning-parser, glm45]
 env:

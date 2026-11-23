@@ -52,6 +52,11 @@ ENV_KEYS_TO_VERIFY = (
     "SGLANG_SIMULATE_ACC_LEN",
     DECODE_ONLY_ENV,
 )
+# The worker process whose environment proves the rendered env (pgrep -f, ERE).
+# Under nsys the launcher execs it by absolute path (/opt/sglang/bin/python3).
+WORKER_PROCESS = (
+    r"^(/[^ ]*/)?python3 (-m dynamo[.]sglang|-P [^ ]*sglang_decode_only[.]py)"
+)
 SMOKE_PROMPT = "Reply with the single word OK."
 
 
@@ -442,7 +447,7 @@ class DeploymentSession:
 
     def _live_env(self, spec: ContainerSpec) -> dict[str, str]:
         cmd = (
-            "pid=$(pgrep -f '^python3 (-m dynamo[.]sglang|-P [^ ]*sglang_decode_only[.]py)' | head -1); "
+            f"pid=$(pgrep -f {shlex.quote(WORKER_PROCESS)} | head -1); "
             '[ -n "$pid" ] && tr "\\0" "\\n" < /proc/$pid/environ'
         )
         out = self.ctx.docker.exec(spec.node, spec.name, cmd, check=False)
@@ -489,6 +494,6 @@ class DeploymentSession:
 
 _KILL_ENGINE_ZOMBIES = (
     "for pid in $(nvidia-smi --query-compute-apps=pid --format=csv,noheader 2>/dev/null); do "
-    '  if ps -o args= -p "$pid" 2>/dev/null | grep -qE \'sglang|dynamo|torchrun\'; then kill -9 "$pid"; fi; '
+    '  if ps -o args= -p "$pid" 2>/dev/null | grep -qE \'sglang|dynamo|torchrun|torch.distributed.run\'; then kill -9 "$pid"; fi; '
     "done"
 )

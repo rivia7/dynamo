@@ -1,11 +1,12 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
-"""Report section 2: interconnect needs, NVLink off vs on, MFU, KV capacity.
+"""Report section 2: interconnect needs, NVLink off vs on, MFU / MBU, KV capacity.
 
 The three focus resources of the leader at saturation: how much interconnect
 it needs (and the smallest NIC count that holds up), how much of the GPUs'
-floating-point peak it uses (MFU from config.json FLOPs), and how much
-context its KV cache pools hold. Reads only the ``ExperimentSummary``.
+floating-point peak (MFU from config.json FLOPs) and memory bandwidth (MBU,
+measured by NVML GPM) it uses, and how much context its KV cache pools hold.
+Reads only the ``ExperimentSummary``.
 """
 
 from __future__ import annotations
@@ -72,6 +73,7 @@ def resources_section(ctx: Ctx) -> list[Block]:
         )
     )
     out.extend(_interconnect(ctx, sm.interconnect))
+    out.extend(_nccl_hops(ctx))
     out.extend(_nvlink(ctx, sm.nvlink))
     out.extend(_mfu(ctx, lead))
     out.extend(_kv(ctx, sm.kv_capacity))
@@ -124,6 +126,48 @@ def _interconnect(ctx: Ctx, need: InterconnectNeeds | None) -> list[Block]:
         )
     )
     out.append(Bullets(tuple(_interconnect_bullets(ctx, need))))
+    return out
+
+
+HOPS_MAX = 32
+
+
+def _nccl_hops(ctx: Ctx) -> list[Block]:
+    """How NCCL connected the GPUs of one node: per GPU pair the transports
+    the intra-node microbenchmark's INFO log names, next to the path
+    ``nvidia-smi topo -m`` reports."""
+    s, sm = ctx.s, ctx.summary
+    peak = next((p for p in sm.peaks if p.details.get("nccl_hops")), None)
+    if peak is None:
+        return []
+    node = next((n for n in sm.inventory.nodes if n.name == peak.scope), None)
+    topo = node.topo if node is not None else {}
+    pairs: dict[tuple[int, int], set[str]] = {}
+    for hop, vias in dict(peak.details["nccl_hops"]).items():
+        src, _, dst = str(hop).partition("->")
+        if not (src.isdigit() and dst.isdigit()):
+            continue
+        a, b = sorted((int(src), int(dst)))
+        pairs.setdefault((a, b), set()).update(str(v) for v in vias)
+    rows: list[tuple[Cell, ...]] = [
+        (
+            f"GPU {a} ↔ GPU {b}",
+            (topo.get(f"GPU{a}") or {}).get(f"GPU{b}") or DASH,
+            " / ".join(sorted(vias)),
+        )
+        for (a, b), vias in sorted(pairs.items())
+    ]
+    if not rows:
+        return []
+    out: list[Block] = [
+        Table(
+            (s.t("resources.hop"), s.t("resources.hop_topo"), s.t("resources.hop_via")),
+            tuple(rows[:HOPS_MAX]),
+            caption=s.t("resources.hops_caption", node=peak.scope),
+        )
+    ]
+    if any(v.startswith("SHM") for vias in pairs.values() for v in vias):
+        out.append(Paragraph(s.r("resources.hops_shm"), tone="note"))
     return out
 
 
@@ -353,38 +397,65 @@ def _nvlink_tail(ctx: Ctx, cmp: NvlinkComparison | None) -> list[Block]:
 # --------------------------------------------------------------------------
 
 
+def _tbs(value: float) -> str:
+    """A memory bandwidth in TB/s at its own precision: 1.398, 4.8, 8."""
+    return f"{value:g}"
+
+
 def _mfu(ctx: Ctx, lead: PointResult) -> list[Block]:
     s, sm = ctx.s, ctx.summary
     out: list[Block] = [Heading(s.t("resources.mfu_heading"), 3)]
     mfu, arch = lead.mfu, sm.model_arch
-    if mfu is None or arch is None:
+    if mfu is None:
         out.append(Paragraph(s.r("resources.no_mfu"), tone="note"))
         return out
-    gflops = num(arch.linear_flops_per_token() / 1e9, 1)
-    if mfu.peak_tflops_per_gpu:
-        out.append(
-            Paragraph(
-                s.r(
-                    "resources.mfu_intro",
-                    gflops=gflops,
-                    params=num(arch.active_params() / 1e9, 1),
-                    gpu=sm.gpu_name,
-                    precision=mfu.precision.upper(),
-                    peak=num(mfu.peak_tflops_per_gpu, 0),
+    if arch is not None and mfu.window_s is not None:
+        gflops = num(arch.linear_flops_per_token() / 1e9, 1)
+        if mfu.peak_tflops_per_gpu:
+            out.append(
+                Paragraph(
+                    s.r(
+                        "resources.mfu_intro",
+                        gflops=gflops,
+                        params=num(arch.active_params() / 1e9, 1),
+                        gpu=sm.gpu_name,
+                        precision=mfu.precision.upper(),
+                        peak=num(mfu.peak_tflops_per_gpu, 0),
+                    )
                 )
             )
-        )
-    else:
-        out.append(
-            Paragraph(
-                s.r(
-                    "resources.mfu_intro_nopeak",
-                    gflops=gflops,
-                    precision=mfu.precision.upper(),
-                ),
-                tone="note",
+        else:
+            out.append(
+                Paragraph(
+                    s.r(
+                        "resources.mfu_intro_nopeak",
+                        gflops=gflops,
+                        precision=mfu.precision.upper(),
+                    ),
+                    tone="note",
+                )
             )
-        )
+    # MBU is measured by NVML GPM: it needs neither config.json nor a peak
+    has_mbu = any(r.mbu is not None for r in mfu.roles)
+    has_tbs = any(r.mem_tbs_per_gpu is not None for r in mfu.roles)
+    metric = code("DRAM_BW_UTIL")
+    if has_mbu and mfu.peak_mem_tbs_per_gpu:
+        peak = _tbs(mfu.peak_mem_tbs_per_gpu)
+        out.append(Paragraph(s.r("resources.mbu_intro", metric=metric, peak=peak)))
+    elif has_mbu:
+        intro = s.r("resources.mbu_intro_nopeak", metric=metric)
+        out.append(Paragraph(intro, tone="note"))
+    else:
+        out.append(Paragraph(s.r("resources.no_mbu"), tone="note"))
+    headers = (
+        s.t("resources.role"),
+        s.t("resources.gpus"),
+        s.t("resources.tflops"),
+        s.t("resources.mfu"),
+        s.t("resources.tensor"),
+        *((s.t("resources.mbu"),) if has_mbu else ()),
+        *((s.t("resources.mem_tbs"),) if has_tbs else ()),
+    )
     rows = [
         (
             s.label("role", r.role),
@@ -392,20 +463,16 @@ def _mfu(ctx: Ctx, lead: PointResult) -> list[Block]:
             num(r.tflops_per_gpu, 1),
             ratio_pct(r.mfu, 1),
             ratio_pct(r.tensor_active, 0),
+            *((ratio_pct(r.mbu, 1),) if has_mbu else ()),
+            *((num(r.mem_tbs_per_gpu, 2),) if has_tbs else ()),
         )
         for r in mfu.roles
     ]
     out.append(
         Table(
-            (
-                s.t("resources.role"),
-                s.t("resources.gpus"),
-                s.t("resources.tflops"),
-                s.t("resources.mfu"),
-                s.t("resources.tensor"),
-            ),
+            headers,
             tuple(rows),
-            numeric=(1, 2, 3, 4),
+            numeric=tuple(range(1, len(headers))),
             caption=s.t("resources.mfu_caption"),
         )
     )
@@ -420,48 +487,51 @@ def _mfu(ctx: Ctx, lead: PointResult) -> list[Block]:
         key=lambda p: p.key.concurrency,
     )
     if len(curve) >= 2:
-        roles = [r.role for r in curve[-1].mfu.roles]  # type: ignore[union-attr]
-        split = len(roles) > 1  # PD: one column per role plus the total
-        headers = (
-            s.t("resources.concurrency"),
-            s.t("resources.tps"),
-            *(
-                (s.t("resources.kpi_mfu", role=r) for r in roles)
-                if split
-                else (s.t("resources.mfu"),)
-            ),
-            *((s.t("resources.mfu_total"),) if split else ()),
-        )
-        rows2 = []
-        for p in curve:
-            m = p.mfu
-            assert m is not None
-            per_role = tuple(
-                ratio_pct(m.role(r).mfu if m.role(r) else None, 1) for r in roles
-            )
-            rows2.append(
-                (
-                    str(p.key.concurrency),
-                    num(p.tps_per_gpu, 1),
-                    *(per_role if split else ()),
-                    ratio_pct(m.total_mfu, 1),
-                )
-            )
-        out.append(
-            Table(
-                headers,
-                tuple(rows2),
-                numeric=tuple(range(len(headers))),
-                caption=s.t(
-                    "resources.mfu_curve_caption",
-                    family=ctx.family(lead.candidate.family_id),
-                ),
-            )
-        )
+        out.append(_mfu_curve(ctx, lead, curve))
     notes = [localize(n) for n in mfu.notes]
     if notes:
         out.append(Bullets(tuple(notes)))
     return out
+
+
+def _mfu_curve(ctx: Ctx, lead: PointResult, curve: list[PointResult]) -> Table:
+    """MFU, and MBU where GPM measured it, of the leader's search points."""
+    s = ctx.s
+    results = [p.mfu for p in curve if p.mfu is not None]
+    roles = [r.role for r in results[-1].roles]
+    split = len(roles) > 1  # PD: one column per role plus the total
+    mbu = any(r.mbu is not None for m in results for r in m.roles)
+    headers = [s.t("resources.concurrency"), s.t("resources.tps")]
+    if split:
+        headers += [s.t("resources.kpi_mfu", role=r) for r in roles]
+    headers.append(s.t("resources.mfu_total") if split else s.t("resources.mfu"))
+    if mbu:
+        headers += (
+            [s.t("resources.kpi_mbu", role=r) for r in roles]
+            if split
+            else [s.t("resources.mbu")]
+        )
+    rows = []
+    for p in curve:
+        m = p.mfu
+        assert m is not None
+        per_role = [m.role(r) for r in roles]
+        row = [str(p.key.concurrency), num(p.tps_per_gpu, 1)]
+        if split:
+            row += [ratio_pct(x.mfu if x else None, 1) for x in per_role]
+        row.append(ratio_pct(m.total_mfu, 1))
+        if mbu:
+            row += [ratio_pct(x.mbu if x else None, 1) for x in per_role]
+        rows.append(tuple(row))
+    return Table(
+        tuple(headers),
+        tuple(rows),
+        numeric=tuple(range(len(headers))),
+        caption=s.t(
+            "resources.mfu_curve_caption",
+            family=ctx.family(lead.candidate.family_id),
+        ),
+    )
 
 
 # --------------------------------------------------------------------------
@@ -585,7 +655,7 @@ def _nic_tile(ctx: Ctx, need: InterconnectNeeds) -> Kpi | None:
 
 
 def resource_kpis(ctx: Ctx, lead: PointResult) -> list[Kpi]:
-    """Headline tiles for the summary: fewest NICs, MFU, KV capacity."""
+    """Headline tiles for the summary: fewest NICs, NVLink, MFU, MBU, KV capacity."""
     s, sm = ctx.s, ctx.summary
     tiles: list[Kpi] = []
     need = sm.interconnect
@@ -627,6 +697,32 @@ def resource_kpis(ctx: Ctx, lead: PointResult) -> list[Kpi]:
                 s.t("resources.kpi_mfu", role=main.role),
                 ratio_pct(main.mfu, 1),
                 s.t("resources.kpi_mfu_detail", tflops=num(main.tflops_per_gpu, 0)),
+            )
+        )
+    if mfu is not None and mfu.total_mbu is not None and len(mfu.roles) > 1:
+        # PD: the whole cluster's MBU, with each role's in the detail
+        tiles.append(
+            Kpi(
+                s.t("resources.kpi_mbu_total"),
+                ratio_pct(mfu.total_mbu, 1),
+                " · ".join(f"{r.role} {ratio_pct(r.mbu, 1)}" for r in mfu.roles),
+            )
+        )
+    elif mfu is not None and mfu.roles and mfu.roles[0].mbu is not None:
+        main = mfu.roles[0]
+        peak = mfu.peak_mem_tbs_per_gpu
+        detail = (
+            s.t(
+                "resources.kpi_mbu_detail",
+                tbs=num(main.mem_tbs_per_gpu, 2),
+                peak=_tbs(peak),
+            )
+            if main.mem_tbs_per_gpu is not None and peak
+            else s.t("resources.kpi_mbu_detail_nopeak")
+        )
+        tiles.append(
+            Kpi(
+                s.t("resources.kpi_mbu", role=main.role), ratio_pct(main.mbu, 1), detail
             )
         )
     kv = sm.kv_capacity

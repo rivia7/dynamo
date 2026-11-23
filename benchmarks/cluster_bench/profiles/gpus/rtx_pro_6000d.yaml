@@ -1,0 +1,23 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+# NVIDIA RTX PRO 6000D Blackwell Server (PCI device 0x2bb9; nvidia-smi calls it
+# "NVIDIA RTX 6000D"): the China-market GB202 card, PCIe Gen5 x16 only, no NVLink.
+# Read on real cards (nvidia-smi and NVML, driver 580.178.04, 2026-11-23):
+# 156 SMs (the RTX PRO 6000 has 188), 448-bit GDDR7 at a 12,481 MHz maximum
+# memory clock, i.e. 448/512 of the RTX PRO 6000 Server's 1,597 GB/s = 1,398 GB/s,
+# 85,651 MiB (83.6 GiB) per GPU, 600 W, 2,430 MHz maximum SM clock.
+# No public datasheet lists its Tensor Core peaks: the dense values below are
+# the RTX PRO 6000 profile's scaled by the SM count (156/188), UNVERIFIED.
+name: rtx_pro_6000d
+match: ['RTX (PRO )?6000D']
+arch: sm120
+hbm_gb: 84
+nvlink: false
+weights_variant: nvfp4
+nominal_pcie_gbs: 64
+peak_dense_tflops: {fp4: 1660, fp8: 830, bf16: 415}
+hbm_tbs: 1.398
+lane_cap: 256
+notes: >-
+  GLM-5.3 DSA attention kernels on SM120 are UNVERIFIED; the smoke ladder decides.
+  Dense Tensor Core peaks are the RTX PRO 6000 values scaled by SM count (UNVERIFIED).

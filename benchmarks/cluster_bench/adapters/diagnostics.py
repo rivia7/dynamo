@@ -59,6 +59,11 @@ from benchmarks.cluster_bench.domain.kernels import (
     synthetic_mem_time_sum_csv,
 )
 from benchmarks.cluster_bench.domain.schema import ContainerSpec
+from benchmarks.cluster_bench.domain.steps import (
+    parse_timeline,
+    step_breakdown,
+    synthetic_timeline_json,
+)
 from benchmarks.cluster_bench.fsutil import atomic_write_text
 from benchmarks.cluster_bench.ports import Clock, Cluster, CommandError, CommandResult
 
@@ -105,6 +110,10 @@ STATS_REPORTS: tuple[str, ...] = (
 )
 START_PROFILE_ROUTE = "/engine/control/start_profile"
 DEFAULT_STEPS = 10
+# agents/nsys_timeline.py reduces each SQLite export next to its report.
+CONTAINER_SRC = "/bench/src"  # the synced harness source, mounted read-only
+TIMELINE_AGENT = f"{CONTAINER_SRC}/benchmarks/cluster_bench/agents/nsys_timeline.py"
+TIMELINE_SUFFIX = "_timeline.json"
 WORKER_ROLES = ("agg", "prefill", "decode")
 
 # Derived image: SGLang v0.5.21 docker/Dockerfile, framework stage (the same
@@ -133,13 +142,27 @@ REPORT_POLL_S = 15.0
 ERROR_TAIL_CHARS = 2000
 
 PROBE_MARKER = "CB_NSYS_PATH="
+REPORT_MARKER = "CB_NSYS_REPORT="
+# A report round trip, not just --version: the nsys that Nsight Compute bundles
+# (sglang-runtime 1.6.2 links it as /usr/local/bin/nsys) captures, but its
+# QdstrmImporter lacks libdw.so.1, so every capture stays a .qdstrm.
+REPORT_CHECK = (
+    "nsys profile --trace=none --sample=none --cpuctxsw=none "
+    "--force-overwrite=true -o /tmp/cb-nsys-check true"
+)
 PROBE_SCRIPT = (
     'p="$(command -v nsys 2>/dev/null || true)"; '
     'if [ -z "$p" ]; then for c in /opt/nvidia/nsight-systems*/*/bin/nsys '
     "/opt/nvidia/nsight-systems*/bin/nsys /usr/local/cuda/bin/nsys; do "
     'if [ -x "$c" ]; then p="$c"; break; fi; done; fi; '
     f'echo "{PROBE_MARKER}$p"; '
-    'if [ -n "$p" ]; then "$p" --version 2>&1 | head -n 3; fi'
+    'if [ -n "$p" ]; then "$p" --version 2>&1 | head -n 3; '
+    'd="$(mktemp -d)"; '
+    '"$p" profile --trace=none --sample=none --cpuctxsw=none '
+    '-o "$d/check" true >"$d/log" 2>&1; '
+    f'if [ -f "$d/check.nsys-rep" ]; then echo "{REPORT_MARKER}ok"; '
+    f'else echo "{REPORT_MARKER}failed: $(tail -n 3 "$d/log" | tr "\\n" " ")"; fi; '
+    'rm -rf "$d"; fi'
 )
 
 _SAFE_NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]*$")
@@ -347,11 +370,13 @@ def diag_dockerfile(
         "    apt-get update -y; \\",
         f"    apt-get install -y --no-install-recommends {package}; \\",
         "    rm -rf /var/lib/apt/lists/*; \\",
-        "    if ! command -v nsys >/dev/null 2>&1; then \\",
-        '      ln -s "$(ls -d /opt/nvidia/nsight-systems*/*/bin/nsys | head -n 1)" \\',
-        "        /usr/local/bin/nsys; \\",
-        "    fi; \\",
-        "    nsys --version",
+        # First on PATH, over an nsys the base image already links there.
+        '    ln -sf "$(ls -d /opt/nvidia/nsight-systems*/*/bin/nsys | sort -V | tail -n 1)" \\',
+        "      /usr/local/bin/nsys; \\",
+        "    nsys --version; \\",
+        f"    {REPORT_CHECK}; \\",
+        "    test -f /tmp/cb-nsys-check.nsys-rep; \\",
+        "    rm -f /tmp/cb-nsys-check.*",
         f"USER {user}",
         "",
     ]
@@ -562,6 +587,49 @@ def csv_path(output_base: str, report: str) -> str:
     return f"{output_base}_{report}.csv"
 
 
+def timeline_path(output_base: str) -> str:
+    """File ``agents/nsys_timeline.py`` writes for one report."""
+    return f"{output_base}{TIMELINE_SUFFIX}"
+
+
+def timeline_container_argv(
+    *,
+    name: str,
+    image: str,
+    workdir: str,
+    src_dir: str,
+    sqlite: str,
+    output: str,
+    steps: int,
+    labels: Mapping[str, str] | None = None,
+) -> list[str]:
+    """Foreground, self-removing diagnostic-image container reducing one
+    SQLite export to per-GPU wall-time totals (container paths)."""
+    return docker_run_argv(
+        name=name,
+        image=image,
+        command=[
+            "python3",
+            "-I",
+            TIMELINE_AGENT,
+            sqlite,
+            output,
+            "--steps",
+            str(steps),
+        ],
+        gpus=None,
+        mounts=(
+            Mount(host_experiments(workdir), CONTAINER_EXP),
+            Mount(src_dir, CONTAINER_SRC, read_only=True),
+        ),
+        labels=labels,
+        rdma=False,
+        detach=False,
+        remove=True,
+        shm_size="1g",
+    )
+
+
 def cat_command(path: str, timeout_s: float = CAT_TIMEOUT_S) -> str:
     return bounded(shlex.join(["cat", "--", path]), timeout_s)
 
@@ -583,10 +651,13 @@ def parse_probe(stdout: str, *, image: str, rc: int = 0, stderr: str = "") -> Ns
     """``NsysInfo`` from the probe container's output."""
     marker = False
     path: str | None = None
+    report: str | None = None
     for line in stdout.splitlines():
         if line.startswith(PROBE_MARKER):
             marker = True
             path = line[len(PROBE_MARKER) :].strip() or None
+        elif line.startswith(REPORT_MARKER):
+            report = line[len(REPORT_MARKER) :].strip()
     if not marker:
         detail = _tail(stderr, 300) or _tail(stdout, 300) or f"exit {rc}"
         return NsysInfo(
@@ -601,6 +672,16 @@ def parse_probe(stdout: str, *, image: str, rc: int = 0, stderr: str = "") -> Ns
             available=False,
             path=path,
             notes=(f"{path} --version printed no version",),
+        )
+    if report != "ok":
+        why = report or "the report check did not finish"
+        return NsysInfo(
+            image=image,
+            available=False,
+            path=path,
+            version=version,
+            version_tuple=triple,
+            notes=(f"{path} cannot write a report: {why}",),
         )
     return NsysInfo(
         image=image, available=True, path=path, version=version, version_tuple=triple
@@ -738,14 +819,14 @@ def simulated_stdout(
 ) -> str | None:
     """Synthetic output of a diagnostics command (dry-run simulator), else None.
 
-    Like the pinned image, a probed serving image has no nsys and a derived
-    ``cb-diag/...`` image has one. ``docker build`` / ``image inspect`` /
+    Like the pinned image, a probed serving image has no working nsys and a
+    derived ``cb-diag/...`` image has one. ``docker build`` / ``image inspect`` /
     ``nsys stats`` need no output: the simulator's empty success suffices.
     """
     if PROBE_MARKER in command:
         if f" {DIAG_REPOSITORY}/" not in command:
             return f"{PROBE_MARKER}\n"
-        return f"{PROBE_MARKER}/usr/local/bin/nsys\n{SIM_NSYS_VERSION}\n"
+        return f"{PROBE_MARKER}/usr/local/bin/nsys\n{SIM_NSYS_VERSION}\n{REPORT_MARKER}ok\n"
     if START_PROFILE_ROUTE in command:
         return '{"message":"Profiling started","status":"ok"}\n200'
     if command.startswith("timeout") and " stat --printf " in command:
@@ -754,6 +835,8 @@ def simulated_stdout(
     if " cat -- " in command:
         match = _ROLE_IN_NAME.search(command)
         role = match.group(1) if match else "decode"
+        if TIMELINE_SUFFIX in command:
+            return synthetic_timeline_json(role, devices=devices, steps=steps)
         for report, make in (
             ("cuda_gpu_kern_sum", synthetic_kern_sum_csv),
             ("cuda_gpu_mem_time_sum", synthetic_mem_time_sum_csv),
@@ -789,9 +872,12 @@ class NsysDiagnostics:
         probe_timeout_s: float = PROBE_TIMEOUT_S,
         build_timeout_s: float = BUILD_TIMEOUT_S,
         stats_timeout_s: float = STATS_TIMEOUT_S,
+        src_dir: str | None = None,
     ):
         self._cluster = cluster
         self._workdir = workdir.rstrip("/")
+        # The synced harness source (the reducer agent); <workdir>/src.
+        self._src_dir = (src_dir or f"{self._workdir}/src").rstrip("/")
         self._results = results_dir
         self._labels = dict(labels or {})
         self._prefix = sanitize_label(name_prefix) or "cb-diag"
@@ -1048,13 +1134,17 @@ class NsysDiagnostics:
         source: str | None = None,
         expected_devices: int | None = None,
         keep_sqlite: bool = False,
+        steps: int | None = None,
     ) -> KernelReport:
         """``nsys stats`` of one report on its node -> ``KernelReport``.
 
         Runs in a foreground container of ``image`` (the diagnostic image)
         with ``<workdir>/experiments`` mounted, then reads the three CSVs.
         ``expected_devices`` (the container's GPU count) drives the coverage
-        check. The SQLite export (hundreds of MB) is removed unless kept.
+        check. With ``steps`` (the forward steps captured) and the source
+        directory, ``agents/nsys_timeline.py`` reduces the SQLite export to the
+        wall-time split of those steps (``domain/steps.py``). The SQLite
+        export (hundreds of MB) is removed unless kept.
         """
         name = posixpath.basename(report)
         label = source or (
@@ -1110,6 +1200,11 @@ class NsysDiagnostics:
             texts[kind] = out.stdout
             files.append(path)
             self._save(f"stats/{safe}_{kind}.csv", out.stdout)
+        timeline = None
+        if steps and res is not None and res.ok:
+            timeline = self._timeline(
+                node, label, base_host, base_inside, image, steps, notes
+            )
         if not keep_sqlite:
             self._run(node, remove_command(f"{base_host}.sqlite"), CLEANUP_TIMEOUT_S)
         rows = parse_kern_sum_csv(texts.get("cuda_gpu_kern_sum", ""))
@@ -1135,7 +1230,53 @@ class NsysDiagnostics:
             source=label,
             report=report,
             breakdown=result,
+            timeline=timeline,
             files=tuple(files),
             # The breakdown's notes add the coverage findings to these.
             notes=result.notes if result is not None else tuple(dict.fromkeys(notes)),
         )
+
+    def _timeline(
+        self,
+        node: str,
+        label: str,
+        base_host: str,
+        base_inside: str,
+        image: str,
+        steps: int,
+        notes: list[str],
+    ) -> dict[str, Any] | None:
+        """Run the reducer next to one SQLite export; the breakdown as JSON."""
+        safe = sanitize_label(label) or "report"
+        container = (
+            f"{self._prefix}-steps-{sanitize_label(node)}-{sanitize_label(label)}"[:120]
+        )
+        argv = timeline_container_argv(
+            name=container,
+            image=image,
+            workdir=self._workdir,
+            src_dir=self._src_dir,
+            sqlite=f"{base_inside}.sqlite",
+            output=timeline_path(base_inside),
+            steps=steps,
+            labels=self._labels,
+        )
+        command = stats_command(argv, self._stats_timeout)
+        self._run(node, cleanup_command(container), CLEANUP_TIMEOUT_S)
+        res = self._run(node, command, self._stats_timeout)
+        self._save(f"stats/{safe}_timeline.log", self._transcript(command, res))
+        if res is None or not res.ok:
+            detail = "could not run" if res is None else f"exit {res.rc}"
+            notes.append(f"{label}: step timeline failed ({detail})")
+            self._run(node, cleanup_command(container), CLEANUP_TIMEOUT_S)
+            return None
+        out = self._run(node, cat_command(timeline_path(base_host)), CAT_TIMEOUT_S)
+        if out is None or not out.ok:
+            notes.append(f"{label}: step timeline missing")
+            return None
+        self._save(f"stats/{safe}{TIMELINE_SUFFIX}", out.stdout)
+        doc = parse_timeline(out.stdout)
+        if doc is None:
+            notes.append(f"{label}: step timeline unreadable")
+            return None
+        return step_breakdown(doc, source=label, steps=steps).model_dump(mode="json")

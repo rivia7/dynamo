@@ -11,7 +11,8 @@ from pathlib import Path
 
 import pytest
 
-from benchmarks.cluster_bench.app.pipeline import drive
+from benchmarks.cluster_bench.app.deployment import WORKER_PROCESS
+from benchmarks.cluster_bench.app.pipeline import PHASES, drive, rerun_phases
 from benchmarks.cluster_bench.app.simulate import SimClock
 from benchmarks.cluster_bench.app.store import EventStore
 from benchmarks.cluster_bench.domain.schema import Candidate, EventType, RunConfig
@@ -130,3 +131,36 @@ def test_drive_dispatches_accuracy_checks_and_history_sees_the_verdict(tmp_path)
         exp_dir=tmp_path,
     )
     assert drive(ctx2, rt2, "accuracy", planner) == "accuracy checks disabled"
+
+
+def test_a_redo_reruns_the_named_phase_and_every_later_one() -> None:
+    assert rerun_phases(()) == frozenset()
+    assert rerun_phases(("diagnose",)) == {"diagnose", "finalize"}
+    assert rerun_phases(("finalize",)) == {"finalize"}
+    assert rerun_phases(("finalize", "diagnose")) == {"diagnose", "finalize"}
+    assert PHASES[-2:] == ("diagnose", "finalize")
+    with pytest.raises(ValueError, match="only"):
+        rerun_phases(("search",))
+
+
+def test_worker_process_pattern_matches_plain_and_nsys_launched_workers() -> None:
+    grep = shutil.which("grep")
+    if grep is None:
+        pytest.skip("grep not available")
+    entry = "/bench/src/benchmarks/cluster_bench/agents/sglang_decode_only.py"
+    lines = {
+        f"python3 -P {entry} --model-path /models/x": True,
+        f"/opt/sglang/bin/python3 -P {entry} --model-path /models/x": True,  # nsys
+        "python3 -m dynamo.sglang --model-path /models/x": True,
+        f"/opt/nvidia/nsight-systems-cli/2026.4.1/target-linux-x64/nsys profile -o r python3 -P {entry}": False,
+        "bash -lc python3 -m dynamo.sglang": False,
+    }
+    for line, expected in lines.items():
+        found = subprocess.run(
+            [grep, "-E", WORKER_PROCESS],
+            input=line + "\n",
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        assert (found.returncode == 0) is expected, line

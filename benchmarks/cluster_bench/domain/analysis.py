@@ -99,12 +99,18 @@ def audit_point(
     nvlink_p99_gbs: float | None = None,
     nvlink_leak_gbs: float = 1.0,
     stage: Stage = "e2e",
+    failure_details: Sequence[str] = (),
 ) -> AuditResult:
-    """Classify one measured run as valid / valid_with_recovery / invalid."""
+    """Classify one measured run as valid / valid_with_recovery / invalid.
+
+    ``failure_details`` explain a missing export (adapters/aiperf.py).
+    """
     invalid: list[str] = []
     recovered: list[str] = []
     if metrics is None:
-        return AuditResult(status="invalid", reasons=("no AIPerf export found",))
+        return AuditResult(
+            status="invalid", reasons=("no AIPerf export found", *failure_details)
+        )
     if metrics.aiperf_version != expected_aiperf_version:
         invalid.append(
             f"aiperf {metrics.aiperf_version} != pinned {expected_aiperf_version}"

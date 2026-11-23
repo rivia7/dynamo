@@ -1,0 +1,116 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+#
+# GLM-5.3 (NVFP4, ~0.43-0.46 TB) on RTX PRO 6000D Blackwell Server (89.8 GB,
+# SM120, PCIe only), written for 4 nodes x 8 like the RTX PRO 6000 file it is
+# derived from (scales to 2/8 nodes; ids/titles are templates). TP4 cannot hold
+# the weights (4 x 89.8 GB), so replicas are TP8 per node; trtllm-gen kernels
+# are SM100-only, so CUTLASS paths are used.
+#
+# No DP attention (unlike the RTX PRO 6000 file): with attention DP8 every GPU
+# holds all attention weights, the embedding and the LM head. In
+# nvidia/GLM-5.3-NVFP4 attention is BF16 (25.7 GB of 464 GB; read from the
+# safetensors headers, 2026-11-23), so attention DP8 needs ~85 GB of weights
+# per GPU, more than the 0.84 static budget (75 GB). Attention TP8 needs
+# ~61 GB per GPU. The price: MLA keeps the latent KV on every TP rank, so the
+# KV pool is ~17 GiB per instance at mem-fraction-static 0.88 (~300k tokens),
+# and long agentic contexts make the decode batch small; hence the smaller grid.
+#
+# DSA attention: with no --dsa-*-backend, SGLang 0.5.21 serves
+# GlmMoeDsaForCausalLM with an FP8 KV cache on SM12x through
+# flashinfer_sparse_mla (arg_groups/overrides.py), so no role sets one. TileLang
+# needs a BF16 KV cache on CUDA and FlashMLA is Hopper/SM100-only, so the ladder
+# has one DSA rung: TileLang with a BF16 KV cache (half the KV capacity).
+gpu: rtx_pro_6000d
+model: glm-5.3
+# 224 Ki tokens, not the model's 256 Ki. MLA keeps the whole latent KV on every
+# TP rank, so a TP8 decode worker at mem-fraction-static 0.88 holds 248,192
+# tokens (measured with MTP, SGLang 0.5.21) and refuses a longer prompt; one
+# such request in the AgentX warmup aborts the AIPerf run. AIPerf drops traces
+# whose peak exceeds served_context - 2048: 198 of the 393 CC traces stay (218
+# at 256 Ki). Roles at mem 0.85 hold less: check before a P-Only or e2e run.
+served_context: 229376
+default_grid: {start: 8, max: 128, min: 2}
+
+families:
+  - id: agg-tp8
+    title: "聚合 TP8 x{agg}（每机一副本，attention 也按 TP 切分）"
+    priority: 0
+    roles:
+      - role: agg
+        gpus_per_instance: 8
+        instances: 4
+        base: {path: recipes/glm-5.3/sglang/agg-b200-agentic/deploy.yaml, key: agg.yaml}
+        sglang:
+          tensor-parallel-size: 8
+          data-parallel-size: null
+          enable-dp-attention: null
+          enable-dp-lm-head: null
+          moe-runner-backend: flashinfer_cutlass
+          fp4-gemm-backend: flashinfer_cutlass
+          enable-flashinfer-allreduce-fusion: null
+          max-running-requests: 128
+          mem-fraction-static: 0.85
+          hicache-size: 64
+    notes: Derived from the B200 recipe with SM120-safe GEMM/MoE backends and attention TP8.
+
+  - id: pd-{prefill}p{decode}d
+    title: "PD 分离 {prefill}P(TP8) + {decode}D(TP8)"
+    priority: 10
+    transport: mooncake
+    cross_node: [kv]
+    roles:
+      - role: prefill
+        gpus_per_instance: 8
+        instances: 2
+        base: {path: recipes/glm-5.3/sglang/disagg-b200-agentic/deploy.yaml, key: prefill.yaml}
+        sglang:
+          tensor-parallel-size: 8
+          data-parallel-size: null
+          enable-dp-attention: null
+          enable-dp-lm-head: null
+          ep-size: 8
+          moe-runner-backend: flashinfer_cutlass
+          mem-fraction-static: 0.85
+        extra_args: [--cuda-graph-backend-prefill, disabled]
+        env: {MC_FORCE_HCA: "1"}
+      - role: decode
+        gpus_per_instance: 8
+        instances: 2
+        base: {path: recipes/glm-5.3/sglang/disagg-b200-agentic/deploy.yaml, key: decode.yaml}
+        sglang:
+          data-parallel-size: null
+          enable-dp-attention: null
+          enable-dp-lm-head: null
+          moe-runner-backend: flashinfer_cutlass
+          enable-symm-mem: null
+          enable-flashinfer-allreduce-fusion: null
+          # The KV pool is what limits decode here: 0.88 instead of 0.84, and
+          # CUDA graphs only up to the batch the pool can hold.
+          mem-fraction-static: 0.88
+          cuda-graph-max-bs-decode: 64
+        env: {MC_FORCE_HCA: "1", SGLANG_DISAGGREGATION_WAITING_TIMEOUT: "3600"}
+
+ladder:
+  - id: sm120-dsa-tilelang-bf16-kv
+    when: kernel_unsupported
+    extra_args: [--dsa-prefill-backend, tilelang, --dsa-decode-backend, tilelang]
+    drop_args: [--dsa-prefill-backend, --dsa-decode-backend]
+    sglang: {kv-cache-dtype: bfloat16}
+  - id: sm120-no-spec
+    when: kernel_unsupported
+    sglang:
+      speculative-algorithm: null
+      speculative-num-steps: null
+      speculative-eagle-topk: null
+      speculative-num-draft-tokens: null
+      speculative-attention-mode: null
+      speculative-moe-runner-backend: null
+      speculative-moe-a2a-backend: null
+  - id: sm120-triton-moe
+    when: kernel_unsupported
+    sglang: {moe-runner-backend: triton}
+  - id: oom-mem-0.03
+    when: oom
+    mem_fraction_delta: -0.03
+    halve_cuda_graph_bs: true

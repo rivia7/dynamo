@@ -161,6 +161,41 @@ DG_GROUPED = (
 
 # (name, category); "guess" marks names inferred from library sources.
 CLASSIFICATION = [
+    # GLM-5.3-Flash on SM120 (SGLang 0.5.21): DSA, KDA layers, mHC
+    ("main_kernel", "attention"),
+    ("fused_sigmoid_gating_delta_rule_update_kernel", "attention"),
+    ("kda_replayssm_exact_fold_kernel", "attention"),
+    ("_causal_conv1d_update_kernel", "attention"),
+    ("layer_norm_gated_fwd_kernel", "norm_act"),
+    ("mhc_pre_big_fuse_with_norm_tilelang_kernel", "norm_act"),
+    ("mhc_post_tilelang_kernel", "norm_act"),
+    (
+        "void tensorrt_llm::kernels::cutlass_kernels::"
+        "fusedBuildExpertMapsSortFirstTokenKernel<(int)64, (int)8, (int)9>(const int *)",
+        "moe_routing",
+    ),
+    (
+        "void deep_gemm::sm120_tf32_hc_prenorm_gemm_impl<(unsigned int)24>(float *)",
+        "dense_gemm",
+    ),
+    (
+        "void sglang::<unnamed>::kpool_topk_transform_kernel<(int)512>(int *)",
+        "attention",
+    ),
+    # GLM-5.3 (DSA indexer top-k; a CuTe DSL norm and GEMM)
+    (
+        "void sglang::topk_main_kernel<(int)2048>(const float *, int *, int)",
+        "attention",
+    ),
+    (
+        "kernel_cutlass_kernel_flashinfernormkernelsfused_add_rmsnorm"
+        "FusedAddRMSNormKernel_object_at__tensorptrbf16gmemalign16o1",
+        "norm_act",
+    ),
+    (
+        "kernel_cutlass__dsv3_fused_a_gemm_kernel_tensorptri32gmemo2624307230721",
+        "dense_gemm",
+    ),
     (DG_GROUPED, "moe_gemm"),
     (DG_GROUPED.replace("GemmType)2", "GemmType)1"), "moe_gemm"),
     (DG_GROUPED.replace("GemmType)2", "GemmType)0"), "dense_gemm"),
@@ -463,6 +498,15 @@ def test_rules_are_well_formed() -> None:
         ),
         ("fused_moe_kernel", "fused_moe_kernel"),
         ("[CUDA memset]", "[CUDA memset]"),
+        (  # a CuTe DSL kernel spells its argument types into the name
+            "kernel_cutlass__dsv3_fused_a_gemm_kernel_tensorptri32gmemo26243072307"
+            "21_tensorptri32gmemo16307230721_tensorptrbf16gmemoalign16o71686144",
+            "kernel_cutlass__dsv3_fused_a_gemm_kernel…",
+        ),
+        (
+            "kernel_cutlass_rmsnorm_kernel_Tensorgmemoalign16_1024_Float32_0",
+            "kernel_cutlass_rmsnorm_kernel…",
+        ),
     ],
 )
 def test_short_kernel_name(name: str, short: str) -> None:

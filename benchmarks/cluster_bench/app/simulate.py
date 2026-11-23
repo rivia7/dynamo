@@ -84,6 +84,14 @@ SIM_NAMES = {
     "h200": ("NVIDIA H200", 143771, "9.0"),
     "h100": ("NVIDIA H100 80GB HBM3", 81559, "9.0"),
     "rtx_pro_6000": ("NVIDIA RTX PRO 6000 Blackwell Server Edition", 97887, "12.0"),
+    "rtx_pro_6000d": ("NVIDIA RTX 6000D", 85651, "12.0"),
+}
+# PCIe-only GPUs: synthetic RDMA NICs (count, Gb/s) and host memory per node.
+SIM_PCIE_ONLY = {
+    "rtx_pro_6000": (4, 200.0, 1024 * GIB),
+    # As on the 2 x 8 RTX PRO 6000D machines the profile was checked on: one
+    # 25GbE RoCE port (ConnectX-5) and 1 TB of host memory per node.
+    "rtx_pro_6000d": (1, 25.0, 1008 * GIB),
 }
 
 
@@ -198,11 +206,11 @@ def synthetic_node(
 
 def synthetic_inventory(gpu_profile: str, nodes: int = 4) -> Inventory:
     name, mem, cc = SIM_NAMES[gpu_profile]
-    pcie_only = gpu_profile == "rtx_pro_6000"
     kwargs: dict[str, Any] = {"gpu_name": name, "memory_mib": mem, "compute_cap": cc}
-    if pcie_only:
+    if gpu_profile in SIM_PCIE_ONLY:
+        hcas, rate, host_mem = SIM_PCIE_ONLY[gpu_profile]
         kwargs.update(
-            hcas=4, nvlink=False, hca_rate_gbps=200.0, mem_total_bytes=1024 * GIB
+            hcas=hcas, nvlink=False, hca_rate_gbps=rate, mem_total_bytes=host_mem
         )
     return Inventory(nodes=tuple(synthetic_node(i, **kwargs) for i in range(nodes)))
 
@@ -569,6 +577,7 @@ class Simulator:
         n = min(metrics.request_count, SIM_RECORDS)
         start = (metrics.window_start_ns or 0) / 1e9
         span = metrics.duration_s * n / metrics.request_count
+        phase = (metrics.phase_s or metrics.duration_s) * n / metrics.request_count
         raw = synthetic_records(
             requests=n,
             start_s=start,
@@ -586,6 +595,7 @@ class Simulator:
             gpus=plan.gpu_count,
             tiers=tiers,
             window=(start, start + span),
+            duration_s=phase,
             arch=arch,
         )
 
@@ -787,6 +797,7 @@ class Simulator:
             itl_p99_ms=2000 / max(user_rate, 1e-6) if user_rate else None,
             request_throughput=requests / duration,
             duration_s=duration,
+            phase_s=duration,
             isl_avg=isl,
             osl_avg=osl,
             window_start_ns=int(ctx.clock.now() * 1e9),

@@ -14,6 +14,7 @@ from benchmarks.cluster_bench.adapters.telemetry import load_samples, parse_samp
 from benchmarks.cluster_bench.domain import loadstress
 from benchmarks.cluster_bench.domain.bandwidth import Window
 from benchmarks.cluster_bench.domain.gpuactivity import (
+    ActivityAggregate,
     GpmSamples,
     GpmSeries,
     activity_by_role,
@@ -419,3 +420,15 @@ def test_activity_failure_costs_only_activity(
     assert point.activity is None
     assert "GPU activity analysis failed: boom" in point.notes
     assert point.nodes == ("node0",)
+
+
+def test_layers_split_the_time_by_what_the_gpu_was_doing() -> None:
+    layers = ActivityAggregate(gr_pct_mean=90.0, sm_pct_mean=60.0).layers()
+    assert layers == pytest.approx((60.0, 30.0, 10.0))
+    assert ActivityAggregate(sm_pct_mean=60.0).layers() is None
+    # SM activity sampled a little above the graphics engine's is no negative gap
+    assert ActivityAggregate(gr_pct_mean=50.0, sm_pct_mean=55.0).layers() == (
+        50.0,
+        0.0,
+        50.0,
+    )

@@ -16,7 +16,7 @@ import signal
 import threading
 import traceback
 from dataclasses import dataclass
-from typing import Callable, Protocol
+from typing import Callable, Protocol, Sequence
 
 from benchmarks.cluster_bench.app.accuracy_ops import AccuracyGate
 from benchmarks.cluster_bench.app.context import RunContext
@@ -52,9 +52,24 @@ PHASES = (
     "diagnose",
     "finalize",
 )
+# Phases a finished experiment can run again (``run --redo``): the redo also
+# re-runs every phase after the first one named.
+REDO_PHASES = ("diagnose", "finalize")
 EXIT_RESUMABLE = 75
 HEARTBEAT_S = 30.0
 MAX_ISSUES_PER_POINT = 2
+
+
+def rerun_phases(redo: Sequence[str]) -> frozenset[str]:
+    """Phases a redo runs although they are done: the named ones and every
+    phase after the first of them."""
+    unknown = sorted(set(redo) - set(REDO_PHASES))
+    if unknown:
+        raise ValueError(f"cannot redo {unknown}: only {list(REDO_PHASES)}")
+    if not redo:
+        return frozenset()
+    first = min(PHASES.index(p) for p in redo)
+    return frozenset(PHASES[first:])
 
 
 class Interrupted(BaseException):
@@ -221,8 +236,9 @@ class Pipeline:
     def _on_signal(self, signum: int, _frame: object) -> None:
         raise Interrupted(f"signal {signum}")
 
-    def run(self, only: tuple[str, ...] = ()) -> int:
+    def run(self, only: tuple[str, ...] = (), redo: tuple[str, ...] = ()) -> int:
         ctx = self.ctx
+        rerun = rerun_phases(redo)
         with RunLock(ctx.exp_dir / ".runner.lock"):
             ctx.store.append(
                 EventType.RUN_START, {"config": ctx.config.model_dump(mode="json")}
@@ -238,8 +254,16 @@ class Pipeline:
             try:
                 self.restore(ctx)
                 done = self.done_phases()
+                if rerun & done:
+                    ctx.note(
+                        "re-ran the finished phase(s) "
+                        + ", ".join(p for p in PHASES if p in rerun & done)
+                        + " (--redo)"
+                    )
                 for name in PHASES:
-                    if name in done or (only and name not in only):
+                    if (name in done and name not in rerun) or (
+                        only and name not in only
+                    ):
                         continue
                     ctx.store.append(EventType.PHASE_START, {"phase": name})
                     ctx.status(state="running", phase=name, step="")

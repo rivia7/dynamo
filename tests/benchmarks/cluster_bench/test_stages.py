@@ -30,7 +30,7 @@ from benchmarks.cluster_bench.report.strings import Strings
 
 pytestmark = [pytest.mark.unit, pytest.mark.pre_merge, pytest.mark.gpu_0]
 
-GPUS = ("b200", "b300", "h200", "h100", "rtx_pro_6000")
+GPUS = ("b200", "b300", "h200", "h100", "rtx_pro_6000", "rtx_pro_6000d")
 RECIPES = profile_store.RecipeLoader()
 BIG = search.Budget(
     remaining_s=1e9, deploy_s=900, point_s={"screen": 900, "decision": 1800}
@@ -318,3 +318,60 @@ def test_report_wording_follows_the_stage() -> None:
     assert d_only._template("method.objective") != base._template("method.objective")
     for stage in ("prefill", "decode"):
         assert base._template(f"stages.banner.{stage}")
+
+
+def test_glm_5_3_flash_d_only_on_rtx_pro_6000d(tmp_path) -> None:
+    base = profile_store.load_deployment_profile("glm-5.3-flash", "rtx_pro_6000d")
+    staged = stages.stage_deployment(base, "decode", role_config)
+    # lanes at profile scale (4 nodes): the D-Only climb on 2 nodes runs 32..256
+    assert {f.grid for f in staged.families} == {GridSpec(start=64, max=512, min=2)}
+    fitted, _ = prof.fit_deployment(staged, 16, 8)
+    assert [f.id for f in fitted.families] == ["d-only-tp4x4", "d-only-tp8x2"]
+    model = profile_store.load_model_profile("glm-5.3-flash")
+    gpu = profile_store.load_gpu_profiles()["rtx_pro_6000d"]
+    model_dir = "/data/models/GLM-5.3-Flash-NVFP4"
+    for family, tp in zip(fitted.families, (4, 8)):
+        for mtp in (True, False):
+            plan = SglangEngine().render(
+                Candidate(family_id=family.id, mtp=mtp, simulate_acceptance=mtp),
+                config=RunConfig(
+                    exp_id="exp-1",
+                    image="img:1",
+                    workdir=str(tmp_path),
+                    stage="decode",
+                    checkpoint="nvfp4-nvidia",
+                ),
+                inventory=synthetic_inventory("rtx_pro_6000d", nodes=2),
+                gpu=gpu,
+                model=model,
+                deployment=fitted,
+                model_dir=model_dir,
+            )
+            workers = [
+                (spec, yaml.safe_load(spec.files[path]))
+                for spec in plan.containers
+                if spec.role not in ("control", "frontend")
+                for path in spec.files
+                if path.endswith(".yaml")
+            ]
+            assert sorted(len(s.gpus) for s, _ in workers) == [tp] * (16 // tp)
+            for spec, cfg in workers:
+                assert spec.role == "decode" and spec.env[stages.DECODE_ONLY_ENV] == "1"
+                assert (
+                    spec.env["CB_SGLANG_HOTFIXES"] == "sm120-tilelang-dsa-v1-one-stage"
+                )
+                assert cfg["disaggregation-transfer-backend"] == "fake"
+                assert cfg["tensor-parallel-size"] == tp
+                assert (cfg["kv-cache-dtype"], cfg["dsa-decode-backend"]) == (
+                    "bfloat16",
+                    "tilelang",
+                )
+                assert cfg["quantization"] == "modelopt_fp4"
+                assert cfg["disable-shared-experts-fusion"] is True
+                assert cfg["model-path"] == model_dir
+                assert cfg["served-model-name"] == "zai-org/GLM-5.3-Flash"
+                assert cfg["context-length"] == 229376
+                # without a draft model there is no ReplaySSM ring either
+                assert ("speculative-algorithm" in cfg) == mtp
+                assert ("enable-linear-replayssm-spec" in cfg) == mtp
+                assert ("SGLANG_SIMULATE_ACC_LEN" in spec.env) == mtp

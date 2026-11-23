@@ -21,6 +21,7 @@ from benchmarks.cluster_bench.adapters.microbench import (
     NCCL_SCRIPT,
     P2P_SCRIPT,
     PORT_SPAN,
+    TORCHRUN,
     MicrobenchRunner,
     build_microbench_docker,
     build_nccl_collective_args,
@@ -31,6 +32,7 @@ from benchmarks.cluster_bench.adapters.microbench import (
     nccl_ib_hca_value,
     output_path,
     parse_nccl,
+    parse_nccl_hops,
     parse_nccl_net_log,
     parse_p2p,
     rendezvous_port,
@@ -111,7 +113,7 @@ def test_torchrun_standalone_and_static_rendezvous():
     single = build_torchrun_command(
         NCCL_SCRIPT, ["--mode", "collective"], nproc_per_node=8
     )
-    assert single[:4] == ["torchrun", "--standalone", "--nnodes", "1"]
+    assert single[:6] == [*TORCHRUN, "--standalone", "--nnodes", "1"]
     assert single[-3:] == [NCCL_SCRIPT, "--mode", "collective"]
     assert flag_value(single, "--nproc-per-node") == "8"
 
@@ -386,7 +388,7 @@ def test_runner_collectives_intra_then_inter(recorder, tmp_path):
     for rank, node in enumerate(NODES):
         intra_argv, inter_argv = docker_runs(recorder, node)
         inner = intra_argv[intra_argv.index(IMAGE) + 1 :]
-        assert inner[:2] == ["torchrun", "--standalone"]
+        assert inner[:4] == [*TORCHRUN, "--standalone"]
         assert "NCCL_NET" not in env_of(intra_argv)
         inner = inter_argv[inter_argv.index(IMAGE) + 1 :]
         assert flag_value(inner, "--nnodes") == "4"
@@ -581,3 +583,59 @@ def test_from_inventory_fills_addresses_counts_planes_and_rates(recorder, tmp_pa
 def recorder_result(node: str, command: str, stdout: str) -> CommandResult:
     """A successful CommandResult carrying ``stdout``."""
     return CommandResult(node, command, 0, stdout, "")
+
+
+def test_parse_nccl_hops_keeps_the_intra_node_transports():
+    log = "\n".join(
+        (
+            "host-a:1:1 [0] NCCL INFO Channel 00/0 : 0[0] -> 1[1] via P2P/CUMEM",
+            "host-a:1:1 [0] NCCL INFO Channel 01/0 : 0[0] -> 1[1] via P2P/CUMEM/read",
+            "host-a:2:2 [1] NCCL INFO Channel 00/0 : 1[1] -> 0[0] via P2P/IPC",
+            # NCCL 2.30 prints no sub-channel for SHM
+            "host-a:4:4 [3] NCCL INFO Channel 00 : 3[3] -> 4[4] via SHM/direct/direct",
+            "host-a:4:4 [3] NCCL INFO Channel 01 : 3[3] -> 4[4] via SHM/direct",
+            "host-a:1:3 [0] NCCL INFO Channel 00/1 : 0[0] -> 8[0] [send] via NET/IB/0",
+            "host-a:1:3 [0] NCCL INFO Channel 00/1 : 8[0] -> 0[0] [receive] via NET/IB/0",
+        )
+    )
+    assert parse_nccl_hops(log) == {
+        "0->1": ["P2P/CUMEM"],
+        "1->0": ["P2P/IPC"],
+        "3->4": ["SHM/direct"],
+    }
+    pairs_log = fixture_text("nccl_info_pairs_node0.log.txt")
+    assert parse_nccl_hops(pairs_log) == {"0->1": ["P2P/CUMEM"]}
+    assert parse_nccl_hops("") == {}
+
+
+def test_runner_collectives_keep_the_nccl_hops_of_each_node(recorder, tmp_path):
+    remote = f"{OUT_DIR}/nccl.json"
+    for node in NODES:
+        recorder.files[(node, output_path(remote, f"intra-{node}"))] = fixture_text(
+            "nccl_intra_h100.json"
+        )
+    recorder.files[("node0", output_path(remote, "inter"))] = fixture_text(
+        "nccl_inter_h100.json"
+    )
+
+    def responder(node, command):
+        if node == "node0" and command.startswith("docker run ") and "intra" in command:
+            log = (
+                "n0:1:1 [3] NCCL INFO Channel 00 : 3[3] -> 4[4] via SHM/direct\n"
+                "n0:1:1 [0] NCCL INFO Channel 00/0 : 0[0] -> 1[1] via P2P/CUMEM\n"
+            )
+            return recorder_result(node, command, log)
+        return None
+
+    recorder.responder = responder
+    peaks = make_runner(recorder, tmp_path).collectives(list(NODES), remote)
+    intra = {p.scope: p for p in peaks if p.test == "nccl_all_reduce_intra"}
+    assert intra["node0"].details["nccl_hops"] == {
+        "0->1": ["P2P/CUMEM"],
+        "3->4": ["SHM/direct"],
+    }
+    assert "nccl_hops" not in intra["node1"].details
+    intra_argv, inter_argv = docker_runs(recorder, "node0")
+    env = env_of(intra_argv)
+    assert (env["NCCL_DEBUG"], env["NCCL_DEBUG_SUBSYS"]) == ("INFO", "INIT")
+    assert "NCCL_DEBUG_SUBSYS" not in env_of(inter_argv)
