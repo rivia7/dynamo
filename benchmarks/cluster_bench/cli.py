@@ -12,8 +12,10 @@ Commands
               launch, watch, pull, down)
 
 ``--stage`` picks what is measured: e2e (default; aggregated and PD
-deployments end to end), p-only (the PD prefill stage alone: input tok/s/GPU)
-or d-only (the PD decode stage alone: output tok/s/GPU); see domain/stages.py.
+deployments end to end), p-only (the PD prefill stage alone: input tok/s/GPU),
+d-only (the PD decode stage alone: output tok/s/GPU) or a-only (the attention
+side of attention-FFN disaggregation, F simulated as described by
+``--afd-f``: output tok/s per A GPU); see domain/stages.py and domain/afd.py.
 """
 
 from __future__ import annotations
@@ -39,6 +41,7 @@ from benchmarks.cluster_bench.adapters.executors import (
     Redactor,
 )
 from benchmarks.cluster_bench.adapters.providers import ExistingClusterProvider
+from benchmarks.cluster_bench.app.afd_ops import stored_plan
 from benchmarks.cluster_bench.app.context import RunContext, Secrets, SystemClock
 from benchmarks.cluster_bench.app.phases.diagnose import DiagnosePhase
 from benchmarks.cluster_bench.app.phases.download import DownloadPhase
@@ -66,6 +69,7 @@ from benchmarks.cluster_bench.app.simulate import (
 )
 from benchmarks.cluster_bench.app.store import EventStore
 from benchmarks.cluster_bench.app.summary import plan_lookup_for
+from benchmarks.cluster_bench.domain.afd import parse_afd_f
 from benchmarks.cluster_bench.domain.datasets import (
     DEFAULT_DATASET,
     DatasetError,
@@ -77,13 +81,14 @@ from benchmarks.cluster_bench.domain.schema import (
     DEFAULT_BENCH_SPECS,
     DEFAULT_LINK_TARGET_UTIL,
     AccuracyConfig,
+    AfdFSpec,
     BudgetConfig,
     DiagnoseConfig,
     EventType,
     ExperimentSummary,
     RunConfig,
 )
-from benchmarks.cluster_bench.domain.stages import STAGE_PREFIX, parse_stage
+from benchmarks.cluster_bench.domain.stages import STAGE_PREFIX, parse_stage, stage_spec
 from benchmarks.cluster_bench.kb.writer import export_experiment
 from benchmarks.cluster_bench.ports import NodeAddress, Provider
 from benchmarks.cluster_bench.report.render import render_report
@@ -124,10 +129,22 @@ def _add_run_args(p: argparse.ArgumentParser) -> None:
     p.add_argument(
         "--stage",
         default="e2e",
-        metavar="{e2e,p-only,d-only}",
+        metavar="{e2e,p-only,d-only,a-only}",
         help="e2e: whole deployments; p-only: the PD prefill stage alone "
         "(max input tok/s/GPU); d-only: the PD decode stage alone (max output "
-        "tok/s/GPU)",
+        "tok/s/GPU); a-only: the attention side of attention-FFN "
+        "disaggregation, routed experts on a simulated F (max output tok/s "
+        "per A GPU)",
+    )
+    p.add_argument(
+        "--afd-f",
+        default="",
+        metavar="KEY=VALUE,...",
+        help="a-only: the F the attention side waits for. Keys: gpus (F GPUs "
+        "per A instance; default the fewest that hold the routed experts), "
+        "link=net|intra, layout=staged|direct, microbatches (default 2), "
+        "wire=bf16|fp8, bw_gbs or bw_gbps (per A GPU, one direction; default "
+        "measured), lat_us, eff_mem, eff_flop, mem_fraction",
     )
     p.add_argument(
         "--dataset",
@@ -322,8 +339,11 @@ def _config(args: argparse.Namespace, dry_run: bool) -> RunConfig:
     try:
         stage = parse_stage(args.stage)
         dataset = parse_dataset(args.dataset)
+        afd_f = parse_afd_f(args.afd_f)
     except (ValueError, DatasetError) as exc:
         raise SystemExit(f"cluster_bench: {exc}") from exc
+    if args.afd_f and stage_spec(stage).afd_side is None:
+        raise SystemExit("cluster_bench: --afd-f applies to --stage a-only only")
     floor = AGENTX_MIN_DURATION_S if dataset.agentx else 1
     if args.confirm_duration_s < floor:
         raise SystemExit(
@@ -382,6 +402,7 @@ def _config(args: argparse.Namespace, dry_run: bool) -> RunConfig:
         else default_tiers(),
         link_target_util=args.link_target_util,
         nvlink_ablation=not args.no_nvlink_ablation,
+        afd_f=afd_f,
         accuracy=AccuracyConfig(
             enabled=not args.no_accuracy,
             questions=args.accuracy_questions,
@@ -411,7 +432,9 @@ def _resume_config(
     store: EventStore, fresh: RunConfig, redo: tuple[str, ...] = ()
 ) -> RunConfig:
     """A resumed experiment keeps its original configuration; ``--redo
-    diagnose`` takes the diagnostic window's options given now."""
+    diagnose`` takes the diagnostic window's options given now. A-Only keeps
+    the F it planned; until it has one (the plan failed), a new ``--afd-f``
+    applies."""
     starts = store.of_type(EventType.RUN_START)
     if not starts:
         if redo:
@@ -433,6 +456,11 @@ def _resume_config(
                 },
             }
         )
+    planned = stored_plan(store)
+    if planned is not None:
+        original = original.model_copy(update={"afd_f": planned.spec})
+    elif fresh.afd_f != AfdFSpec():
+        original = original.model_copy(update={"afd_f": fresh.afd_f})
     if original.model_dump(exclude={"exp_id"}) != fresh.model_dump(exclude={"exp_id"}):
         logger.warning(
             "resuming %s with its original configuration; new CLI options are ignored",

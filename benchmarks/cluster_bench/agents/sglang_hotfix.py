@@ -29,6 +29,16 @@ Hotfixes:
     GLM-5.3-Flash answers correctly with it at TP4 and TP8. Upstream #50752
     fixes the same overflow only for the v2 kernel's 512+64 geometry (GLM-5.3,
     DeepSeek). Other GPUs and attention geometries are unchanged.
+
+``afd-attn-only``
+    The A-Only stage (attention side of attention-FFN disaggregation, F
+    simulated). Copies agents/sglang_afd.py and its kernel into the package
+    as ``srt/cb_afd.py`` and ``srt/cb_afd_kernel.py``; ``DeepseekV2MoE``
+    builds that module's null experts in target layers and gives them the
+    full top-k (the routing A sends to F, which SM100's flashinfer_trtllm
+    runner would leave to its fused kernel), and the safetensors iterators
+    skip target layers' routed-expert tensors. Inert unless the worker env
+    sets ``CB_AFD_ATTN_ONLY=1`` (domain/afd.py renders it).
 """
 
 from __future__ import annotations
@@ -43,6 +53,9 @@ from typing import Iterable
 ENV_VAR = "CB_SGLANG_HOTFIXES"
 
 
+AGENTS_DIR = Path(__file__).resolve().parent
+
+
 class HotfixError(RuntimeError):
     pass
 
@@ -52,6 +65,14 @@ class Edit:
     path: str  # relative to the installed sglang package directory
     old: str
     new: str
+
+
+@dataclass(frozen=True)
+class Copy:
+    """Install a file of this directory into the sglang package."""
+
+    src: str  # file name in this agents directory
+    path: str  # destination, relative to the installed sglang package directory
 
 
 _TILELANG_OLD = """\
@@ -72,13 +93,109 @@ _TILELANG_NEW = """\
     return out
 """
 
-HOTFIXES: dict[str, tuple[Edit, ...]] = {
+_DSV2 = "srt/models/deepseek_v2.py"
+_DSV2_MOE_OLD = """\
+class DeepseekV2MoE(nn.Module):
+    def __init__(
+"""
+_DSV2_MOE_NEW = """\
+def _cb_afd_experts_class(quant_config, is_nextn):
+    # cluster_bench hotfix afd-attn-only: an A-Only worker's target MoE layers
+    # hold no routed experts (benchmarks/cluster_bench/agents/sglang_afd.py).
+    from sglang.srt import cb_afd
+
+    if cb_afd.nulls_experts(is_nextn):
+        return cb_afd.null_experts_class()
+    return get_moe_impl_class(quant_config)
+
+
+def _cb_afd_standard_topk(is_nextn):
+    # cluster_bench hotfix afd-attn-only: A computes the routing it sends to F,
+    # so a null layer always takes the full top-k.
+    from sglang.srt import cb_afd
+
+    return cb_afd.nulls_experts(is_nextn)
+
+
+class DeepseekV2MoE(nn.Module):
+    def __init__(
+"""
+_DSV2_EXPERTS_OLD = """\
+        self.experts = get_moe_impl_class(quant_config)(
+            num_experts=num_experts_for_moe + get_exec().moe.ep_num_redundant_experts,
+"""
+_DSV2_EXPERTS_NEW = """\
+        self.experts = _cb_afd_experts_class(quant_config, is_nextn)(
+            num_experts=num_experts_for_moe + get_exec().moe.ep_num_redundant_experts,
+"""
+_DSV2_TOPK_OLD = """\
+                output_format=(
+                    TopKOutputFormat.STANDARD
+                    if (quant_config is None)
+                    and (not get_moe_runner_backend().is_flashinfer_trtllm())
+                    else None
+                ),
+"""
+_DSV2_TOPK_NEW = """\
+                output_format=(
+                    TopKOutputFormat.STANDARD
+                    if _cb_afd_standard_topk(is_nextn)
+                    or (
+                        (quant_config is None)
+                        and (not get_moe_runner_backend().is_flashinfer_trtllm())
+                    )
+                    else None
+                ),
+"""
+_WEIGHTS = "srt/model_loader/weight_utils.py"
+_WEIGHTS_SKIP_OLD = "CAPTURE_SAFE_WEIGHT_SENTINEL = 1e-3\n"
+_WEIGHTS_SKIP_NEW = """\
+CAPTURE_SAFE_WEIGHT_SENTINEL = 1e-3
+
+
+def _cb_afd_skip_tensor(name):
+    # cluster_bench hotfix afd-attn-only: an A-Only worker never reads the
+    # target's routed experts (benchmarks/cluster_bench/agents/sglang_afd.py).
+    from sglang.srt import cb_afd
+
+    return cb_afd.skip_tensor(name)
+"""
+_WEIGHTS_ITER_OLD = """\
+                for name in f.keys():
+                    yield name, f.get_tensor(name)
+"""
+_WEIGHTS_ITER_NEW = """\
+                for name in f.keys():
+                    if _cb_afd_skip_tensor(name):
+                        continue
+                    yield name, f.get_tensor(name)
+"""
+_WEIGHTS_THREADS_OLD = (
+    "                result = {k: f.get_tensor(k) for k in f.keys()}\n"
+)
+_WEIGHTS_THREADS_NEW = """\
+                result = {
+                    k: f.get_tensor(k) for k in f.keys() if not _cb_afd_skip_tensor(k)
+                }
+"""
+
+HOTFIXES: dict[str, tuple[Edit | Copy, ...]] = {
     "sm120-tilelang-dsa-v1-one-stage": (
         Edit(
             "kernels/ops/attention/dsa/tilelang_kernel.py",
             _TILELANG_OLD,
             _TILELANG_NEW,
         ),
+    ),
+    "afd-attn-only": (
+        Copy("sglang_afd.py", "srt/cb_afd.py"),
+        Copy("sglang_afd_kernel.py", "srt/cb_afd_kernel.py"),
+        Edit(_DSV2, _DSV2_MOE_OLD, _DSV2_MOE_NEW),
+        Edit(_DSV2, _DSV2_EXPERTS_OLD, _DSV2_EXPERTS_NEW),
+        Edit(_DSV2, _DSV2_TOPK_OLD, _DSV2_TOPK_NEW),
+        Edit(_WEIGHTS, _WEIGHTS_SKIP_OLD, _WEIGHTS_SKIP_NEW),
+        Edit(_WEIGHTS, _WEIGHTS_ITER_OLD, _WEIGHTS_ITER_NEW),
+        Edit(_WEIGHTS, _WEIGHTS_THREADS_OLD, _WEIGHTS_THREADS_NEW),
     ),
 }
 
@@ -105,8 +222,9 @@ def sglang_dir() -> Path:
 def plan(ids: Iterable[str], root: Path) -> dict[Path, str]:
     """The new text of every file the hotfixes change; empty once all are applied.
 
-    Raises HotfixError for an unknown id, an unreadable file, or an edit whose
-    text does not occur exactly once (the hotfix does not fit this SGLang).
+    Raises HotfixError for an unknown id, an unreadable file, an edit whose
+    text does not occur exactly once (the hotfix does not fit this SGLang), or
+    a changed Python file that no longer compiles.
     """
     pending: dict[Path, str] = {}
     for hotfix_id in ids:
@@ -116,6 +234,9 @@ def plan(ids: Iterable[str], root: Path) -> dict[Path, str]:
             raise HotfixError(f"unknown hotfix {hotfix_id!r} (known: {known})")
         for edit in edits:
             path = root / edit.path
+            if isinstance(edit, Copy):
+                _plan_copy(hotfix_id, edit, path, pending)
+                continue
             text = pending.get(path)
             if text is None:
                 try:
@@ -133,7 +254,32 @@ def plan(ids: Iterable[str], root: Path) -> dict[Path, str]:
                     f"{path}, not once: the hotfix does not fit this SGLang"
                 )
             pending[path] = text.replace(edit.old, edit.new)
+    for path, text in pending.items():
+        try:
+            compile(text, str(path), "exec")
+        except SyntaxError as exc:
+            raise HotfixError(f"{path} would not compile: {exc}") from exc
     return pending
+
+
+def _plan_copy(
+    hotfix_id: str, copy: Copy, path: Path, pending: dict[Path, str]
+) -> None:
+    try:
+        text = (AGENTS_DIR / copy.src).read_text(encoding="utf-8")
+    except OSError as exc:
+        raise HotfixError(f"{hotfix_id}: cannot read {copy.src}: {exc}") from exc
+    if not path.parent.is_dir():
+        raise HotfixError(
+            f"{hotfix_id}: {path.parent} does not exist: the hotfix does not fit "
+            "this SGLang"
+        )
+    try:
+        installed = path.read_text(encoding="utf-8")
+    except OSError:
+        installed = None
+    if installed != text:
+        pending[path] = text
 
 
 def write(pending: dict[Path, str]) -> None:

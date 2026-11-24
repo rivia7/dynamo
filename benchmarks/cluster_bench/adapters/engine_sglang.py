@@ -11,9 +11,11 @@ deployment session writes the files and starts the containers.
 Placement fills nodes in role order (prefill before decode), so prefill and
 decode instances land on different nodes and KV transfer crosses the fabric.
 
-P-Only and D-Only families (domain/stages.py) get their stage overrides last:
-P-Only workers run the prefill config as aggregated workers, D-Only workers
-the decode config with the fake KV-transfer backend and the decode-only shim.
+P-Only, D-Only and A-Only families (domain/stages.py) get their stage
+overrides last: P-Only workers run the prefill config as aggregated workers,
+D-Only workers the decode config with the fake KV-transfer backend and the
+decode-only shim, A-Only workers that config as DP attention without routed
+experts, waiting for the simulated F the run's plan describes (domain/afd.py).
 """
 
 from __future__ import annotations
@@ -46,6 +48,7 @@ from benchmarks.cluster_bench.domain.profiles import (
     select_checkpoint,
 )
 from benchmarks.cluster_bench.domain.schema import (
+    AfdPlan,
     Candidate,
     ContainerSpec,
     DeploymentProfile,
@@ -60,7 +63,11 @@ from benchmarks.cluster_bench.domain.schema import (
     RunConfig,
     Stage,
 )
-from benchmarks.cluster_bench.domain.stages import apply_stage
+from benchmarks.cluster_bench.domain.stages import (
+    WorkerContext,
+    apply_stage,
+    stage_spec,
+)
 
 LAUNCH_SCRIPT = "/bench/src/benchmarks/cluster_bench/scripts/launch_node.sh"
 # Store-true keys passed on the worker command line, not in its --config YAML:
@@ -295,6 +302,7 @@ class SglangEngine:
         model: ModelProfile,
         deployment: DeploymentProfile,
         model_dir: str,
+        afd: AfdPlan | None = None,
     ) -> LaunchPlan:
         self.notes = []
         gpn = len(inventory.nodes[0].gpus)
@@ -304,6 +312,11 @@ class SglangEngine:
         if family is None:
             raise RenderError(
                 f"{candidate.family_id} does not fit {inventory.gpu_count} GPUs"
+            )
+        if stage_spec(family.stage).afd_side and afd is None:
+            raise RenderError(
+                f"{family.id}: an {stage_spec(family.stage).label} family needs the "
+                "run's F plan (app/afd_ops.py)"
             )
         rungs = {r.id: r for r in deployment.ladder}
         unknown = [r for r in candidate.rungs if r not in rungs]
@@ -362,6 +375,7 @@ class SglangEngine:
                 rungs,
                 family.stage,
                 checkpoint.sglang,
+                afd,
             )
             leader_node, _ = placement.ranks[0]
             leader_addr = inventory.node(leader_node).address
@@ -536,9 +550,9 @@ class SglangEngine:
         rungs: dict[str, LadderRung],
         stage: Stage = "e2e",
         checkpoint_sglang: Mapping[str, Any] | None = None,
+        afd: AfdPlan | None = None,
     ) -> tuple[dict[str, Any], tuple[str, ...], dict[str, str]]:
-        cfg: dict[str, Any] = self.recipes.config(role.base) if role.base else {}
-        cfg = merge_config(cfg, role.sglang)
+        cfg = self.recipes.role_config(role)
         # What the served checkpoint needs (e.g. its quantization method).
         cfg = merge_config(cfg, checkpoint_sglang or {})
         cfg.update(
@@ -573,7 +587,10 @@ class SglangEngine:
             rung = rungs[rung_id]
             if role.role in rung.roles:
                 cfg, args, env = _apply_rung(cfg, args, env, rung)
-        cfg, env = apply_stage(stage, role.role, cfg, env)
+        worker = WorkerContext(
+            gpus=role.gpus_per_instance, afd=afd, null_f=candidate.null_f
+        )
+        cfg, env = apply_stage(stage, role.role, cfg, env, worker)
         return cfg, args, env
 
     @staticmethod

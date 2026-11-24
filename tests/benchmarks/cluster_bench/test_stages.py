@@ -37,15 +37,9 @@ BIG = search.Budget(
 )
 
 
-def role_config(role: Any) -> dict[str, Any]:
-    return prof.merge_config(
-        RECIPES.config(role.base) if role.base else {}, role.sglang
-    )
-
-
 def stage_profile(gpu: str, stage: str):
     base = profile_store.load_deployment_profile("glm-5.3", gpu)
-    return stages.stage_deployment(base, stage, role_config)
+    return stages.stage_deployment(base, stage, RECIPES.role_config)
 
 
 @pytest.mark.parametrize(
@@ -58,6 +52,9 @@ def stage_profile(gpu: str, stage: str):
         ("prefill", "prefill"),
         ("d-only", "decode"),
         (" D ", "decode"),
+        ("a-only", "attention"),
+        ("A_Only", "attention"),
+        ("attention", "attention"),
     ],
 )
 def test_parse_stage(text: str, stage: str) -> None:
@@ -65,8 +62,8 @@ def test_parse_stage(text: str, stage: str) -> None:
 
 
 def test_parse_stage_rejects_unknown_names() -> None:
-    with pytest.raises(ValueError, match="use e2e, p-only or d-only"):
-        stages.parse_stage("a-only")
+    with pytest.raises(ValueError, match="use e2e, p-only, d-only or a-only"):
+        stages.parse_stage("f-only")
 
 
 @pytest.mark.parametrize("gpu", GPUS)
@@ -130,7 +127,7 @@ def test_profile_stage_families_win_and_are_checked() -> None:
     base = profile_store.load_deployment_profile("glm-5.3", "b200")
     derived = stage_profile("b200", "decode").families
     with_own = base.model_copy(update={"families": base.families + derived[:1]})
-    again = stages.stage_deployment(with_own, "decode", role_config)
+    again = stages.stage_deployment(with_own, "decode", RECIPES.role_config)
     assert [f.id for f in again.families] == [f.id for f in derived]
     assert stages.stage_deployment(with_own, "e2e").families == base.families
     wrong = derived[0].model_copy(update={"stage": "prefill"})
@@ -322,7 +319,7 @@ def test_report_wording_follows_the_stage() -> None:
 
 def test_glm_5_3_flash_d_only_on_rtx_pro_6000d(tmp_path) -> None:
     base = profile_store.load_deployment_profile("glm-5.3-flash", "rtx_pro_6000d")
-    staged = stages.stage_deployment(base, "decode", role_config)
+    staged = stages.stage_deployment(base, "decode", RECIPES.role_config)
     # lanes at profile scale (4 nodes): the D-Only climb on 2 nodes runs 32..256
     assert {f.grid for f in staged.families} == {GridSpec(start=64, max=512, min=2)}
     fitted, _ = prof.fit_deployment(staged, 16, 8)

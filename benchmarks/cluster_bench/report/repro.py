@@ -13,12 +13,14 @@ import shlex
 from dataclasses import dataclass
 from typing import Sequence
 
+from benchmarks.cluster_bench.domain.afd import format_afd_f
 from benchmarks.cluster_bench.domain.requests import default_tiers
 from benchmarks.cluster_bench.domain.schema import (
     DEFAULT_LINK_TARGET_UTIL,
     AccuracyConfig,
     ExperimentSummary,
 )
+from benchmarks.cluster_bench.domain.stages import stage_spec
 
 HARNESS = "benchmarks.cluster_bench"
 WORKDIR = '"$WORKDIR"'
@@ -85,8 +87,13 @@ def run_args(summary: ExperimentSummary) -> tuple[str, ...]:
         "--expect-nodes",
         str(summary.node_count),
     ]
+    if summary.stage != "e2e":
+        args += ["--stage", stage_spec(summary.stage).cli]
     cfg = summary.run_config
     if cfg is not None:
+        afd_f = format_afd_f(cfg.afd_f)
+        if afd_f:
+            args += ["--afd-f", q(afd_f)]
         if cfg.model_repo:
             args += ["--model-repo", q(cfg.model_repo)]
             if cfg.model_size_gb is not None:

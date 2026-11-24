@@ -1,10 +1,12 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 """Planner-driven phases: search (+ floors, MTP ablation), pilot, NIC sweep,
-confirm. Each phase only wires a pure ``decide_*`` function into ``drive``."""
+confirm (+ the A-Only null-F bound). Each phase only wires a pure ``decide_*``
+function into ``drive``."""
 
 from __future__ import annotations
 
+from benchmarks.cluster_bench.app.afd_ops import ensure_plan
 from benchmarks.cluster_bench.app.context import RunContext
 from benchmarks.cluster_bench.app.history import build_history
 from benchmarks.cluster_bench.app.pipeline import PhaseRuntime, drive
@@ -13,7 +15,11 @@ from benchmarks.cluster_bench.domain.analysis import noise_from_samples, valid_p
 from benchmarks.cluster_bench.domain.nicplan import feasible_counts
 from benchmarks.cluster_bench.domain.profiles import fit_family, scale_grid
 from benchmarks.cluster_bench.domain.schema import EventType
-from benchmarks.cluster_bench.domain.stages import stage_label, stage_lane_cap
+from benchmarks.cluster_bench.domain.stages import (
+    stage_label,
+    stage_lane_cap,
+    stage_spec,
+)
 
 
 def search_context(ctx: RunContext) -> search.SearchContext:
@@ -44,12 +50,13 @@ def search_context(ctx: RunContext) -> search.SearchContext:
         families=tuple(families),
         ladder=deployment.ladder,
         grids=grids,
-        # D-Only decodes over fake KV: real MTP acceptance is meaningless there.
-        simulate_acceptance=ctx.config.simulate_acceptance or stage == "decode",
+        # Decode over fake KV: real MTP acceptance is meaningless there.
+        simulate_acceptance=ctx.config.simulate_acceptance or stage_spec(stage).fake_kv,
         mtp_capable=bool(model.spec_decode_keys),
         nic_counts=feasible_counts(inventory, ctx.config.nic_counts),
         nvlink=gpu.nvlink and ctx.config.nvlink_ablation,
         stage=stage,
+        f_bound=stage_spec(stage).afd_side is not None,
     )
 
 
@@ -70,6 +77,7 @@ class SearchPhase:
         if unsupported_verdict(ctx):
             ctx.note("search skipped: the kernel smoke found this GPU type unsupported")
             return
+        ensure_plan(ctx)  # A-Only: size the simulated F before the first deploy
         sc = search_context(ctx)
         rt.plan = sc
         drive(ctx, rt, "search", lambda h, b: search.decide_search(sc, h, b))
@@ -85,7 +93,7 @@ class AccuracyPhase:
     def run(self, ctx: RunContext, rt: PhaseRuntime) -> None:
         if unsupported_verdict(ctx):
             return
-        if ctx.config.stage != "e2e":
+        if not stage_spec(ctx.config.stage).accuracy:
             ctx.store.append(
                 EventType.DECISION,
                 {
@@ -166,4 +174,6 @@ class ConfirmPhase:
             sc = search_context(ctx)
             rt.plan = sc
             drive(ctx, rt, "confirm", lambda h, b: search.decide_confirm(sc, h, b))
+            if sc.f_bound:  # A-Only: the leader again with the F wait off
+                drive(ctx, rt, "f_bound", lambda h, b: search.decide_f_bound(sc, h, b))
         rt.session.teardown()

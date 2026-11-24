@@ -98,6 +98,9 @@ def test_export_writes_records_and_views(tmp_path, kb, h200, plan_lookup):
     assert [row["exp_id"] for row in index] == [h200.exp_id]
     assert index[0]["leader_tps_per_gpu"] == factory.LEADER_TPS
     exp = index[0]  # the experiment record
+    # A-Only columns stay out of other stages' rows (their rec_id unchanged)
+    assert not [key for key in exp if key.startswith("afd_")]
+    assert exp["rec_id"] == rec_id_of(exp)
     assert (exp["min_nics_measured"], exp["min_nics_family"]) == (4, "disagg-1p1d")
     assert exp["min_nics_estimated"] == 1 and exp["nvlink_needed"] is True
     assert exp["kv_total_tokens"] == 4 * 381_000 and exp["kv_requests_at_p50"] == 24

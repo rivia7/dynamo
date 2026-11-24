@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Any, Callable, Protocol, Sequence, TypeVar
 
 from benchmarks.cluster_bench.domain.schema import (
+    AfdPlan,
     Candidate,
     DeploymentProfile,
     FailureClass,
@@ -163,6 +164,7 @@ class Engine(Protocol):
         model: ModelProfile,
         deployment: DeploymentProfile,
         model_dir: str,
+        afd: AfdPlan | None = None,
     ) -> LaunchPlan:
         ...
 

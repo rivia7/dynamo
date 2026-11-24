@@ -19,8 +19,12 @@ from pathlib import Path
 
 from benchmarks.cluster_bench.adapters.docker import experiment_labels
 from benchmarks.cluster_bench.adapters.transports import get_transport
+from benchmarks.cluster_bench.agents.sglang_afd import MARKER as AFD_MARKER
+from benchmarks.cluster_bench.app.afd_ops import ensure_plan, plan_instance_gpus
 from benchmarks.cluster_bench.app.context import RunContext
+from benchmarks.cluster_bench.domain import afd
 from benchmarks.cluster_bench.domain.lifecycle import DeployLifecycle, deploy_lifecycle
+from benchmarks.cluster_bench.domain.profiles import select_checkpoint
 from benchmarks.cluster_bench.domain.schema import (
     Candidate,
     ContainerSpec,
@@ -32,7 +36,7 @@ from benchmarks.cluster_bench.domain.schema import (
     Inventory,
     LaunchPlan,
 )
-from benchmarks.cluster_bench.domain.stages import DECODE_ONLY_ENV
+from benchmarks.cluster_bench.domain.stages import DECODE_ONLY_ENV, stage_spec
 from benchmarks.cluster_bench.fsutil import atomic_write_text
 from benchmarks.cluster_bench.ports import CommandError
 
@@ -51,6 +55,9 @@ ENV_KEYS_TO_VERIFY = (
     "SGLANG_HOST_IP",
     "SGLANG_SIMULATE_ACC_LEN",
     DECODE_ONLY_ENV,
+    afd.ATTN_ONLY_ENV,
+    afd.TARGET_LAYERS_ENV,
+    afd.F_WAIT_ENV,
 )
 # The worker process whose environment proves the rendered env (pgrep -f, ERE).
 # Under nsys the launcher execs it by absolute path (/opt/sglang/bin/python3).
@@ -120,6 +127,7 @@ class DeploymentSession:
             model=hw.model,
             deployment=deployment,
             model_dir=hw.model_dir,
+            afd=ensure_plan(self.ctx),
         )
         log_dir = self.ctx.exp_dir / "deployments" / plan.cand_fp
         atomic_write_text(log_dir / "plan.json", plan.model_dump_json(indent=2))
@@ -130,9 +138,9 @@ class DeploymentSession:
         try:
             self._start(plan)
             self._wait_ready(plan, started)
-            # D-Only decodes over fake KV: its tokens are meaningless, possibly
-            # an immediate EOS, so only the HTTP round trip is checked.
-            self._smoke(plan, require_text and plan.stage != "decode")
+            # Decode over fake KV: its tokens are meaningless, possibly an
+            # immediate EOS, so only the HTTP round trip is checked.
+            self._smoke(plan, require_text and not stage_spec(plan.stage).fake_kv)
             engagement = self._engagement(plan)
         except DeployFailed as exc:
             texts = self._save_logs(plan, log_dir)
@@ -156,6 +164,8 @@ class DeploymentSession:
         self.plan = plan
         self.lifecycle = self._lifecycle(plan, texts, started, log_dir)
         self._restarts = self._restart_counts(plan)
+        if stage_spec(plan.stage).afd_side:
+            engagement = self._afd_engagement(plan, self.lifecycle, engagement)
         ok = engagement.ok
         result = DeployResult(
             candidate=candidate,
@@ -425,6 +435,67 @@ class DeploymentSession:
                     )
         ok = all(checks.values()) if checks else True
         return EngagementResult(ok=ok, checks=checks, evidence=tuple(evidence))
+
+    def _afd_engagement(
+        self,
+        plan: LaunchPlan,
+        lifecycle: DeployLifecycle | None,
+        engagement: EngagementResult,
+    ) -> EngagementResult:
+        """A-Only: each worker built the null experts (its log marker), and the
+        A GPUs hold about what they would without the target's routed experts
+        (those stayed on disk)."""
+        checks = dict(engagement.checks)
+        evidence = list(engagement.evidence)
+        for spec in plan.containers:
+            if spec.role in ("control", "frontend") or spec.rank != 0:
+                continue
+            out = self.ctx.cluster.run(
+                spec.node,
+                f"docker logs {shlex.quote(spec.name)} 2>&1 "
+                f"| grep -m 1 -F {shlex.quote(AFD_MARKER)}",
+                check=False,
+            ).stdout
+            line = next((x.strip() for x in out.splitlines() if AFD_MARKER in x), "")
+            checks[f"{spec.name}:afd_marker"] = bool(line)
+            if line:
+                evidence.append(f"{spec.name}: {line[:300]}")
+        role = (
+            lifecycle.roles.get(stage_spec(plan.stage).role or "decode")
+            if lifecycle is not None
+            else None
+        )
+        weights = role.weight_mem_gb_max if role is not None else None
+        n_a = plan_instance_gpus(plan)
+        hw = self.ctx.require_hardware()
+        _, checkpoint = select_checkpoint(hw.model, hw.gpu, self.ctx.config.checkpoint)
+        f_plan = ensure_plan(self.ctx)
+        expected = (
+            afd.expected_weights(f_plan, checkpoint.approx_size_gb, n_a)
+            if f_plan is not None
+            else None
+        )
+        if weights is None:
+            evidence.append("A-side weights per GPU not in the worker logs (unproven)")
+        elif expected is None:
+            evidence.append(
+                f"A-side weights {weights:.1f} GB per GPU; no expected size (the "
+                "checkpoint is not larger than its routed experts)"
+            )
+        else:
+            checks["afd_routed_not_loaded"] = afd.weights_engaged(weights, expected)
+            evidence.append(
+                f"A-side weights {weights:.1f} GB per GPU vs at most "
+                f"{expected[0]:.1f} GB without the target's routed experts and "
+                f"{expected[1]:.1f} GB with them over {n_a} GPUs"
+            )
+        return engagement.model_copy(
+            update={
+                "ok": all(checks.values()) if checks else True,
+                "checks": checks,
+                "evidence": tuple(evidence),
+            }
+        )
 
     def _transport_evidence(self, plan: LaunchPlan, spec: ContainerSpec) -> list[str]:
         """Log lines showing which HCAs the data plane opened (evidence only;

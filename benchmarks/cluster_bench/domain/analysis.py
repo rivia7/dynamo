@@ -1,7 +1,7 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 """Pure analysis: per-point validity audit, noise floor, saturation,
-interactivity floors, MTP and NIC comparisons.
+interactivity floors, MTP, NIC and A-Only null-F comparisons.
 
 Rules encode agent-docs/rules/benchmarking/*.md: one measured run per point;
 a once-per-series n=3 pilot sets the noise floor; deltas inside it are noise;
@@ -17,6 +17,7 @@ from typing import Iterable, Literal, Sequence
 
 from benchmarks.cluster_bench.domain.schema import (
     INTERACTIVITY_FLOORS,
+    AfdBound,
     AuditResult,
     BenchSpec,
     EngagementResult,
@@ -28,7 +29,7 @@ from benchmarks.cluster_bench.domain.schema import (
     PointResult,
     Stage,
 )
-from benchmarks.cluster_bench.domain.stages import PREFILL_ONLY_MAX_OSL
+from benchmarks.cluster_bench.domain.stages import PREFILL_ONLY_MAX_OSL, stage_spec
 
 MAX_ERROR_RATE = (
     0.01  # agent-docs: error storms invalidate; AgentX: >1% overflow invalid
@@ -123,12 +124,13 @@ def audit_point(
         )
     if metrics.output_tps is None:
         invalid.append("no output_token_throughput")
-    if stage == "prefill":
-        if metrics.input_tps is None:
-            invalid.append("no input_token_throughput (the P-Only objective)")
+    traits = stage_spec(stage)
+    if traits.objective == "input" and metrics.input_tps is None:
+        invalid.append(f"no input_token_throughput (the {traits.label} objective)")
+    if traits.one_token:
         if metrics.osl_avg is not None and metrics.osl_avg > PREFILL_ONLY_MAX_OSL:
             invalid.append(
-                f"P-Only requests averaged {metrics.osl_avg:.1f} output tokens "
+                f"{traits.label} requests averaged {metrics.osl_avg:.1f} output tokens "
                 "(the one-token cap was not honoured)"
             )
     if metrics.request_count < concurrency:
@@ -323,6 +325,44 @@ def mtp_comparison(
         delta_pct=delta,
         within_noise=abs(delta) <= noise_pct(noise),
         accept_len=on.accept_len,
+    )
+
+
+def afd_bound(
+    sim: PointResult | None,
+    null: PointResult | None,
+    noise: NoiseResult | None,
+    reason: str = "",
+) -> AfdBound:
+    """A-Only: the simulated-F leader against the same point with the F wait
+    off. f_cost_pct is the share of the null-F throughput the F wait costs."""
+    ids = dict(
+        concurrency=null.key.concurrency if null else None,
+        sim_point_id=sim.key.id if sim else None,
+        null_point_id=null.key.id if null else None,
+    )
+    if null is None:
+        return AfdBound(status="skipped", reason=reason, **ids)
+    # an invalid point says why itself; ``reason`` (the planner's) does not
+    if not null.audit.usable or not null.tps_per_gpu:
+        why = "; ".join(null.audit.reasons) or "null-F point has no throughput"
+        return AfdBound(status="invalid", reason=why, **ids)
+    if sim is None or not sim.audit.usable or sim.tps_per_gpu is None:
+        return AfdBound(status="invalid", reason="no usable simulated-F point", **ids)
+    sim_m, null_m = sim.metrics, null.metrics
+    return AfdBound(
+        status="measured",
+        reason=reason,
+        sim_tps_per_gpu=sim.tps_per_gpu,
+        null_tps_per_gpu=null.tps_per_gpu,
+        f_cost_pct=-pct_delta(sim.tps_per_gpu, null.tps_per_gpu),
+        within_noise=abs(pct_delta(sim.tps_per_gpu, null.tps_per_gpu))
+        <= noise_pct(noise),
+        sim_user_tps=sim_m.user_tps_p50 if sim_m else None,
+        null_user_tps=null_m.user_tps_p50 if null_m else None,
+        sim_itl_p50_ms=sim_m.itl_p50_ms if sim_m else None,
+        null_itl_p50_ms=null_m.itl_p50_ms if null_m else None,
+        **ids,
     )
 
 

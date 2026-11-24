@@ -57,7 +57,7 @@ from benchmarks.cluster_bench.domain.requests import (
     summarize_requests,
 )
 from benchmarks.cluster_bench.domain.schema import BenchSpec, PointMetrics, Stage
-from benchmarks.cluster_bench.domain.stages import PREFILL_ONLY_EXTRA_INPUT
+from benchmarks.cluster_bench.domain.stages import PREFILL_ONLY_EXTRA_INPUT, stage_spec
 
 SCENARIO = "agentx"
 # The scenario's floor on an explicit --benchmark-duration
@@ -283,7 +283,7 @@ def warmup_args(ds: DatasetSpec, spec: BenchSpec) -> list[str]:
 def extra_inputs(stage: Stage) -> list[str]:
     """``--extra-inputs`` values: exact OSL always; P-Only one output token."""
     values = ["ignore_eos:true"]
-    if stage == "prefill":
+    if stage_spec(stage).one_token:
         values.append(PREFILL_ONLY_EXTRA_INPUT)
     return values
 

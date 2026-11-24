@@ -10,18 +10,22 @@ rental), deploys Dynamo + SGLang serving GLM-5.3 (or any `--model-repo`), and
 finds the configuration with the highest throughput per GPU on a chosen
 dataset (AIPerf 0.14.0; by default AIPerf's AgentX short command,
 `--scenario agentx --public-dataset semianalysis_cc_traces_weka_062126`). It
-measures one of three stages:
+measures one of four stages:
 
 | `--stage` | What every GPU runs | Objective |
 |---|---|---|
 | `e2e` (default) | the profile's aggregated and PD-disaggregated families, end to end | output tok/s/GPU |
 | `p-only` | the prefill role of the PD families, one output token per request | input (prompt) tok/s/GPU |
 | `d-only` | the decode role of the PD families, KV transfer faked | output tok/s/GPU |
+| `a-only` | D-Only's decode worker as the attention side of attention-FFN disaggregation: no routed experts, a simulated F wait at every MoE layer | output tok/s per A GPU |
 
 P-Only and D-Only answer "how much prefill, or decode, can this cluster do at
 most on this dataset and model"; the knowledge base turns the latest P-Only and
-D-Only leaders of one cluster into the throughput-ideal P:D GPU split (see
-[Stages](#stages-e2e-p-only-d-only)).
+D-Only leaders of one cluster into the throughput-ideal P:D GPU split. A-Only
+answers how fast the attention side (A) of attention-FFN disaggregation decodes
+when the FFN side (F) answers in modelled time, and what that F costs against
+the same configuration with no F wait at all (see
+[Stages](#stages-e2e-p-only-d-only-a-only)).
 
 Along the way it measures interconnect speed-of-light and occupancy under
 load, compares 1/2/4/8 IB NICs per node and NVLink against PCIe (the leader
@@ -39,8 +43,8 @@ Cluster sizes: profiles are written for 4 x 8 GPUs and fitted to the cluster.
 Instance counts scale by the exact factor (`pd-{prefill}p{decode}d` is
 `pd-2p1d` on 2 nodes, `pd-4p2d` on 4, `pd-8p4d` on 8) and so do concurrency
 grids; `nodes:` limits a family to some sizes (2-node DTP4 P:D alternates,
-opt-in wide-EP DEP16/DEP64). P-Only and D-Only families fill every GPU with
-one stage role, so they also run on a single node when one instance fits in
+opt-in wide-EP DEP16/DEP64). P-Only, D-Only and A-Only families fill every GPU
+with one stage role, so they also run on a single node when one instance fits in
 it. Before renting, the Lium controller refuses a size that no tuned family
 fits (`--nodes 2|4|8`; other sizes keep the families that scale exactly).
 
@@ -81,6 +85,8 @@ bash benchmarks/cluster_bench/cluster_bench.sh controller run-all --exp-id h200-
 bash benchmarks/cluster_bench/cluster_bench.sh controller run-all --exp-id h200-donly-001 \
     --machines machines.txt --kb-root ~/cluster_bench_kb -- --stage d-only --budget-hours 6
 #    同一集群、同一模型和数据集的 P-Only 与 D-Only 都测完后，KB 的 INDEX.md 给出 PD 配比
+#    A-Only（AF 分离的 attention 侧，F 是模拟的）：--stage a-only；改 F 的假设用
+#    --afd-f，例如 --afd-f bw_gbps=400,lat_us=8（见下文 Stages）
 #    分步执行：controller up | sync | launch | watch | pull | down | status
 #    也可以不写文件：--machine 'ssh -p 2222 root@203.0.113.10' --machine root@203.0.113.11（可重复）
 #    网络受限（连不上 huggingface.co / GitHub）：先把权重放到每台机器的同一路径，再加
@@ -270,14 +276,16 @@ when it rents or adopts a cluster):
 - The rental price goes into `provider.json` for $/token; SSH machines use
   `--price-per-node-hour`.
 
-## Stages: E2E, P-Only, D-Only
+## Stages: E2E, P-Only, D-Only, A-Only
 
 Stage families come from the profile's PD families: one per distinct prefill
-(P-Only) or decode (D-Only) role config, named `p-only-<parallelism>x<n>` or
-`d-only-...`, filling every GPU of the cluster with that role. The summary's
-`source` names the PD family it came from. A profile may also list its own
-families with `stage: prefill` (P-Only) or `stage: decode` (D-Only); a derived
-family with the same role config is then dropped.
+(P-Only) or decode (D-Only, A-Only) role config, named `p-only-<parallelism>x<n>`,
+`d-only-...` or `a-only-...`, filling every GPU of the cluster with that role.
+The summary's `source` names the PD family it came from. A profile may also
+list its own families with `stage: prefill` (P-Only), `stage: decode` (D-Only)
+or `stage: attention` (A-Only); a derived family with the same id or role
+config is then dropped. Everything that differs between stages is one row of
+`STAGES` in `domain/stages.py`.
 
 P-Only:
 
@@ -311,6 +319,61 @@ D-Only:
   / decode GPUs, so each GPU sees the decode load it carries in PD.
 - No accuracy gate.
 
+A-Only (the attention side of attention-FFN disaggregation, AFD):
+
+- Each worker is D-Only's decode worker (fake KV, simulated MTP acceptance) run
+  the way SGLang AFD runs its attention instance: DP attention with TP1 per rank
+  (`--enable-dp-attention`, data-parallel size = the instance's GPUs), ep 1, MoE
+  all-to-all off, the shared expert unfused (it stays on A).
+- The SGLang hotfix `afd-attn-only` installs `agents/sglang_afd.py` into the
+  image's SGLang at worker launch (written against SGLang 0.5.21; preflight
+  refuses an image it does not fit). The target model's MoE layers get a null
+  routed-expert layer: those weights are neither allocated nor read from disk,
+  and each MoE layer waits on the GPU (a Triton kernel on `%globaltimer`, CUDA
+  graph safe) for a modelled F instead. The MTP draft layer keeps its routed
+  experts: they run on A. A null layer still computes the full top-k (the
+  routing A sends to F). Deploy checks the worker's log marker and that A's
+  weights per GPU are nearer the checkpoint without the target's routed
+  experts than with them.
+- The F model (`domain/afd.py`) is sized once, before the first deployment,
+  and kept in the event log, so a resumed run waits the same. One MoE layer
+  costs F latency + rows x wire time + max(reading the weights of the experts
+  the rows hit, the expert GEMMs), with F's experts on the smallest power of
+  two of GPUs that holds them, F's speed from the GPU profile (HBM x
+  `eff_mem`, dense peak at the experts' precision x `eff_flop`) and the A<->F
+  link from the measured GPU-direct send/recv per node / GPUs (or P2P for
+  `link=intra`; the NICs' nominal rate x 0.8 when unmeasured). With `m`
+  microbatches the first MoE layer of a forward waits for the whole batch and
+  later layers only for what A's own work does not hide. A model that would
+  wait over 10 s per forward at 256 rows stops the run before the first
+  deployment; over 0.5 s it warns (`link=net` on a 25 GbE host network does).
+- `--afd-f KEY=VALUE,...` changes the assumptions: `gpus` (F GPUs per A
+  instance), `link=net|intra`, `layout=staged|direct` (every F rank gets the
+  whole batch, or only the rows for its experts), `microbatches` (default 2),
+  `wire=bf16|fp8`, `bw_gbs` or `bw_gbps` (per A GPU, one direction),
+  `lat_us`, `eff_mem`, `eff_flop`, `mem_fraction`, and
+  `expert_dtype=nvfp4|mxfp4|fp8|bf16` (the routed experts' precision; by
+  default the checkpoint variant's, so a `--model-repo` model needs it). A run
+  that stopped before it sized F takes a new `--afd-f` on resume.
+- The objective is output tok/s per A GPU; the interactivity floors apply.
+- After the confirm run the leader is deployed again with the wait off and
+  measured at its concurrency (purpose `f_bound`): the null-F upper bound and
+  F's cost, (null - simulated) / null, judged against the noise floor.
+- Report section 2.5 shows the F model, F's modelled wait per forward at
+  16-1024 rows with what bounds it, the null-F bound, the estimated A<->F
+  bytes per output token with the link share they need, and the A-side weights
+  against their expected size. The KB's `resources.md` has one row per A-Only
+  experiment. MFU counts A's FLOPs only (no routed experts) against the BF16
+  peak.
+- The concurrency grid widens like D-Only's and its max doubles again (no
+  routed experts on A, so much more room for KV).
+- GLM-5.3 and GLM-5.3-Flash on RTX PRO 6000D have their own A-Only families
+  (`a-only-dtp8x{decode}`, and `a-only-dtp4x{decode}` for Flash); other
+  profiles derive them from the decode role.
+- Needs a MoE model that SGLang serves with `DeepseekV2MoE` (the DeepSeek-V3
+  family, GLM-5.x; another model fails the deploy check); no accuracy gate.
+  F-Only and a real A+F split are not measured.
+
 PD split: once the KB has a P-Only and a D-Only leader for the same cluster,
 model, checkpoint, dataset and served context, `INDEX.md` shows
 GPUs_P : GPUs_D = (ISL x D) : (OSL x P) and the PD output tok/s/GPU that split
@@ -329,7 +392,12 @@ Not yet verified on GPUs (each report lists the ones that apply):
 - whether `max_completion_tokens:1` holds for every turn of the AgentX
   closed-loop replay (the audit rejects points where it did not);
 - whether an aggregated worker with the prefill role config costs what a PD
-  prefill worker costs (it sends no KV and has no bootstrap queue).
+  prefill worker costs (it sends no KV and has no bootstrap queue);
+- A-Only: the `afd-attn-only` hotfix beyond its source check and the wait
+  kernel's self-test on GPU 0, DP attention with TP1 ranks over fake KV for
+  GLM-5.3 (DSA) and GLM-5.3-Flash (KDA + DSA; Flash is not on SGLang AFD's
+  supported list), and the F model itself: there is no real F and no real
+  A<->F transfer.
 
 ## Versions
 
@@ -376,9 +444,10 @@ AgentX runs and AIPerf's verdict (`metadata.submission_valid` in
   AIPerf marks incomplete (`is_complete=false`) is invalid.
 - A local `weka_trace` file always needs `--unsafe-override` (the corpus
   cannot be pinned).
-- P-Only and D-Only change the AgentX load (one output token per request; no
-  real prefill or KV transfer), so their runs are never AgentX submissions,
-  even when AIPerf stamps them valid.
+- P-Only, D-Only and A-Only change the AgentX load (P-Only: one output token
+  per request; D-Only and A-Only: no real prefill or KV transfer, and A-Only
+  no real F), so their runs are never AgentX submissions, even when AIPerf
+  stamps them valid.
 
 `controller sync --upload FILE` (also on `run-all`, repeatable) copies a local
 file to `<workdir>/inputs/<name>` on node0 and checks its sha256.
@@ -391,15 +460,15 @@ artifacts) are refused. Preflight checks the dataset's flags against
 
 | Phase | What happens |
 |---|---|
-| preflight | Replicate code to peers, bootstrap venvs, probe GPUs/HCAs/topology/disks, pick profiles (for P-Only/D-Only the stage families) and a local weights disk (never `/mnt` on Lium), pull the image, verify every SGLang/Dynamo/AIPerf flag (the stage's and the dataset's included) against `--help` of the pinned versions; D-Only: run the decode-only shim's `--check` inside the image |
+| preflight | Replicate code to peers, bootstrap venvs, probe GPUs/HCAs/topology/disks, pick profiles (for P-Only/D-Only the stage families) and a local weights disk (never `/mnt` on Lium), pull the image, verify every SGLang/Dynamo/AIPerf flag (the stage's and the dataset's included) against `--help` of the pinned versions; D-Only: run the decode-only shim's `--check` inside the image; A-Only: refuse a model without routed experts, check the `afd-attn-only` hotfix against the image and self-test the F wait kernel on GPU 0 (`agents/sglang_afd.py --check`) |
 | download | Resolve the HF commit, download 1/N of the shards per node in the background, meanwhile run intra-node P2P microbenchmarks and a dummy-weight kernel smoke (walks the GPU profile's ladder), then NCCL-broadcast the missing shards over the RDMA fabric and verify sha256; then measure the weights disk's direct-read speed |
 | fabric | Upstream switch topology and link health (see below): identify (sysfs / MAD / LLDP), traces between every node pair per rail, a perftest link matrix (round-robin pairs, every rail concurrently, ~2-4 min on 8 nodes; `--no-link-matrix` skips it), and the list of switch ports sampled at every load point |
 | microbench | Inter-node NCCL collectives and GPU-direct send/recv with 8/4/2/1 NICs (speed-of-light references); the intra-node collectives run with `NCCL_DEBUG=INFO` (`INIT`), and the transport NCCL set up for every GPU-to-GPU hop (`P2P/...`, or `SHM/...` through host memory) is kept with the peak and shown next to `nvidia-smi topo -m` in report section 2.1 |
-| search | Topology families in priority order (recipe baseline first), powers-of-two concurrency climb per family, pruning, P:D alternate by symptom, floor bracketing, MTP-off ablation (P-Only: no floors and no MTP; D-Only: MTP with simulated acceptance) |
-| accuracy | E2E only (P-Only and D-Only produce no real answers). GSM8K 5-shot (200 questions, sha256-pinned test split, greedy, Dynamo `/v1/completions`) on the leader; a configuration below the floor (0.80) or more than 0.07 below the best checked one (outside the 95% CI) never leads, so the next best is checked (`--accuracy-max-checks`, default 3); `--no-accuracy` disables it |
+| search | Topology families in priority order (recipe baseline first), powers-of-two concurrency climb per family, pruning, P:D alternate by symptom, floor bracketing, MTP-off ablation (P-Only: no floors and no MTP; D-Only and A-Only: MTP with simulated acceptance; A-Only sizes its F model first) |
+| accuracy | E2E only (P-Only, D-Only and A-Only produce no real answers). GSM8K 5-shot (200 questions, sha256-pinned test split, greedy, Dynamo `/v1/completions`) on the leader; a configuration below the floor (0.80) or more than 0.07 below the best checked one (outside the 95% CI) never leads, so the next best is checked (`--accuracy-max-checks`, default 3); `--no-accuracy` disables it |
 | pilot | n=3 repetitions at the leader's knee: noise floor and minimum detectable effect |
 | nic_sweep | 1/2/4/8 NICs on the best configuration that has measured cross-node traffic |
-| confirm | Rerun of the leader with the AgentX preset's warmup, `--confirm-duration-s` (default 1200 s, >= 900 s for AgentX) and no `--unsafe-override` |
+| confirm | Rerun of the leader with the AgentX preset's warmup, `--confirm-duration-s` (default 1200 s, >= 900 s for AgentX) and no `--unsafe-override`; A-Only: then the null-F bound (the leader redeployed with the F wait off, one point at its concurrency) |
 | nvlink | NVLink against PCIe: tear down, switch NVLink out of the GPU-GPU path on every node (Hopper: `nvidia-smi nvlink -sBwMode OFF`, "P2P is via PCIe bus"; Blackwell: `-sLWidth 0` only if offered), prove it with a GPU-GPU copy benchmark (must drop to PCIe speed), deploy the leader with NVLS and SGLang's custom all-reduce off (`NCCL_P2P_LEVEL=SYS`), measure one point at the leader's concurrency, restore NVLink (also on resume after a crash and in finalize). Without root or a supported switch: NCCL without P2P, staged through host memory (a labelled lower bound). A DeepEP leader (NVLink-only intranode kernels) hands the comparison to the best family without DeepEP; PCIe-only GPUs skip it. The run is invalid if NVLink counters show traffic. Its budget is the first to yield: the leader's climb and every earlier step may spend it (`--no-nvlink-ablation` turns it off) |
 | diagnose | Opt-in (`--diagnose`): the leader redeployed as a diagnostic variant (SGLang `--enable-mfu-metrics`, device timer, `--expert-balancedness-report-mode prometheus` for MoE; workers under Nsight Systems from the pinned image or a derived `cb-diag/...` image built on each node), a short load, `POST /engine/control/start_profile` for 10 forward steps, `nsys stats` -> kernel-time shares per role, and each report's SQLite export reduced on the node to the wall-time split of a forward step (NCCL, attention, MoE, dense GEMM, other, idle; stalls >= 5 ms cut out for a steady split). The report draws it: step bars per role, every GPU's idle over the window with the long collectives on it, two steps of one GPU's timeline as stacked shares, and a 1.8 ms close-up with every kernel at its real time. Never ranked |
 | finalize | "after" health snapshot, summary, report, KB export |
@@ -408,8 +477,8 @@ artifacts) are refused. Preflight checks the dataset's flags against
 
 Report section 2 and the KB view `resources.md` answer these questions about
 the leader at its saturation point (2.1 interconnect, 2.2 NVLink against
-PCIe, 2.3 MFU and MBU, 2.4 KV capacity), each with the method stated next to the
-number:
+PCIe, 2.3 MFU and MBU, 2.4 KV capacity, and for A-Only 2.5 the simulated F),
+each with the method stated next to the number:
 
 | Question | How it is derived | Where |
 |---|---|---|
@@ -418,6 +487,7 @@ number:
 | How much of the GPUs' floating-point peak does it use (MFU)? | Model FLOPs from the checkpoint's `config.json` (MLA, MoE with shared experts and dense layers, DSA top-k attention plus its indexer, dense GQA) for useful tokens only: prompt tokens not served from the prefix cache (per-request `usage` or the server's hit rate) and generated tokens; MTP drafts are excluded. Divided by AIPerf's throughput duration (its profiling phase, grace period included) x GPUs x the GPU profile's dense peak at the checkpoint's GEMM precision; per role for PD; NVML GPM tensor activity alongside | `PointResult.mfu`, `summary.model_arch`, KB `run.jsonl` `mfu_*`, `index.jsonl` `leader_mfu_*` |
 | How much of the GPUs' memory bandwidth does it use (MBU)? | Measured, not modeled: NVML GPM `DRAM_BW_UTIL` (bandwidth used / the GPU's maximum) of every GPU at 1 s from the telemetry agent, the mean over the point per role, GPU-weighted across PD roles; achieved TB/s = MBU x the GPU profile's `hbm_tbs`. No bytes model: the experts a batch routes to, KV replicated across TP ranks, the DSA indexer scan and speculative decoding change the bytes a step reads. Needs GPM (Hopper and newer); without samples the report says MBU was not measured. MBU does not need `config.json`, so a point without model FLOPs still has it | `PointResult.mfu` (`roles[].mbu`, `total_mbu`, `*_mem_tbs_per_gpu`), KB `run.jsonl` `mbu_*`, `index.jsonl` `leader_mbu_*`, `peak_mem_tbs_per_gpu` |
 | How much context fits in the KV cache? | Per-rank pool `max_total_num_tokens` (cold-start log) x attention-DP ranks x instances of the serving role (agg, or decode with PD); longest single request = one rank's pool capped by the context length; concurrent requests at the trace's p50/p90 context (ISL + OSL); pool usage at the leader point; bytes per token measured vs from `config.json`; HiCache host tokens | `summary.kv_capacity`, KB `index.jsonl` `kv_*` |
+| A-Only: what does F cost, and what A<->F link would it need? | The F model above, the leader against the null-F bound at the same concurrency, and A<->F bytes per output token (rows per token = MTP verify rows / accepted tokens; staged layout: every F rank receives the hidden state, top-k ids and weights and returns a partial sum) x the leader's tok/s per A GPU = the GB/s per A GPU the link must carry. Estimated, not measured | `summary.afd`, KB `index.jsonl` `afd_*` |
 
 ## What is collected for the knowledge base
 
@@ -459,8 +529,8 @@ reason and the most common request error.
 ## Layout
 
 ```text
-domain/    pure models and logic, no I/O (schema, profiles, stages (P-Only/D-Only families, worker
-           config, PD split), datasets (--dataset forms), inventory, nicplan, search, analysis, bandwidth,
+domain/    pure models and logic, no I/O (schema, profiles, stages (P-Only/D-Only/A-Only families,
+           worker config, PD split), afd (A-Only F model, A<->F traffic, A-side config), datasets (--dataset forms), inventory, nicplan, search, analysis, bandwidth,
            fabric, nodefacts, servicestate, loadstress, lifecycle, pointstate, switchload, cost, requests,
            gpuactivity, accuracy, kernels, modelarch (config.json FLOPs/KV bytes, MFU, MBU), capacity
            (interconnect needs, fewest NICs, KV capacity), nvlink (switch methods, NVLink-off comparison))
@@ -472,10 +542,11 @@ adapters/  profile_store (YAML profiles + recipe ConfigMaps), ssh/docker executo
            fabric prober, node-facts collector, accuracy probe runner, Nsight Systems diagnostics
 agents/    standalone node-side scripts (probe, telemetry sampler with NVML GPM, P2P/NCCL benchmarks,
            NCCL file gather, fabric_probe, node_facts, accuracy_probe, sglang_decode_only (D-Only worker),
-           sglang_hotfix (named SGLang source edits a profile applies at worker launch))
+           sglang_hotfix (named SGLang source edits a profile or stage applies at worker launch),
+           sglang_afd (A-Only: null routed experts and the F wait kernel))
 app/       event store, deployment session, pipeline and phases (incl. accuracy gate, diagnose), fabric/facts
            collection points, model_ops (config.json read once per run, MFU per point), nvlink_ops
-           (switch NVLink off on every node and back), summary, simulator
+           (switch NVLink off on every node and back), afd_ops (A-Only F plan and summary), summary, simulator
 controller.py  laptop side: SSH machines or a lium rental; sync, launch, watch, pull, down
 report/    Chinese Markdown/HTML report (stage wording: "stages" in i18n/zh_CN.yaml)
 kb/        knowledge-base records and writer

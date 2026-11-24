@@ -204,8 +204,9 @@ class RecipeRef(Frozen):
 Role = Literal["agg", "prefill", "decode"]
 # What a run measures (domain/stages.py): the whole serving pipeline, or one PD
 # stage on every GPU of the cluster (P-Only: prompt tokens/s; D-Only: output
-# tokens/s with SGLang's fake KV transfer).
-Stage = Literal["e2e", "prefill", "decode"]
+# tokens/s with SGLang's fake KV transfer; A-Only: D-Only's decode role as the
+# attention side of attention-FFN disaggregation, F simulated, domain/afd.py).
+Stage = Literal["e2e", "prefill", "decode", "attention"]
 # Where the machines come from: any SSH-reachable hosts, or a Lium.io rental.
 Platform = Literal["generic", "lium"]
 Transport = Literal["none", "mooncake", "nixl", "nccl", "deepep"]
@@ -428,6 +429,9 @@ class Candidate(Frozen):
     # Diagnostic variant (never ranked): "" | "metrics" | "nsys" (nsys implies
     # metrics). Only set by the diagnose phase.
     diag: str = ""
+    # A-Only null-F bound (never ranked): the F wait is off. Only set by the
+    # f_bound step (domain/search.py).
+    null_f: bool = False
 
     @property
     def key(self) -> str:
@@ -439,6 +443,8 @@ class Candidate(Frozen):
         )
         if self.p2p != "nvlink":
             key = f"{key}|p2p={self.p2p}"
+        if self.null_f:
+            key = f"{key}|f=null"
         return f"{key}|diag={self.diag}" if self.diag else key
 
     @property
@@ -508,6 +514,7 @@ Purpose = Literal[
     "smoke",
     "diagnose",
     "nvlink",
+    "f_bound",
 ]
 AuditStatus = Literal["valid", "valid_with_recovery", "invalid"]
 
@@ -876,6 +883,130 @@ class MtpComparison(Frozen):
     accept_len: float | None = None
 
 
+# --------------------------------------------------------------------------
+# A-Only: the attention side of attention-FFN disaggregation (domain/afd.py)
+# --------------------------------------------------------------------------
+
+AfdLink = Literal["net", "intra"]
+AfdLayout = Literal["staged", "direct"]
+AfdExpertDtype = Literal["nvfp4", "mxfp4", "fp8", "bf16"]  # routed-expert weights
+
+
+class AfdFSpec(Frozen):
+    """The F an A-Only run simulates (``--afd-f``); every field has a default."""
+
+    # F GPUs serving one A instance; None: the smallest power of two that
+    # holds every routed expert at mem_fraction of HBM and divides the experts.
+    gpus: int | None = Field(None, ge=1)
+    # A<->F link: F on other nodes (measured inter-node bandwidth) or on the
+    # same node (measured P2P bandwidth).
+    link: AfdLink = "net"
+    # staged: every F rank receives the whole batch and returns a partial sum
+    # (SGLang AFD's default nccl backend); direct: a row goes only to the F
+    # ranks owning its top-k experts (DeepEP / MegaMoE backends).
+    layout: AfdLayout = "staged"
+    microbatches: int = Field(2, ge=1, le=8)  # decode microbatches (1 = serial)
+    wire: Literal["bf16", "fp8"] = "bf16"  # hidden-state precision on the wire
+    bw_gbs: float | None = Field(None, gt=0)  # GB/s per A GPU, one direction
+    lat_us: float | None = Field(None, ge=0)  # one-way latency of one transfer
+    eff_mem: float = Field(0.7, gt=0, le=1)  # F's share of HBM bandwidth
+    eff_flop: float = Field(0.5, gt=0, le=1)  # F's share of its dense peak
+    mem_fraction: float = Field(0.8, gt=0, le=1)  # HBM share F's experts may use
+    # Routed-expert precision; None: the checkpoint variant's (nvfp4-nvidia ->
+    # nvfp4). A --model-repo checkpoint has no variant name and needs it.
+    expert_dtype: AfdExpertDtype | None = None
+
+
+class AfdPlan(Frozen):
+    """The F model of one run, resolved once before the search (DECISION)."""
+
+    spec: AfdFSpec = AfdFSpec()
+    layers: int  # target decoder layers (the MTP layer has this index)
+    moe_layers: int
+    hidden: int
+    moe_intermediate: int
+    experts: int  # routed experts per layer
+    top_k: int
+    expert_dtype: str  # routed-expert weights: nvfp4 | mxfp4 | fp8 | bf16
+    layer_bytes: float  # routed-expert weight bytes of one MoE layer
+    f_gpus: int
+    f_gpus_source: str
+    f_hbm_tbs: float
+    f_peak_tflops: float
+    f_peak_precision: str
+    link_gbs_per_gpu: float  # A<->F GB/s per A GPU, one direction
+    link_source: str
+    lat_us: float
+    lat_source: str
+    notes: tuple[str, ...] = ()
+
+    @property
+    def routed_gb(self) -> float:
+        return self.layer_bytes * self.moe_layers / 1e9
+
+
+class AfdStepRow(Frozen):
+    """Modelled F time of one MoE layer, and of one forward, at ``rows`` rows."""
+
+    rows: int
+    latency_us: float  # both transfers of one microbatch
+    link_us: float  # one microbatch's bytes on the wire
+    f_mem_us: float  # one microbatch's expert weights read on F
+    f_flop_us: float  # one microbatch's expert GEMMs on F
+    serial_us: float  # f(T): the first MoE layer of a forward, or m == 1
+    overlap_us: float  # m * f(T/m): later layers (A's own work runs meanwhile)
+    step_ms: float  # F wait of one forward; A's own work not included
+    bound: Literal["latency", "link", "memory", "compute"]
+
+
+class AfdTraffic(Frozen):
+    """A<->F bytes per output token and the link share they need, per A GPU
+    (an instance's GPU count cancels out of every ratio)."""
+
+    fan_out: float  # F ranks a row reaches
+    rows_per_token: float  # MoE rows per output token (verify rows / accepted)
+    to_f_bytes_per_token: float
+    from_f_bytes_per_token: float
+    link_gbs_per_gpu: float  # one direction
+    sim_need_gbs_per_gpu: float | None = None  # at the simulated-F leader's tok/s
+    sim_util: float | None = None
+    null_need_gbs_per_gpu: float | None = None  # at the null-F bound's tok/s
+    null_util: float | None = None
+
+
+class AfdBound(Frozen):
+    """Simulated F vs the null-F bound (wait off) at the leader's concurrency."""
+
+    status: Literal["measured", "invalid", "failed", "skipped"] = "skipped"
+    reason: str = ""
+    concurrency: int | None = None
+    sim_point_id: str | None = None
+    null_point_id: str | None = None
+    sim_tps_per_gpu: float | None = None
+    null_tps_per_gpu: float | None = None
+    f_cost_pct: float | None = None  # (null - sim) / null * 100
+    within_noise: bool | None = None
+    sim_user_tps: float | None = None
+    null_user_tps: float | None = None
+    sim_itl_p50_ms: float | None = None
+    null_itl_p50_ms: float | None = None
+
+
+class AfdReport(Frozen):
+    """What an A-Only summary adds: the F model, the bound and the traffic."""
+
+    plan: AfdPlan
+    n_a: int  # GPUs of one A instance of the leader's family
+    bound: AfdBound = AfdBound()
+    traffic: AfdTraffic | None = None
+    steps: tuple[AfdStepRow, ...] = ()
+    weight_gb_per_gpu: float | None = None  # measured (engine log), A side
+    # Expected A weights per GPU without the target's routed experts and with
+    # them (domain/afd.expected_weights); None: no estimate.
+    null_weight_gb_per_gpu: float | None = None
+    loaded_weight_gb_per_gpu: float | None = None
+
+
 Verdict = Literal["ok", "partial", "unsupported", "failed"]
 
 
@@ -1018,6 +1149,7 @@ class ExperimentSummary(Frozen):
     interconnect: InterconnectNeeds | None = None
     kv_capacity: KvCapacity | None = None
     nvlink: NvlinkComparison | None = None
+    afd: AfdReport | None = None  # A-Only (domain/afd.py)
 
     def accuracy_of(self, cand_key: str | None) -> AccuracyCheck | None:
         """The last check of ``cand_key`` (None: never checked)."""
@@ -1169,6 +1301,8 @@ class RunConfig(Frozen):
     link_target_util: float = Field(DEFAULT_LINK_TARGET_UTIL, gt=0.0, le=1.0)
     # Re-measure the leader with NVLink switched off (GPU-GPU over PCIe).
     nvlink_ablation: bool = True
+    # A-Only: the F the attention side waits for (--afd-f, domain/afd.py).
+    afd_f: AfdFSpec = AfdFSpec()
 
 
 # ExperimentSummary references RunConfig, which is defined after it.

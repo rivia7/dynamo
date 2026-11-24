@@ -24,6 +24,7 @@ from benchmarks.cluster_bench.domain.gpuactivity import ActivityAggregate
 from benchmarks.cluster_bench.domain.kernels import KernelBreakdown
 from benchmarks.cluster_bench.domain.pointstate import PointState
 from benchmarks.cluster_bench.domain.schema import PointResult
+from benchmarks.cluster_bench.domain.stages import stage_spec
 from benchmarks.cluster_bench.domain.steps import (
     GROUP_OF,
     GROUP_ORDER,
@@ -525,7 +526,7 @@ def _token_rate(ctx: Ctx, point: PointResult, role: str) -> float | None:
     m = point.metrics
     if m is None:
         return None
-    if role == "prefill" or ctx.summary.stage == "prefill":
+    if role == "prefill" or stage_spec(ctx.summary.stage).objective == "input":
         return m.input_tps
     return m.output_tps
 

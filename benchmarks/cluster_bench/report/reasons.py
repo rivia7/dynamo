@@ -46,6 +46,8 @@ def _rule(pattern: str, render: Callable[[re.Match[str]], str]) -> Rule:
 
 
 ACCURACY_STATUS = {"pass": "通过", "fail": "未通过", "error": "无法判定", "skipped": "已跳过"}
+# What dominates the modelled F wait of one layer (domain/afd.step_rows).
+AFD_TERMS = {"latency": "延迟", "link": "传输", "memory": "F 读权重", "compute": "F 计算"}
 # "gsm8k 5-shot accuracy 0.940 (95% CI 0.898-0.965, n=200)" (domain/accuracy.py)
 _SCORE = r"(\w+) (\d+)-shot accuracy ([\d.]+) \(95% CI ([\d.]+)-([\d.]+), n=(\d+)\)"
 
@@ -363,6 +365,15 @@ RULES: tuple[Rule, ...] = (
         r"^accuracy gate disabled: the leader's numerics are unchecked$",
         lambda m: "精度检查已关闭：最优配置算得对不对没有验证",
     ),
+    _rule(
+        r"^accuracy gate not applicable to (\S+): the stage produces no "
+        r"end-to-end answers$",
+        lambda m: f"{m[1]} 不做精度检查：这个 stage 不产生端到端的回答",
+    ),
+    _rule(
+        r"^accuracy gate not applicable to (\S+) \(no end-to-end answers\)$",
+        lambda m: f"{m[1]} 不做精度检查（不产生端到端的回答）",
+    ),
     _rule(r"^the leader was not accuracy-checked$", lambda m: "最优配置没做精度检查"),
     _rule(
         r"^leader accuracy check (\w+): (.*)$",
@@ -557,6 +568,81 @@ RULES: tuple[Rule, ...] = (
         r"^diagnostic window skipped: NVLink could not be restored$",
         lambda m: "跳过诊断时段：NVLink 没能恢复",
     ),
+    # A-Only (domain/afd.py, domain/stages.py, domain/search.decide_f_bound)
+    _rule(
+        r"^A-Only: F is a simulated GPU wait at every MoE layer \(domain/afd\.py\); tok/s/GPU and cost count the A GPUs only$",
+        lambda m: "A-Only：F 是模拟的，每个 MoE 层在 GPU 上等一段时间（domain/afd.py）；tok/s/GPU 和成本只算 A 的 GPU",
+    ),
+    _rule(
+        r"^A-Only: SGLang hotfix afd-attn-only \(target routed experts null and not read from disk, the F wait kernel\) source-checked against SGLang 0\.5\.21 only; preflight runs its check and the wait kernel's GPU self-test, deploy checks the worker's log marker and A-side weights$",
+        lambda m: "A-Only：SGLang hotfix afd-attn-only（目标模型的 routed experts 换成空模块、不从磁盘读，加上 F 的等待 kernel）只对照 SGLang 0.5.21 的源码检查过；预检会跑它的 check 和等待 kernel 的 GPU 自测，部署后检查 worker 日志里的标记和 A 侧权重的大小",
+    ),
+    _rule(
+        r"^A-Only: the F wait is a model \(F roofline at eff_mem/eff_flop, measured link bandwidth, default or perftest-based latency, microbatch overlap credit, uniform routing, one F per A instance\); no real F and no real A<->F transfer$",
+        lambda m: "A-Only：F 的等待时间是模型算的（F 按 roofline 和 eff_mem / eff_flop 算，链路带宽用实测值，延迟用默认值或 perftest 估算，按 microbatch 折算重叠，路由均匀，每个 A 实例一个 F）；没有真实的 F，也没有真实的 A↔F 传输",
+    ),
+    _rule(
+        r"^A-Only: DP attention \(TP1 per rank\) over fake KV with GLM-5\.3's DSA and GLM-5\.3-Flash's KDA \+ DSA \(Flash is not on SGLang AFD's supported list\) has not run on these GPUs$",
+        lambda m: "A-Only：DP attention（每个 rank TP1）加 fake KV，配 GLM-5.3 的 DSA 和 GLM-5.3-Flash 的 KDA + DSA（Flash 不在 SGLang AFD 支持的模型里），还没在这些 GPU 上跑过",
+    ),
+    _rule(
+        r"^A-Only: the wait kernel \(Triton, %globaltimer\) under CUDA graph replay is self-tested on GPU 0 only; eager batches above the graph sizes run the shared expert after the wait \(no overlap\)$",
+        lambda m: "A-Only：等待 kernel（Triton，读 %globaltimer）在 CUDA graph 回放下只在 GPU 0 上自测过；超过 CUDA graph 大小的 batch 走 eager，shared expert 在等待之后才算（不重叠）",
+    ),
+    _rule(
+        r"^A-Only: MTP acceptance is simulated \(fake KV\), as in D-Only$",
+        lambda m: "A-Only：和 D-Only 一样，MTP 接受长度用模拟值（KV 是假的）",
+    ),
+    _rule(
+        r"^A-Only: A-side FLOPs only \(the routed experts run on F\), BF16 peak$",
+        lambda m: "A-Only：计算量只算 A 这一侧（routed experts 在 F 上），峰值用 BF16",
+    ),
+    _rule(r"^A-Only F model: (.+)$", lambda m: f"A-Only 的 F 模型：{localize(m[1])}"),
+    _rule(
+        r"^F with (\d+) GPUs holds (\d+) GB of experts per GPU, more than (\d+)% of (\d+) GB$",
+        lambda m: f"F 用 {m[1]} 张 GPU 时每张要放 {m[2]} GB experts，超过 {m[4]} GB 的 {m[3]}%",
+    ),
+    _rule(
+        r"^no dense (\w+) peak in the (\S+) profile: F's (\w+) expert GEMMs use the (\w+) peak$",
+        lambda m: f"{m[2]} 配置文件里没有 {m[1].upper()} 稠密峰值：F 的 {m[3]} expert GEMM 按 {m[4].upper()} 峰值算",
+    ),
+    _rule(
+        r"^simulated F: a forward with (\d+) MoE rows waits ([\d.]+) s for F on an A instance of (\d+) GPUs \((\w+)-bound; A<->F ([\d.]+) GB/s, (.+)\): the simulated-F numbers will mostly measure this link$",
+        lambda m: f"模拟的 F：一个 A 实例（{m[3]} 张 GPU）一次 forward 有 {m[1]} 行 MoE 输入时要等 F {m[2]} s（主要耗时在{AFD_TERMS.get(m[4], m[4])}；A↔F {m[5]} GB/s，{localize(m[6])}），模拟 F 的结果主要反映这条链路；可以用 --afd-f bw_gbs=...,lat_us=... 或 link=intra 换一种 A↔F 互联",
+    ),
+    _rule(
+        r"^smallest power of two holding (\d+) GB of routed experts at (\d+)% of (\d+) GB$",
+        lambda m: f"能在每张 GPU 的 {m[2]}%（共 {m[3]} GB）里放下全部 {m[1]} GB routed experts 的最小 2 的幂",
+    ),
+    _rule(
+        r"^microbench gdr_send_recv \((?:(all) NICs|(\d+) NICs?)\): ([\d.]+) GB/s per node / (\d+) GPUs$",
+        lambda m: f"微基准 gdr_send_recv（{'全部网卡' if m[1] else f'{m[2]} 张网卡'}）："
+        f"每节点 {m[3]} GB/s ÷ {m[4]} 张 GPU",
+    ),
+    _rule(
+        r"^inventory: ([\d.]+) GB/s of active NICs x ([\d.]+) / (\d+) GPUs \(no gdr_send_recv peak\)$",
+        lambda m: f"硬件清单：活跃网卡共 {m[1]} GB/s × {m[2]} ÷ {m[3]} 张 GPU（没有 gdr_send_recv 微基准结果）",
+    ),
+    _rule(
+        r"^microbench p2p_ring_aggregate: ([\d.]+) GB/s per GPU$",
+        lambda m: f"微基准 p2p_ring_aggregate：每张 GPU {m[1]} GB/s",
+    ),
+    _rule(
+        r"^GPU profile: (\d+) GB/s (NVLink|PCIe) x ([\d.]+) \(no p2p_ring_aggregate peak\)$",
+        lambda m: f"GPU 配置文件：{m[2]} {m[1]} GB/s × {m[3]}（没有 p2p_ring_aggregate 微基准结果）",
+    ),
+    _rule(
+        r"^perftest ib_write_lat median ([\d.]+) us \+ (\d+) us NCCL software \(estimate\)$",
+        lambda m: f"perftest ib_write_lat 中位数 {m[1]} µs + NCCL 软件开销 {m[2]} µs（估算）",
+    ),
+    _rule(r"^default, not measured$", lambda m: "默认值，没有实测"),
+    _rule(r"^null-F bound not applicable$", lambda m: "不适用"),
+    _rule(r"^no leader to bound$", lambda m: "没有最优配置"),
+    _rule(r"^null-F deployment failed$", lambda m: "关掉 F 的等待后部署失败"),
+    _rule(r"^null-F bound measured$", lambda m: "已测完"),
+    _rule(r"^budget skipped the null-F bound$", lambda m: "预算不够，跳过了这一步"),
+    _rule(r"^no usable simulated-F point$", lambda m: "没有可用的模拟 F 测点"),
+    _rule(r"^null-F point has no throughput$", lambda m: "null-F 测点没有吞吐"),
     # render-time notes (adapters/engine_sglang.py)
     _rule(
         r"^(\S+): HiCache clamped (\d+) -> (\d+) GB/rank to fit host memory$",

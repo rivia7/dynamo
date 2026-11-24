@@ -88,6 +88,7 @@ purpose:
   pilot: "重复测量"
   nic: "网卡数量对比"
   confirm: "长时复测"
+  f_bound: "null-F 上界"
   smoke: "冒烟测试"
 
 spec:
@@ -526,6 +527,7 @@ method:
   submission_invalid: "AIPerf 对长时复测的场景判定（{scenario}）：submission_valid=false，原因：{reasons}。"
   submission_prefill: "注意：P-Only 改了 AgentX 的负载（每轮只输出 1 个 token），所以就算 submission_valid=true，也只说明 AIPerf 检查的规则都满足，不能当作 AgentX 的正式提交结果。"
   submission_decode: "注意：D-Only 改了 AgentX 的负载（没有真实的 prefill 和 KV 传输），所以就算 submission_valid=true，也只说明 AIPerf 检查的规则都满足，不能当作 AgentX 的正式提交结果。"
+  submission_attention: "注意：A-Only 改了 AgentX 的负载（没有真实的 prefill 和 KV 传输，routed experts 不计算，F 是模拟的），所以就算 submission_valid=true，也只说明 AIPerf 检查的规则都满足，不能当作 AgentX 的正式提交结果。"
   cache_plain: "缓存状态：各并发点之间不重启 worker；数据集里重复的前缀会命中 KV 缓存，各点在同一个数据集、同样的缓存条件下排名。"
   specs_caption: "测量规格与有效性"
   spec: "规格"
@@ -831,6 +833,71 @@ resources:
   kpi_nvl: "禁用 NVLink（改走 PCIe）"
   kpi_nvl_detail: "{on} → {off} tok/s/GPU"
   kpi_nvl_detail_host: "{on} → {off} tok/s/GPU（经主机内存，下限）"
+  afd_heading: "2.5 A-Only：模拟的 F、null-F 上界和 A↔F 流量"
+  afd_intro: "A-Only 只测 AF 分离里的 attention 一侧（A）。目标模型的 routed experts 不加载也不计算；每个 MoE 层在原来算 routed experts 的地方等一段时间，代表“把 hidden state 发给 F、F 算完、把结果传回来”。等多久由下面的 F 模型算出，由 GPU 上的一个小 kernel 来等，所以也能放进 CUDA graph。gate / top-k、shared experts、dense 层、attention 和 MTP 草稿层（它的 experts 留在 A 上）都照常计算。吞吐只算 A 的 GPU，真实的 AF 部署还要另加 F 的 GPU。"
+  afd_item: "项目"
+  afd_value: "取值"
+  afd_source: "来源"
+  afd_default: "默认值"
+  afd_from_config: "config.json 和 checkpoint 的精度"
+  afd_from_profile: "GPU 配置文件（F 和 A 用同一种 GPU）"
+  afd_f_gpus: "F 的 GPU 数"
+  afd_f_gpus_value: "{gpus} 张（每个 A 实例配一个 F），每张放 {per_gpu} GB experts"
+  afd_experts: "routed experts"
+  afd_experts_value: "{layers} 个 MoE 层，每层 {layer} GB，共 {total} GB（{dtype}；每层 {experts} 个专家，每个 token 选 {top_k} 个）"
+  afd_link: "A↔F 带宽"
+  afd_link_value: "每张 A GPU {bw} GB/s（单方向，{kind}）"
+  afd_link_kind:
+    net: "F 在别的节点上"
+    intra: "F 在同一节点上"
+  afd_lat: "A↔F 延迟"
+  afd_lat_value: "单程 {lat} µs"
+  afd_layout: "发送方式"
+  afd_layout_staged: "staged：每个 F rank 都收到整批，各自算自己那部分专家，A 把结果加起来（SGLang AFD 默认的 NCCL 后端）；每行发 {fan} 份，去 {b_in} B、回 {b_out} B（{wire}）"
+  afd_layout_direct: "direct：每行只发给它的 top-k 专家所在的 F rank（DeepEP 一类后端），平均发 {fan} 份，去 {b_in} B、回 {b_out} B（{wire}）"
+  afd_microbatches: "microbatch"
+  afd_mb_overlap: "{m} 个：每层把 batch 分成 {m} 份轮流发给 F；从第二个 MoE 层起，F 的时间和 A 自己的计算重叠"
+  afd_mb_serial: "1 个：不重叠，每层都等 F 算完整个 batch"
+  afd_f_speed: "F 的速度"
+  afd_f_speed_value: "显存带宽 {hbm} TB/s 用到 {eff_mem}，{precision} 稠密峰值 {peak} TFLOPS 用到 {eff_flop}"
+  afd_model_caption: "F 模型（一个 A 实例 {n_a} 张 GPU，配一个 F）"
+  afd_rows: "MoE 输入行数"
+  afd_latency: "延迟 µs"
+  afd_wire: "传输 µs"
+  afd_f_mem: "F 读权重 µs"
+  afd_f_flop: "F 计算 µs"
+  afd_first: "第一层 µs"
+  afd_later: "之后每层 µs"
+  afd_step: "每次 forward ms"
+  afd_bound: "主要耗时"
+  afd_bound_kind:
+    latency: "延迟"
+    link: "传输"
+    memory: "F 读权重"
+    compute: "F 计算"
+  afd_steps_caption: "F 模型给出的等待时间。MoE 输入行数 = 一个 rank 在 attention DP 汇总后的 batch（含 MTP 验证的行）。前四列是一个 microbatch 的分项，每层等 2 × 延迟 + 传输 + max(读权重, 计算)。第一层从头等；之后每层从上一层的结果到达算起，等 {m} 个 microbatch 的时间，A 自己的计算在这段时间里进行。“每次 forward” = 第一层 + 其余 {rest} 层，是 F 这一侧的下限，不含 A 自己的计算。"
+  afd_bound_intro: "null-F 上界：在同样的并发（C={c}）下，把 F 的等待关掉（routed experts 仍然不加载、不计算）重测一次。它是 A 这一侧的上限：F 再快，吞吐也不会超过它。"
+  afd_bound_skipped: "没有测 null-F 上界（{reason}）。"
+  afd_bound_failed: "没有测成 null-F 上界：关掉等待后部署失败了。"
+  afd_bound_invalid: "null-F 上界的测量无效（{reason}），不做对比。"
+  afd_f: "F"
+  afd_sim: "模拟的 F"
+  afd_null: "null F（不等）"
+  afd_vs_null: "相对 null F"
+  afd_baseline: "基准"
+  afd_bound_caption: "模拟的 F 和 null-F 上界（同一配置，并发 {c}）"
+  afd_cost: "F 的等待让每张 A GPU 的吞吐少了 {cost}{verdict}。"
+  afd_cost_noise: "，在测量噪声以内：按这个 F 模型，F 几乎不拖慢 A"
+  afd_cost_real: "，超出测量噪声"
+  afd_traffic: "A↔F 流量（估算，不是实测）：每个输出 token 发往 F {to_f} MB、从 F 收回 {from_f} MB（{layers} 个 MoE 层 × 每个 token {rows} 行 × 每行 {fan} 份）。"
+  afd_traffic_need: "按模拟 F 的吞吐，每张 A GPU 需要 {need} GB/s（单方向），占 A↔F 带宽 {link} GB/s 的 {util}。"
+  afd_traffic_need_null: "按模拟 F 的吞吐，每张 A GPU 需要 {need} GB/s（单方向），占 A↔F 带宽 {link} GB/s 的 {util}；按 null-F 上界需要 {null_need} GB/s（{null_util}）。"
+  afd_weights: "A 侧权重：每张 GPU {w} GB（启动日志）。估算：不加载目标层的 routed experts 时最多约 {null} GB，加载的话约 {loaded} GB（routed experts 分到一个实例的 {n_a} 张 GPU 上）。实测更接近前者，说明这些 routed experts 确实没有加载。"
+  afd_weights_high: "A 侧权重：每张 GPU {w} GB（启动日志），更接近加载目标层 routed experts 时的约 {loaded} GB（分到一个实例的 {n_a} 张 GPU 上；不加载时最多约 {null} GB）：routed experts 可能还是加载了。"
+  afd_weights_unchecked: "A 侧权重：每张 GPU {w} GB（启动日志）。checkpoint 不比它的 routed experts 大，估算不出应有的大小。"
+  afd_weights_unknown: "启动日志里没有 A 侧权重的大小，无法确认 routed experts 没有加载。"
+  afd_simplified: "F 模型的简化：A 每层算整个 batch（真实的 microbatch 会让 A 每份都重读一遍权重）；路由按均匀分布算；每个 A 实例配一个独立的 F，F 上没有排队；F 按显存带宽和算力的固定比例算。"
+  afd_no_traffic_ib: "A-Only 没有真实的 A↔F 流量，上表不含它；按 F 模型估算的 A↔F 流量见 2.5。"
 
 link_kind:
   nvlink: "机内 GPU 之间（NVLink）"
@@ -849,9 +916,6 @@ link_status:
   tight: "偏紧"
   unavailable: "无数据"
 
-# P-Only / D-Only (domain/stages.py). Per stage: replace = [old, new] text
-# replacements over every template; overrides = dotted key -> template.
-# E2E uses the table as is.
 # Display labels of kernel names (Python regular expressions searched in the
 # demangled name; the first match wins): a reading of the name, shown next to
 # it in the diagnostic window's kernel table.
@@ -884,16 +948,21 @@ kernel_labels:
   - ['BatchMLAPagedAttention|mla::|FlashMLA|flash_mla', "MLA attention"]
   - ['nvjet', "cuBLAS GEMM（nvjet）"]
 
+# P-Only / D-Only / A-Only (domain/stages.py). Per stage: replace = [old, new]
+# text replacements over every template; overrides = dotted key -> template.
+# E2E uses the table as is.
 stages:
   label:
     e2e: "E2E（完整部署）"
     prefill: "P-Only（只测 prefill）"
     decode: "D-Only（只测 decode）"
+    attention: "A-Only（只测 AF 分离的 attention 侧）"
   platform:
     generic: "通用 SSH 机器"
     lium: "lium.io 租用集群"
   banner:
     prefill: "测量阶段：P-Only，只测 PD 分离里的 prefill 阶段。每个 worker 用 PD 配置里 prefill 角色的参数（并行方式、chunked prefill、MTP 等），但按聚合模式运行、不传 KV；每个请求只生成 1 个 token（max_completion_tokens=1），所以本报告的吞吐都是输入 tok/s/GPU（每 GPU 每秒处理的 prompt token），前缀缓存命中照常生效。结果是整个集群都做 prefill 时能达到的上限；和同一数据集的 D-Only 结果一起，可以算出 PD 的最佳 GPU 配比（见知识库 INDEX.md）。"
+    attention: "测量阶段：A-Only，只测 AF 分离（attention-FFN disaggregation）里的 attention 一侧（A）。每个 worker 用 PD 配置里 decode 角色的参数，改成 attention DP（每个 rank TP1），KV 传输和 D-Only 一样换成 fake 后端。目标模型的 routed experts 不加载、不计算，每个 MoE 层改为等一个模拟的 F（F 模型见 2.5）；gate / top-k、shared experts、dense 层和 MTP 草稿层照常计算。本报告的吞吐是每张 A GPU 的输出 tok/s，不含 F 的 GPU；生成的文字没有意义，MTP 接受长度用模拟值，精度检查不适用。最后在最优配置的并发下关掉 F 的等待重测一次，得到 null-F 上界。"
     decode: "测量阶段：D-Only，只测 PD 分离里的 decode 阶段。每个 worker 用 PD 配置里 decode 角色的参数，KV 传输换成 SGLang 的 fake 后端：worker 照常为整段 prompt 分配 KV 再解码，但不等 prefill，也不做 prefill 计算。KV 内容没有意义，所以生成的文字没有意义，但 batch 大小、KV 占用和 attention 计算量和真实 decode 一样。本报告的吞吐是输出 tok/s/GPU；MTP 接受长度用模拟值，精度检查不适用。"
   replace:
     prefill:
@@ -906,3 +975,5 @@ stages:
       summary.best: "最优配置：{family}（{key}），并发 {c} 时达到 {tps}；TTFT p50 {ttft} ms。"
     decode:
       method.objective: "目标：错误率 < 1% 的前提下，让饱和时的输出 tok/s/GPU 最高（所有 GPU 都只做 decode）；另外从并发曲线读出单用户 ≥ 20 和 ≥ 50 tok/s 时的吞吐。并发取 2 的幂，其他并发值只用来细化拐点。"
+    attention:
+      method.objective: "目标：错误率 < 1% 的前提下，让饱和时每张 A GPU 的输出 tok/s 最高（所有 GPU 都做 attention 一侧，routed experts 在模拟的 F 上）；另外从并发曲线读出单用户 ≥ 20 和 ≥ 50 tok/s 时的吞吐。并发取 2 的幂，其他并发值只用来细化拐点。"

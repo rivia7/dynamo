@@ -33,7 +33,15 @@ NEGLIGIBLE_CROSS_NODE_GBS = CROSS_NODE_MIN_GBS  # same rule as the planner
 
 PLANE_ORDER = ("ib", "nvlink", "pcie", "pcie_nic")
 DIRECTION_ORDER = ("tx", "rx", "bidir")
-PURPOSE_ORDER = ("search", "mtp_ablation", "pilot", "nic", "confirm", "smoke")
+PURPOSE_ORDER = (
+    "search",
+    "mtp_ablation",
+    "pilot",
+    "nic",
+    "confirm",
+    "f_bound",
+    "smoke",
+)
 AUDIT_ORDER = ("valid", "valid_with_recovery", "invalid")
 SPEC_ORDER = ("smoke", "screen", "decision")
 METHOD_RANK = {"measured": 2, "derived": 1, "unavailable": 0}

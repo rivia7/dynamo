@@ -17,12 +17,15 @@ from typing import Any
 import yaml
 
 from benchmarks.cluster_bench.domain import profiles as prof
+from benchmarks.cluster_bench.domain import stages
 from benchmarks.cluster_bench.domain.profiles import ProfileError
 from benchmarks.cluster_bench.domain.schema import (
     DeploymentProfile,
     GpuProfile,
     ModelProfile,
     RecipeRef,
+    RoleSpec,
+    Stage,
     modernize_sglang_keys,
 )
 
@@ -91,13 +94,16 @@ def load_fitted_profile(
     nodes: int = 4,
     gpus_per_node: int = 8,
     profiles_dir: Path = PROFILES_DIR,
+    stage: Stage = "e2e",
 ) -> DeploymentProfile:
-    """The deployment profile fitted to ``nodes`` x ``gpus_per_node`` GPUs."""
-    fitted, _ = prof.fit_deployment(
+    """The families a ``stage`` run sees (domain/stages.py), fitted to
+    ``nodes`` x ``gpus_per_node`` GPUs."""
+    staged = stages.stage_deployment(
         load_deployment_profile(model, gpu, profiles_dir),
-        nodes * gpus_per_node,
-        gpus_per_node,
+        stage,
+        RecipeLoader().role_config,
     )
+    fitted, _ = prof.fit_deployment(staged, nodes * gpus_per_node, gpus_per_node)
     return fitted
 
 
@@ -113,6 +119,12 @@ class RecipeLoader:
         if cache_key not in self._cache:
             self._cache[cache_key] = self._load(ref)
         return dict(self._cache[cache_key])
+
+    def role_config(self, role: RoleSpec) -> dict[str, Any]:
+        """A role's SGLang config: its recipe base with the role's keys merged."""
+        return prof.merge_config(
+            self.config(role.base) if role.base else {}, role.sglang
+        )
 
     def _load(self, ref: RecipeRef) -> dict[str, Any]:
         path = self.repo_root / ref.path

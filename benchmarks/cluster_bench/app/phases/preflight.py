@@ -23,6 +23,7 @@ from benchmarks.cluster_bench.agents.sglang_hotfix import ENV_VAR as HOTFIX_ENV
 from benchmarks.cluster_bench.agents.sglang_hotfix import parse_ids as parse_hotfixes
 from benchmarks.cluster_bench.app.context import RunContext
 from benchmarks.cluster_bench.app.facts_ops import collect_preflight
+from benchmarks.cluster_bench.domain import afd
 from benchmarks.cluster_bench.domain import profiles as prof
 from benchmarks.cluster_bench.domain import stages
 from benchmarks.cluster_bench.domain.datasets import parse_dataset
@@ -59,6 +60,7 @@ HARNESS_SGLANG_KEYS = (
     "load-format",  # dummy-weight kernel smoke
 )
 MULTINODE_KEYS = ("nnodes", "node-rank", "dist-init-addr")
+CONTAINER_AGENTS = f"{CONTAINER_SRC}/benchmarks/cluster_bench/agents"
 
 
 class PreflightError(RuntimeError):
@@ -87,14 +89,13 @@ def collect_family_flags(
         if family.transport == "mooncake":
             used.add("--disaggregation-ib-device")
         for role in family.roles:
-            cfg = prof.merge_config(
-                recipes.config(role.base) if role.base else {}, role.sglang
-            )
+            cfg = recipes.role_config(role)
             used |= {f"--{k}" for k in cfg}
             used |= {a for a in role.extra_args if a.startswith("--")}
             if role.nodes_per_instance > 1:
                 used |= {f"--{k}" for k in MULTINODE_KEYS}
-            if role.role in ("prefill", "decode") and family.stage != "prefill":
+            disaggregated = stages.stage_spec(family.stage).disaggregated
+            if role.role in ("prefill", "decode") and disaggregated:
                 used.add("--disaggregation-bootstrap-port")
         for rung in deployment.ladder:
             used |= {f"--{k}" for k, v in rung.sglang.items() if v is not None}
@@ -159,9 +160,9 @@ def resolve_profiles(
             nodes=len(inventory.nodes),
             gpus_per_node=gpn,
             served_context=cfg.served_context or 131072,
-            # P-Only/D-Only derive their family from the PD split, which a
-            # single node can also hold.
-            pd_min_nodes=2 if cfg.stage == "e2e" else 1,
+            # Single-role stages derive their family from the PD split, which
+            # a single node can also hold.
+            pd_min_nodes=2 if stages.stage_role(cfg.stage) is None else 1,
         )
     else:
         model = profile_store.load_model_profile(cfg.model)
@@ -170,18 +171,12 @@ def resolve_profiles(
             deployment = deployment.model_copy(
                 update={"served_context": cfg.served_context}
             )
-    deployment = stages.stage_deployment(
-        deployment,
-        cfg.stage,
-        lambda role: prof.merge_config(
-            recipes.config(role.base) if role.base else {}, role.sglang
-        ),
-    )
+    deployment = stages.stage_deployment(deployment, cfg.stage, recipes.role_config)
     if not deployment.families:
         raise PreflightError(
             f"{deployment.model}/{deployment.gpu} has no "
-            f"{stages.stage_label(cfg.stage)} family (P-Only/D-Only derive theirs "
-            "from PD families; the profile has none)"
+            f"{stages.stage_label(cfg.stage)} family (P-Only, D-Only and A-Only "
+            "derive theirs from PD families; the profile has none)"
         )
     fitted, dropped = prof.fit_deployment(deployment, inventory.gpu_count, gpn)
     if not fitted.families:
@@ -275,9 +270,17 @@ class PreflightPhase:
                 )
 
         gpu, model, deployment = resolve_profiles(ctx, inventory)
+        spec = stages.stage_spec(cfg.stage)
+        # a --model-repo profile does not know: the F plan reads config.json
+        if spec.needs_moe and not model.moe and model.name != prof.GENERIC_MODEL:
+            raise PreflightError(
+                f"{spec.label} needs a MoE model; {model.name} has no routed experts"
+            )
         try:
-            _, checkpoint = prof.select_checkpoint(model, gpu, cfg.checkpoint)
-        except prof.ProfileError as exc:
+            variant, checkpoint = prof.select_checkpoint(model, gpu, cfg.checkpoint)
+            if spec.afd_side:
+                afd.routed_dtype(variant, cfg.afd_f.expert_dtype)
+        except (prof.ProfileError, afd.AfdError) as exc:
             raise PreflightError(str(exc)) from exc
         model_root: str | None = None
         if not cfg.model_path:
@@ -309,59 +312,93 @@ class PreflightPhase:
         collect_preflight(ctx)
         self._check_flags(ctx, model, deployment)
 
-    def _check_decode_only_shim(self, ctx: RunContext) -> None:
-        """The D-Only shim patches dynamo.sglang internals: prove they exist."""
-        shim = f"{CONTAINER_SRC}/benchmarks/cluster_bench/agents/sglang_decode_only.py"
+    def _check_in_image(
+        self,
+        ctx: RunContext,
+        *,
+        name: str,
+        command: list[str],
+        gpus: list[int] | None,
+        timeout: int,
+        artifact: str,
+        failure: str,
+    ) -> None:
+        """Run a check in the image on node0 with the harness sources mounted;
+        its output goes to preflight/<artifact>, a non-zero exit fails."""
         argv = docker_run_argv(
-            name=f"cb-donly-{ctx.config.exp_id[:8]}",
+            name=f"{name}-{ctx.config.exp_id[:8]}",
             image=ctx.config.image,
-            command=["python3", "-P", shim, "--check"],
-            gpus=[0],
+            command=command,
+            gpus=gpus,
             mounts=(Mount(f"{ctx.config.workdir}/src", CONTAINER_SRC, read_only=True),),
             detach=False,
             remove=True,
             rdma=False,
         )
         res = ctx.cluster.run(
-            ctx.node0, shlex.join(argv) + " 2>&1", timeout=600, check=False
+            ctx.node0, shlex.join(argv) + " 2>&1", timeout=timeout, check=False
         )
-        atomic_write_text(
-            ctx.exp_dir / "preflight" / "decode_only_shim.txt", res.stdout + res.stderr
-        )
+        output = res.stdout + res.stderr
+        atomic_write_text(ctx.exp_dir / "preflight" / artifact, output)
         if res.rc != 0:
-            raise PreflightError(
-                "D-Only needs the decode-only shim, which does not fit this image "
-                f"(rc {res.rc}): {(res.stdout + res.stderr).strip()[-600:]}"
-            )
+            raise PreflightError(f"{failure} (rc {res.rc}): {output.strip()[-600:]}")
+
+    def _check_decode_only_shim(self, ctx: RunContext) -> None:
+        """The D-Only shim patches dynamo.sglang internals: prove they exist."""
+        self._check_in_image(
+            ctx,
+            name="cb-donly",
+            command=[
+                "python3",
+                "-P",
+                f"{CONTAINER_AGENTS}/sglang_decode_only.py",
+                "--check",
+            ],
+            gpus=[0],
+            timeout=600,
+            artifact="decode_only_shim.txt",
+            failure="D-Only needs the decode-only shim, which does not fit this image",
+        )
+
+    def _check_afd_kernel(self, ctx: RunContext) -> None:
+        """A-Only's F wait is a Triton kernel: compile and time it on GPU 0."""
+        self._check_in_image(
+            ctx,
+            name="cb-afd",
+            command=["python3", "-P", f"{CONTAINER_AGENTS}/sglang_afd.py", "--check"],
+            gpus=[0],
+            timeout=900,
+            artifact="afd_wait_kernel.txt",
+            failure="A-Only's F wait kernel does not work in this image",
+        )
 
     def _check_sglang_hotfixes(
         self, ctx: RunContext, model: ModelProfile, deployment: DeploymentProfile
     ) -> None:
         """Hotfixes edit SGLang sources at launch: prove each fits this image."""
-        ids = profile_hotfixes(model, deployment)
-        if not ids:
-            return
-        tool = f"{CONTAINER_SRC}/benchmarks/cluster_bench/agents/sglang_hotfix.py"
-        argv = docker_run_argv(
-            name=f"cb-hotfix-{ctx.config.exp_id[:8]}",
-            image=ctx.config.image,
-            command=["python3", "-P", tool, "check", ",".join(ids)],
-            gpus=None,
-            mounts=(Mount(f"{ctx.config.workdir}/src", CONTAINER_SRC, read_only=True),),
-            detach=False,
-            remove=True,
-            rdma=False,
+        ids = parse_hotfixes(
+            ",".join(
+                (
+                    *profile_hotfixes(model, deployment),
+                    *stages.stage_spec(ctx.config.stage).hotfixes,
+                )
+            )
         )
-        res = ctx.cluster.run(
-            ctx.node0, shlex.join(argv) + " 2>&1", timeout=600, check=False
-        )
-        atomic_write_text(
-            ctx.exp_dir / "preflight" / "sglang_hotfixes.txt", res.stdout + res.stderr
-        )
-        if res.rc != 0:
-            raise PreflightError(
-                f"SGLang hotfixes {','.join(ids)} do not fit this image "
-                f"(rc {res.rc}): {(res.stdout + res.stderr).strip()[-600:]}"
+        if ids:
+            self._check_in_image(
+                ctx,
+                name="cb-hotfix",
+                command=[
+                    "python3",
+                    "-P",
+                    f"{CONTAINER_AGENTS}/sglang_hotfix.py",
+                    "check",
+                    ",".join(ids),
+                ],
+                gpus=None,
+                timeout=600,
+                artifact="sglang_hotfixes.txt",
+                failure=f"SGLang hotfixes {','.join(ids)} do not fit this image",
             )
 
     def _check_flags(
@@ -398,8 +435,11 @@ class PreflightPhase:
         )
         help_text = res.stdout + res.stderr
         atomic_write_text(out_dir / "dynamo_sglang_help.txt", help_text)
-        if ctx.config.stage == "decode":
+        spec = stages.stage_spec(ctx.config.stage)
+        if spec.fake_kv:
             self._check_decode_only_shim(ctx)
+        if spec.afd_side:
+            self._check_afd_kernel(ctx)
         self._check_sglang_hotfixes(ctx, model, deployment)
         flags = collect_family_flags(deployment, model, profile_store.RecipeLoader())
         baseline = min(deployment.families, key=lambda f: f.priority)

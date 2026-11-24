@@ -27,6 +27,7 @@ from typing import Any, ClassVar, Literal, TypeVar
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from benchmarks.cluster_bench.domain.afd import format_afd_f
 from benchmarks.cluster_bench.domain.kernels import KernelBreakdown
 from benchmarks.cluster_bench.domain.lifecycle import DeployLifecycle
 from benchmarks.cluster_bench.domain.pointstate import PointState
@@ -68,6 +69,9 @@ class KbRecord(BaseModel):
 
     FILE_KIND: ClassVar[str] = ""
     SCHEMA: ClassVar[str] = ""
+    # Columns added after rows were written are left out of a row while None,
+    # so a row without them keeps its rec_id.
+    OMIT_NONE_PREFIXES: ClassVar[tuple[str, ...]] = ()
 
     record_schema: str = Field(alias="schema")
     fp: str
@@ -83,10 +87,18 @@ class KbRecord(BaseModel):
 
     def payload(self) -> dict[str, Any]:
         """Canonical JSON payload without ``rec_id`` (what ``rec_id`` hashes)."""
-        return self.model_dump(mode="json", by_alias=True, exclude={"rec_id"})
+        return self._row(exclude={"rec_id"})
 
     def as_json(self) -> dict[str, Any]:
-        return self.model_dump(mode="json", by_alias=True)
+        return self._row()
+
+    def _row(self, exclude: set[str] | None = None) -> dict[str, Any]:
+        row = self.model_dump(mode="json", by_alias=True, exclude=exclude)
+        return {
+            k: v
+            for k, v in row.items()
+            if v is not None or not k.startswith(self.OMIT_NONE_PREFIXES)
+        }
 
 
 def rec_id_of(row: dict[str, Any]) -> str:
@@ -393,6 +405,7 @@ class ExperimentRecord(KbRecord):
 
     FILE_KIND: ClassVar[str] = "experiment"
     SCHEMA: ClassVar[str] = "cluster_bench.experiment/v1"
+    OMIT_NONE_PREFIXES: ClassVar[tuple[str, ...]] = ("afd_",)  # A-Only columns
 
     gpu_profile: str
     gpu_name: str
@@ -495,6 +508,25 @@ class ExperimentRecord(KbRecord):
     nvlink_off_within_noise: bool | None = None
     nvlink_off_p2p_gbs: float | None = None  # GPU-GPU copy with NVLink off
     nvlink_off_pcie_p99_gbs: float | None = None
+    # A-Only (domain/afd.py): the simulated F, the null-F bound (the F wait
+    # off, same config and C) and the estimated A<->F traffic per output token.
+    afd_f: str | None = None  # --afd-f text (non-default keys; "" = defaults)
+    afd_n_a: int | None = None  # GPUs of one A instance
+    afd_f_gpus: int | None = None
+    afd_link_gbs_per_gpu: float | None = None  # A<->F, one direction
+    afd_lat_us: float | None = None
+    afd_layout: str | None = None  # staged | direct
+    afd_microbatches: int | None = None
+    afd_bound_status: str | None = None  # measured | invalid | failed | skipped
+    afd_bound_reason: str | None = None
+    afd_null_tps_per_gpu: float | None = None
+    afd_f_cost_pct: float | None = None  # (null - simulated) / null
+    afd_f_cost_within_noise: bool | None = None
+    afd_to_f_mb_per_token: float | None = None
+    afd_from_f_mb_per_token: float | None = None
+    afd_need_gbs_per_gpu: float | None = None  # at the leader's tok/s
+    afd_link_util: float | None = None
+    afd_weight_gb_per_gpu: float | None = None  # A side, from the engine log
 
 
 class FabricRecord(KbRecord):
@@ -1080,7 +1112,40 @@ def experiment_record(summary: ExperimentSummary) -> ExperimentRecord:
         **_leader_accuracy(summary, cand),
         **_diagnostics_extras(summary),
         **_resources_extras(summary, lead),
+        **_afd_extras(summary),
     )
+
+
+def _afd_extras(summary: ExperimentSummary) -> dict[str, Any]:
+    report = summary.afd
+    if report is None:
+        return {}
+    plan, bound, traffic = report.plan, report.bound, report.traffic
+    return {
+        "afd_f": format_afd_f(plan.spec),
+        "afd_n_a": report.n_a,
+        "afd_f_gpus": plan.f_gpus,
+        "afd_link_gbs_per_gpu": _round(plan.link_gbs_per_gpu, 3),
+        "afd_lat_us": _round(plan.lat_us, 2),
+        "afd_layout": plan.spec.layout,
+        "afd_microbatches": plan.spec.microbatches,
+        "afd_bound_status": bound.status,
+        "afd_bound_reason": bound.reason or None,
+        "afd_null_tps_per_gpu": _round(bound.null_tps_per_gpu, 3),
+        "afd_f_cost_pct": _round(bound.f_cost_pct, 2),
+        "afd_f_cost_within_noise": bound.within_noise,
+        "afd_to_f_mb_per_token": _round(traffic.to_f_bytes_per_token / 1e6, 3)
+        if traffic
+        else None,
+        "afd_from_f_mb_per_token": _round(traffic.from_f_bytes_per_token / 1e6, 3)
+        if traffic
+        else None,
+        "afd_need_gbs_per_gpu": _round(traffic.sim_need_gbs_per_gpu, 3)
+        if traffic
+        else None,
+        "afd_link_util": _round(traffic.sim_util, 4) if traffic else None,
+        "afd_weight_gb_per_gpu": _round(report.weight_gb_per_gpu, 2),
+    }
 
 
 def _resources_extras(

@@ -27,7 +27,13 @@ from benchmarks.cluster_bench.domain.modelarch import (
 )
 from benchmarks.cluster_bench.domain.pointstate import PointState
 from benchmarks.cluster_bench.domain.requests import RequestSummary
-from benchmarks.cluster_bench.domain.schema import EventType, GpuProfile, LaunchPlan
+from benchmarks.cluster_bench.domain.schema import (
+    EventType,
+    GpuProfile,
+    LaunchPlan,
+    Stage,
+)
+from benchmarks.cluster_bench.domain.stages import stage_spec
 from benchmarks.cluster_bench.ports import CommandError
 
 logger = logging.getLogger(__name__)
@@ -117,12 +123,15 @@ def point_mfu(
     variant: str | None,
     requests: RequestSummary | None,
     state: PointState | None,
+    stage: Stage = "e2e",
 ) -> MfuResult | None:
     """MFU (config.json FLOPs) and MBU (NVML GPM DRAM bandwidth) of one point.
 
     None when the point has neither FLOPs with a window nor GPM DRAM samples.
+    The stage may count its GEMMs at another precision's peak (A-Only: BF16).
     """
-    precision = precision_of(variant)
+    traits = stage_spec(stage)
+    precision = traits.mfu_precision or precision_of(variant)
     tensor: dict[str, float] = {}
     dram: dict[str, float] = {}
     activity = state.stress.activity if state and state.stress else None
@@ -140,7 +149,7 @@ def point_mfu(
         and requests.flops_prefill is not None
         and bool(requests.window_s)
     )
-    return compute_mfu(
+    result = compute_mfu(
         flops_prefill=requests.flops_prefill if known and requests else None,
         flops_decode=(requests.flops_decode or 0.0) if known and requests else None,
         window_s=requests.window_s if known and requests else None,
@@ -152,3 +161,6 @@ def point_mfu(
         peak_mem_tbs=gpu.hbm_tbs,
         cache_source=requests.cache_source if requests is not None else "none",
     )
+    if result is not None and traits.mfu_note:
+        result = result.model_copy(update={"notes": result.notes + (traits.mfu_note,)})
+    return result

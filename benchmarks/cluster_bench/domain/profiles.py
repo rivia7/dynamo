@@ -248,11 +248,14 @@ def fit_deployment(
 # --------------------------------------------------------------------------
 
 
+GENERIC_MODEL = "generic"  # the profile name of a --model-repo model
+
+
 def generic_model_profile(
     repo: str, revision: str, size_gb: float, served_name: str | None = None
 ) -> ModelProfile:
     return ModelProfile(
-        name="generic",
+        name=GENERIC_MODEL,
         served_model_name=served_name or repo,
         checkpoints={
             "generic": Checkpoint(repo=repo, revision=revision, approx_size_gb=size_gb)

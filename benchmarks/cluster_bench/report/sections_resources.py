@@ -1,6 +1,7 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
-"""Report section 2: interconnect needs, NVLink off vs on, MFU / MBU, KV capacity.
+"""Report section 2: interconnect needs, NVLink off vs on, MFU / MBU, KV capacity,
+and for A-Only the simulated F (its model, the null-F bound, A<->F traffic).
 
 The three focus resources of the leader at saturation: how much interconnect
 it needs (and the smallest NIC count that holds up), how much of the GPUs'
@@ -13,13 +14,18 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from benchmarks.cluster_bench.domain import afd
 from benchmarks.cluster_bench.domain.capacity import IDLE_IB_NOTE
 from benchmarks.cluster_bench.domain.schema import (
+    AfdBound,
+    AfdFSpec,
+    AfdReport,
     InterconnectNeeds,
     KvCapacity,
     NvlinkComparison,
     PointResult,
 )
+from benchmarks.cluster_bench.domain.stages import flops_arch
 from benchmarks.cluster_bench.report import facts
 from benchmarks.cluster_bench.report.doc import (
     Block,
@@ -77,6 +83,7 @@ def resources_section(ctx: Ctx) -> list[Block]:
     out.extend(_nvlink(ctx, sm.nvlink))
     out.extend(_mfu(ctx, lead))
     out.extend(_kv(ctx, sm.kv_capacity))
+    out.extend(_afd(ctx, sm.afd))
     return out
 
 
@@ -260,6 +267,8 @@ def _interconnect_bullets(ctx: Ctx, need: InterconnectNeeds) -> list[Inline]:
         )
     # the idle-IB note is already part of the NIC bullet
     items.extend(localize(n) for n in need.notes if n != IDLE_IB_NOTE)
+    if ctx.summary.afd is not None:
+        items.append(s.r("resources.afd_no_traffic_ib"))
     return items
 
 
@@ -405,7 +414,7 @@ def _tbs(value: float) -> str:
 def _mfu(ctx: Ctx, lead: PointResult) -> list[Block]:
     s, sm = ctx.s, ctx.summary
     out: list[Block] = [Heading(s.t("resources.mfu_heading"), 3)]
-    mfu, arch = lead.mfu, sm.model_arch
+    mfu, arch = lead.mfu, flops_arch(sm.stage, sm.model_arch)
     if mfu is None:
         out.append(Paragraph(s.r("resources.no_mfu"), tone="note"))
         return out
@@ -742,3 +751,286 @@ def resource_kpis(ctx: Ctx, lead: PointResult) -> list[Kpi]:
             )
         )
     return tiles
+
+
+# --------------------------------------------------------------------------
+# 2.5 A-Only: the simulated F
+# --------------------------------------------------------------------------
+
+
+def _afd(ctx: Ctx, report: AfdReport | None) -> list[Block]:
+    """A-Only: the F model behind the wait, the null-F bound, A<->F traffic."""
+    if report is None:
+        return []
+    s = ctx.s
+    out: list[Block] = [
+        Heading(s.t("resources.afd_heading"), 3),
+        Paragraph(s.r("resources.afd_intro")),
+        _afd_model(ctx, report),
+    ]
+    if report.steps:
+        out.append(_afd_steps(ctx, report))
+    out.extend(_afd_bound(ctx, report.bound))
+    items = _afd_bullets(ctx, report)
+    items.extend(localize(n) for n in report.plan.notes)
+    items.append(s.r("resources.afd_simplified"))
+    out.append(Bullets(tuple(items)))
+    return out
+
+
+def _short(value: float) -> str:
+    """Up to two decimals, trailing zeros dropped: 8.0 -> "8", 3.476 -> "3.48"."""
+    return f"{value:.2f}".rstrip("0").rstrip(".")
+
+
+def _afd_flag(ctx: Ctx, spec: AfdFSpec, name: str) -> Inline:
+    """Where an --afd-f setting came from: the flag, or the default."""
+    value = getattr(spec, name)
+    if value == AfdFSpec.model_fields[name].default:
+        return ctx.s.t("resources.afd_default")
+    return code(f"--afd-f {name}={value}")
+
+
+def _afd_model(ctx: Ctx, report: AfdReport) -> Table:
+    s, plan = ctx.s, report.plan
+    spec = plan.spec
+    b_in, b_out = afd.row_bytes(plan.hidden, plan.top_k, spec.wire)
+    rows: tuple[tuple[Cell, ...], ...] = (
+        (
+            s.t("resources.afd_f_gpus"),
+            s.r(
+                "resources.afd_f_gpus_value",
+                gpus=str(plan.f_gpus),
+                per_gpu=num(plan.routed_gb / plan.f_gpus, 0),
+            ),
+            localize(plan.f_gpus_source),
+        ),
+        (
+            s.t("resources.afd_experts"),
+            s.r(
+                "resources.afd_experts_value",
+                layers=str(plan.moe_layers),
+                layer=num(plan.layer_bytes / 1e9, 2),
+                total=num(plan.routed_gb, 0),
+                dtype=plan.expert_dtype.upper(),
+                experts=str(plan.experts),
+                top_k=str(plan.top_k),
+            ),
+            s.t("resources.afd_from_config"),
+        ),
+        (
+            s.t("resources.afd_link"),
+            s.r(
+                "resources.afd_link_value",
+                bw=num(plan.link_gbs_per_gpu, 1),
+                kind=s.label("resources.afd_link_kind", spec.link),
+            ),
+            localize(plan.link_source),
+        ),
+        (
+            s.t("resources.afd_lat"),
+            s.r("resources.afd_lat_value", lat=num(plan.lat_us, 1)),
+            localize(plan.lat_source),
+        ),
+        (
+            s.t("resources.afd_layout"),
+            s.r(
+                f"resources.afd_layout_{spec.layout}",
+                fan=_short(afd.fan_out(spec.layout, plan.f_gpus, plan.top_k)),
+                b_in=f"{b_in:,.0f}",
+                b_out=f"{b_out:,.0f}",
+                wire=spec.wire.upper(),
+            ),
+            _afd_flag(ctx, spec, "layout"),
+        ),
+        (
+            s.t("resources.afd_microbatches"),
+            s.r(
+                "resources.afd_mb_overlap"
+                if spec.microbatches > 1
+                else "resources.afd_mb_serial",
+                m=str(spec.microbatches),
+            ),
+            _afd_flag(ctx, spec, "microbatches"),
+        ),
+        (
+            s.t("resources.afd_f_speed"),
+            s.r(
+                "resources.afd_f_speed_value",
+                hbm=_tbs(plan.f_hbm_tbs),
+                eff_mem=ratio_pct(spec.eff_mem, 0),
+                precision=plan.f_peak_precision.upper(),
+                peak=num(plan.f_peak_tflops, 0),
+                eff_flop=ratio_pct(spec.eff_flop, 0),
+            ),
+            s.t("resources.afd_from_profile"),
+        ),
+    )
+    return Table(
+        (
+            s.t("resources.afd_item"),
+            s.t("resources.afd_value"),
+            s.t("resources.afd_source"),
+        ),
+        rows,
+        caption=s.t("resources.afd_model_caption", n_a=report.n_a),
+    )
+
+
+def _afd_steps(ctx: Ctx, report: AfdReport) -> Table:
+    s = ctx.s
+    rows = tuple(
+        (
+            f"{row.rows:,}",
+            num(row.latency_us, 1),
+            num(row.link_us, 1),
+            num(row.f_mem_us, 1),
+            num(row.f_flop_us, 1),
+            num(row.serial_us, 1),
+            num(row.overlap_us, 1),
+            num(row.step_ms, 2),
+            s.label("resources.afd_bound_kind", row.bound),
+        )
+        for row in report.steps
+    )
+    return Table(
+        (
+            s.t("resources.afd_rows"),
+            s.t("resources.afd_latency"),
+            s.t("resources.afd_wire"),
+            s.t("resources.afd_f_mem"),
+            s.t("resources.afd_f_flop"),
+            s.t("resources.afd_first"),
+            s.t("resources.afd_later"),
+            s.t("resources.afd_step"),
+            s.t("resources.afd_bound"),
+        ),
+        rows,
+        numeric=(0, 1, 2, 3, 4, 5, 6, 7),
+        caption=s.t(
+            "resources.afd_steps_caption",
+            m=report.plan.spec.microbatches,
+            rest=report.plan.moe_layers - 1,
+        ),
+    )
+
+
+def _afd_bound(ctx: Ctx, bound: AfdBound) -> list[Block]:
+    """The simulated F against the same point with the wait off."""
+    s = ctx.s
+    if bound.status == "skipped":
+        reason = localize(bound.reason) or DASH
+        return [
+            Paragraph(s.r("resources.afd_bound_skipped", reason=reason), tone="note")
+        ]
+    if bound.status == "failed":
+        return [Paragraph(s.r("resources.afd_bound_failed"), tone="warn")]
+    out: list[Block] = [
+        Paragraph(s.r("resources.afd_bound_intro", c=str(bound.concurrency or DASH)))
+    ]
+    if bound.status == "invalid":
+        reason = "；".join(localize(r) for r in bound.reason.split("; ")) or DASH
+        out.append(
+            Paragraph(s.r("resources.afd_bound_invalid", reason=reason), tone="warn")
+        )
+        return out
+    out.append(
+        Table(
+            (
+                s.t("resources.afd_f"),
+                s.t("resources.nvl_tps"),
+                s.t("resources.afd_vs_null"),
+                s.t("resources.nvl_user"),
+                s.t("resources.nvl_itl"),
+            ),
+            (
+                (
+                    s.t("resources.afd_sim"),
+                    num(bound.sim_tps_per_gpu, 1),
+                    pct(
+                        -bound.f_cost_pct if bound.f_cost_pct is not None else None,
+                        1,
+                        signed=True,
+                    ),
+                    num(bound.sim_user_tps, 1),
+                    num(bound.sim_itl_p50_ms, 1),
+                ),
+                (
+                    s.t("resources.afd_null"),
+                    num(bound.null_tps_per_gpu, 1),
+                    s.t("resources.afd_baseline"),
+                    num(bound.null_user_tps, 1),
+                    num(bound.null_itl_p50_ms, 1),
+                ),
+            ),
+            numeric=(1, 2, 3, 4),
+            caption=s.t("resources.afd_bound_caption", c=bound.concurrency),
+        )
+    )
+    verdict = ""
+    if bound.within_noise is not None:
+        verdict = s.t(
+            "resources.afd_cost_noise"
+            if bound.within_noise
+            else "resources.afd_cost_real"
+        )
+    out.append(
+        Paragraph(
+            s.r("resources.afd_cost", cost=pct(bound.f_cost_pct, 1), verdict=verdict)
+        )
+    )
+    return out
+
+
+def _afd_bullets(ctx: Ctx, report: AfdReport) -> list[Inline]:
+    """Estimated A<->F traffic and the measured A-side weights."""
+    s, plan = ctx.s, report.plan
+    items: list[Inline] = []
+    traffic = report.traffic
+    if traffic is not None:
+        items.append(
+            s.r(
+                "resources.afd_traffic",
+                to_f=num(traffic.to_f_bytes_per_token / 1e6, 2),
+                from_f=num(traffic.from_f_bytes_per_token / 1e6, 2),
+                layers=str(plan.moe_layers),
+                rows=num(traffic.rows_per_token, 2),
+                fan=_short(traffic.fan_out),
+            )
+        )
+        if traffic.sim_need_gbs_per_gpu is not None:
+            null = traffic.null_need_gbs_per_gpu
+            items.append(
+                s.r(
+                    "resources.afd_traffic_need"
+                    if null is None
+                    else "resources.afd_traffic_need_null",
+                    need=num(traffic.sim_need_gbs_per_gpu, 2),
+                    link=num(traffic.link_gbs_per_gpu, 1),
+                    util=ratio_pct(traffic.sim_util, 0),
+                    null_need=num(null, 2),
+                    null_util=ratio_pct(traffic.null_util, 0),
+                )
+            )
+    items.append(_afd_weights(ctx, report))
+    return items
+
+
+def _afd_weights(ctx: Ctx, report: AfdReport) -> Inline:
+    """The A-side weights against their size without and with the target's
+    routed experts (what deploy checked)."""
+    s, weights = ctx.s, report.weight_gb_per_gpu
+    null, loaded = report.null_weight_gb_per_gpu, report.loaded_weight_gb_per_gpu
+    if weights is None:
+        return s.r("resources.afd_weights_unknown")
+    if null is None or loaded is None:
+        return s.r("resources.afd_weights_unchecked", w=num(weights, 1))
+    return s.r(
+        "resources.afd_weights"
+        if afd.weights_engaged(weights, (null, loaded))
+        else "resources.afd_weights_high",
+        w=num(weights, 1),
+        null=num(null, 1),
+        loaded=num(loaded, 1),
+        n_a=str(report.n_a),
+    )

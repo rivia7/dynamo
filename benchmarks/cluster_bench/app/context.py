@@ -16,6 +16,7 @@ from benchmarks.cluster_bench.adapters.docker import DockerHost
 from benchmarks.cluster_bench.adapters.executors import Redactor
 from benchmarks.cluster_bench.app.store import EventStore
 from benchmarks.cluster_bench.domain.schema import (
+    AfdPlan,
     DeploymentProfile,
     EventType,
     GpuProfile,
@@ -75,6 +76,7 @@ class RunContext:
     deployment: DeploymentProfile | None = None
     model_dir: str | None = None
     simulator: Any = None  # app.simulate.Simulator in --dry-run, else None
+    afd: AfdPlan | None = None  # A-Only: the run's F model (app/afd_ops.py)
     _status: dict[str, Any] = field(default_factory=dict)
     _status_lock: threading.Lock = field(default_factory=threading.Lock)
 

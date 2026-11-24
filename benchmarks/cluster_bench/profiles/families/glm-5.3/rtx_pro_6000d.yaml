@@ -91,6 +91,38 @@ families:
           cuda-graph-max-bs-decode: 64
         env: {MC_FORCE_HCA: "1", SGLANG_DISAGGREGATION_WAITING_TIMEOUT: "3600"}
 
+  # A-Only (--stage a-only, domain/afd.py): every GPU is an attention (A) GPU
+  # of attention-FFN disaggregation. The target model's routed experts are
+  # neither loaded nor run (hotfix afd-attn-only); each MoE layer waits for a
+  # simulated F instead. Without them (407.7 GB of the checkpoint) attention
+  # DP8 fits after all: about 35 GB per GPU (BF16 attention, embedding, LM
+  # head, dense and shared layers, and the MTP layer, whose experts stay on A).
+  # Every DP rank keeps its own KV pool instead of a TP8 copy, an estimated
+  # 15-20x the TP8 decode instance's 248k tokens; hence D-Only's grid doubled
+  # and up to 32 running requests (and CUDA graphs) per rank. Estimates: not
+  # yet run on this GPU (the oom rung below backs off).
+  - id: a-only-dtp8x{decode}
+    title: "A-Only {decode} x DTP8（attention DP8，每 rank TP1）"
+    stage: attention
+    priority: 10
+    grid: {start: 32, max: 512, min: 2}
+    roles:
+      - role: decode
+        gpus_per_instance: 8
+        instances: 4
+        base: {path: recipes/glm-5.3/sglang/disagg-b200-agentic/deploy.yaml, key: decode.yaml}
+        sglang:
+          moe-runner-backend: flashinfer_cutlass
+          enable-symm-mem: null
+          enable-flashinfer-allreduce-fusion: null
+          mem-fraction-static: 0.88
+          max-running-requests: 256
+          cuda-graph-max-bs-decode: 32
+        env: {MC_FORCE_HCA: "1", SGLANG_DISAGGREGATION_WAITING_TIMEOUT: "3600"}
+    notes: >-
+      A-Only of the PD decode role: attention DP8 (TP1 per rank), the target's
+      routed experts on a simulated F; batch limits estimated, not measured.
+
 ladder:
   - id: sm120-dsa-tilelang-bf16-kv
     when: kernel_unsupported

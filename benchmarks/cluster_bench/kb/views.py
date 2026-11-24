@@ -219,7 +219,8 @@ def render_index(experiments: Sequence[ExperimentRecord]) -> str:
                 numeric=(9, 10),
             ),
             "P-Only rows rank input tok/s/GPU (prompt tokens); E2E and D-Only "
-            "rows rank output tok/s/GPU.",
+            "rows rank output tok/s/GPU; A-Only rows output tok/s per A GPU "
+            "(F is simulated and not counted).",
             "## Clusters",
             md_table(
                 ("Cluster", "GPU", "Experiments", "Latest", "Views"), cluster_rows, (2,)
@@ -543,15 +544,44 @@ def _nvlink_row(e: ExperimentRecord, shape: str) -> tuple[str, ...]:
     )
 
 
+def _afd_row(e: ExperimentRecord, shape: str) -> tuple[str, ...]:
+    cost = NA
+    if e.afd_f_cost_pct is not None:
+        cost = f"{e.afd_f_cost_pct:.1f}%"
+        if e.afd_f_cost_within_noise:
+            cost += " (noise)"
+    return (
+        code(e.exp_id),
+        shape,
+        e.leader_family or NA,
+        code(f"--afd-f {e.afd_f}") if e.afd_f else "defaults",
+        f"{e.afd_f_gpus} F / {e.afd_n_a} A" if e.afd_f_gpus and e.afd_n_a else NA,
+        num(e.afd_link_gbs_per_gpu, 1, dash=NA),
+        num(e.afd_lat_us, 1, dash=NA),
+        f"{e.afd_layout or NA} x{e.afd_microbatches or NA}",
+        num(e.leader_tps_per_gpu, 1, dash=NA),
+        num(e.afd_null_tps_per_gpu, 1, dash=NA),
+        cost,
+        num(e.afd_to_f_mb_per_token, 2, dash=NA),
+        num(e.afd_need_gbs_per_gpu, 2, dash=NA),
+        _pct(e.afd_link_util, 0),
+        num(e.afd_weight_gb_per_gpu, 1, dash=NA),
+        e.afd_bound_status or NA,
+    )
+
+
 def render_resources(experiments: Sequence[ExperimentRecord]) -> str:
-    """Interconnect needs, NVLink off vs on, MFU and KV capacity per experiment."""
+    """Interconnect needs, NVLink off vs on, MFU and KV capacity per experiment,
+    and for A-Only runs the simulated F."""
     order = _exp_order(experiments)
     exps = sorted(experiments, key=lambda e: order.get(e.exp_id, (0.0, e.exp_id)))
-    links, nvlink, compute, kv = [], [], [], []
+    links, nvlink, compute, kv, attention = [], [], [], [], []
     for e in exps:
         shape = f"{e.node_count} x {e.gpus_per_node}"
         if e.nvlink_off_status is not None:
             nvlink.append(_nvlink_row(e, shape))
+        if e.afd_bound_status is not None:
+            attention.append(_afd_row(e, shape))
         links.append(
             (
                 code(e.exp_id),
@@ -683,6 +713,38 @@ def render_resources(experiments: Sequence[ExperimentRecord]) -> str:
             kv,
         ),
     ]
+    if attention:  # only knowledge bases with A-Only runs get the section
+        parts += [
+            "## A-Only: simulated F",
+            "The attention side of attention-FFN disaggregation (--stage a-only): "
+            "the routed experts are not loaded, each MoE layer waits for a modelled "
+            "F (domain/afd.py). Leader tok/s/GPU counts A GPUs only; null F is the "
+            "same configuration and C with the wait off (A's upper bound); F cost = "
+            "(null - simulated) / null. Traffic is estimated, not measured: MB per "
+            "output token to F, and the A<->F GB/s per A GPU it needs at the "
+            "leader's throughput.",
+            md_table(
+                (
+                    "Experiment",
+                    "Nodes x GPUs",
+                    "Leader",
+                    "F model",
+                    "F / A GPUs",
+                    "A<->F GB/s/GPU",
+                    "Latency us",
+                    "Layout",
+                    "tok/s/GPU (sim F)",
+                    "tok/s/GPU (null F)",
+                    "F cost",
+                    "MB/token to F",
+                    "Need GB/s/GPU",
+                    "Link use",
+                    "A weights GB/GPU",
+                    "Bound",
+                ),
+                attention,
+            ),
+        ]
     return "\n\n".join(parts) + "\n"
 
 

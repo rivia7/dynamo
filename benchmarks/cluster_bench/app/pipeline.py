@@ -35,6 +35,7 @@ from benchmarks.cluster_bench.domain.search import (
     RunPoint,
     SearchContext,
 )
+from benchmarks.cluster_bench.domain.stages import stage_spec
 
 logger = logging.getLogger(__name__)
 
@@ -122,7 +123,7 @@ def drive(ctx: RunContext, rt: PhaseRuntime, phase: str, decide: Decider) -> str
             rt.plan,
             ctx.clock.now(),
             accuracy=ctx.config.accuracy.enabled
-            and ctx.config.stage == "e2e"
+            and stage_spec(ctx.config.stage).accuracy
             and rt.checker is not None,
             diagnose_s=ctx.config.diagnose.window_s,
         )

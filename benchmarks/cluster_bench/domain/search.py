@@ -54,6 +54,7 @@ from benchmarks.cluster_bench.domain.schema import (
     Purpose,
     Stage,
 )
+from benchmarks.cluster_bench.domain.stages import stage_spec
 
 MAX_FLOOR_DESCENTS = 3
 MAX_INVALID_FIRST_POINTS = 2
@@ -180,6 +181,8 @@ class SearchContext:
     # e2e, or the one PD stage every family runs (domain/stages.py). P-Only
     # has no per-user decode rate, so no interactivity floors.
     stage: Stage = "e2e"
+    # A-Only: re-measure the leader with the F wait off (the null-F bound).
+    f_bound: bool = False
 
 
 def deploy_cost(budget: Budget, history: History, cand: Candidate) -> float:
@@ -456,8 +459,10 @@ def _leader_tps_at(history: History, leader: PointResult, concurrency: int) -> f
 
 def decide_floors(ctx: SearchContext, history: History, budget: Budget) -> Action:
     """Bracket the interactivity floors on the leader's curve by descending."""
-    if ctx.stage == "prefill":
-        return Done("interactivity floors do not apply to P-Only (one output token)")
+    spec = stage_spec(ctx.stage)
+    if not spec.floors:
+        why = " (one output token)" if spec.one_token else ""
+        return Done(f"interactivity floors do not apply to {spec.label}{why}")
     leader = leader_point(history, ("search",))
     if leader is None:
         return Done("no valid leader")
@@ -813,6 +818,31 @@ def decide_nvlink(
     )
 
 
+def decide_f_bound(ctx: SearchContext, history: History, budget: Budget) -> Action:
+    """A-Only: the leader's concurrency again with the F wait off (null F)."""
+    if not ctx.f_bound:
+        return Done("null-F bound not applicable")
+    leader = final_leader(history)
+    if leader is None:
+        return Done("no leader to bound")
+    bound = leader.candidate.model_copy(update={"null_f": True})
+    if history.deploy_failed(bound.key):
+        return Done("null-F deployment failed")
+    if history.points_for(bound.key, ("f_bound",)):
+        return Done("null-F bound measured")
+    if not budget.affordable(
+        deploy_cost(budget, history, bound) + budget.point_s["screen"]
+    ):
+        return Done("budget skipped the null-F bound")
+    return RunPoint(
+        bound,
+        leader.key.concurrency,
+        "screen",
+        "f_bound",
+        reason="F wait off (null F) at the leader's concurrency",
+    )
+
+
 def pilot_samples(history: History, leader: PointResult) -> int:
     """Samples at the leader's knee: its search point plus pilot repetitions."""
     return 1 + len(
@@ -838,6 +868,7 @@ STEPS = (
     "pilot",
     "nic_sweep",
     "confirm",
+    "f_bound",
     "nvlink",
     "diagnose",
     "finalize",
@@ -849,6 +880,7 @@ FLOOR_POINTS_UNKNOWN = 2
 _LEADER = "<leader>"
 _LEADER_MTP_OFF = "<leader>/mtp-off"
 _LEADER_NVLINK_OFF = "<leader>/nvlink-off"
+_LEADER_F_BOUND = "<leader>/null-f"
 
 
 @dataclass(frozen=True)
@@ -867,7 +899,7 @@ def floor_points_needed(
     ctx: SearchContext, history: History, leader: PointResult | None
 ) -> int:
     """Descent points ``decide_floors`` would still measure on this leader."""
-    if ctx.stage == "prefill":
+    if not stage_spec(ctx.stage).floors:
         return 0
     if leader is None:
         return FLOOR_POINTS_UNKNOWN
@@ -913,6 +945,19 @@ def _mtp_off_key(
     if history.deploy_failed(off.key) or history.points_for(off.key, ("mtp_ablation",)):
         return None
     return off.key
+
+
+def _f_bound_key(ctx: SearchContext, history: History) -> str | None:
+    """Key of the null-F run ``decide_f_bound`` would still make."""
+    if not ctx.f_bound:
+        return None
+    leader = final_leader(history)
+    if leader is None:
+        return _LEADER_F_BOUND
+    bound = leader.candidate.model_copy(update={"null_f": True})
+    if history.deploy_failed(bound.key) or history.points_for(bound.key, ("f_bound",)):
+        return None
+    return bound.key
 
 
 def _nic_arm_keys(ctx: SearchContext, history: History, phase: str) -> list[str]:
@@ -1015,6 +1060,10 @@ def reserve_plan(
                 or history.deploy_failed(lead_key)
             ):
                 cost = run_on(lead_key) + decision
+        elif step == "f_bound":
+            bound = _f_bound_key(ctx, history)
+            if bound is not None:
+                cost = run_on(bound) + screen
         elif step == "nvlink":
             off = _nvlink_off_key(ctx, history)
             if off is not None:

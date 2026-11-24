@@ -63,6 +63,7 @@ from benchmarks.cluster_bench.domain.servicestate import (
     classify_bottleneck,
     endpoint_descriptors,
 )
+from benchmarks.cluster_bench.domain.stages import flops_arch, stage_spec
 from benchmarks.cluster_bench.domain.switchload import summarize_switch_load
 from benchmarks.cluster_bench.fsutil import atomic_write_text
 
@@ -85,13 +86,14 @@ def objective_per_gpu(
     """The search objective: input tok/s/GPU for P-Only, else output tok/s/GPU."""
     if metrics is None or gpus <= 0:
         return None
-    value = metrics.input_tps if stage == "prefill" else metrics.output_tps
+    input_ = stage_spec(stage).objective == "input"
+    value = metrics.input_tps if input_ else metrics.output_tps
     return value / gpus if value else None
 
 
 def objective_tokens(metrics: PointMetrics, stage: Stage) -> float | None:
     """Tokens the objective counts over the window: prompt tokens for P-Only."""
-    if stage != "prefill":
+    if stage_spec(stage).objective != "input":
         return metrics.total_output_tokens
     if metrics.input_tps and metrics.duration_s:
         return metrics.input_tps * metrics.duration_s
@@ -257,11 +259,11 @@ class Measurer:
                 plan,
                 metrics,
                 self.ctx.config.slo_tiers,
-                arch=stored_arch(self.ctx),
+                arch=flops_arch(plan.stage, stored_arch(self.ctx)),
             )
         else:
             metrics, bandwidth, alive, state = self._measure_real(action, plan, pdir)
-            requests = self._requests(pdir, plan.gpu_count, metrics, state)
+            requests = self._requests(pdir, plan.gpu_count, metrics, state, plan.stage)
         ended = self.ctx.clock.now()
         loads = switches.load(before, switches.snapshot(f"{key.id}-after"))
         if loads:
@@ -297,7 +299,7 @@ class Measurer:
             else None
         )
         # P-Only emits one token per request: there is no decode to accept.
-        speculating = action.candidate.mtp and plan.stage != "prefill"
+        speculating = action.candidate.mtp and stage_spec(plan.stage).speculative
         accept = accept_length(state, pdir) if speculating else None
         if speculating and accept is None and metrics is not None:
             state = _with_note(
@@ -330,6 +332,7 @@ class Measurer:
                 variant=self.ctx.require_hardware().gpu.weights_variant,
                 requests=requests,
                 state=state,
+                stage=plan.stage,
             ),
             artifact_dir=str(pdir),
             started_at=started,
@@ -376,6 +379,7 @@ class Measurer:
         gpus: int,
         metrics: PointMetrics | None,
         state: PointState | None = None,
+        stage: Stage = "e2e",
     ) -> RequestSummary | None:
         """Goodput / turn / session view of the point's AIPerf records."""
         window = None
@@ -388,7 +392,7 @@ class Measurer:
                 tiers=self.ctx.config.slo_tiers,
                 window=window,
                 duration_s=metrics.phase_s if metrics else None,
-                arch=stored_arch(self.ctx),
+                arch=flops_arch(stage, stored_arch(self.ctx)),
                 cached_fraction=state.derived(
                     "cached_token_fraction", roles=("prefill", "agg")
                 )

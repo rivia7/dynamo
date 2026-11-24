@@ -217,6 +217,95 @@ families:
       TP8 decode: half the weights per GPU, so twice the KV per instance, for
       twice the GPUs per instance and all-reduces over PCIe.
 
+  # A-Only (--stage a-only, domain/afd.py), as in the GLM-5.3 file: attention
+  # DP with TP1 per rank, the target's routed experts on a simulated F (the
+  # MTP layer's stay on A). This model is not in SGLang AFD's supported list
+  # (its Glm5NextMoE is DeepseekV2MoE, so the same hotfix applies). Without the
+  # routed experts every rank keeps its own KV pool and KDA state slots: D-Only's
+  # grid doubled, up to 64 running requests (and CUDA graphs) per rank.
+  # Estimates: not yet run on this GPU (the oom rung below backs off).
+  - id: a-only-dtp4x{decode}
+    title: "A-Only {decode} x DTP4（attention DP4，每 rank TP1）"
+    stage: attention
+    priority: 10
+    grid: {start: 64, max: 1024, min: 2}
+    roles:
+      - role: decode
+        gpus_per_instance: 4
+        instances: 8
+        sglang:
+          tensor-parallel-size: 4
+          kv-cache-dtype: bfloat16
+          dsa-prefill-backend: tilelang
+          dsa-decode-backend: tilelang
+          moe-runner-backend: flashinfer_cutlass
+          fp4-gemm-backend: flashinfer_cutlass
+          linear-attn-prefill-backend: triton
+          linear-attn-decode-backend: triton
+          linear-attn-verify-backend: triton
+          mamba-ssm-dtype: float32
+          page-size: 64
+          chunked-prefill-size: 16384
+          max-prefill-tokens: 16384
+          max-running-requests: 256
+          watchdog-timeout: 3600
+          weight-loader-prefetch-checkpoints: true
+          model-loader-extra-config: {enable_multithread_load: true, num_threads: 32}
+          speculative-algorithm: EAGLE
+          speculative-num-steps: 3
+          speculative-eagle-topk: 1
+          speculative-num-draft-tokens: 4
+          enable-linear-replayssm-spec: true
+          disaggregation-mode: decode
+          disaggregation-transfer-backend: mooncake
+          mem-fraction-static: 0.88
+          cuda-graph-max-bs-decode: 64
+        env: {MC_FORCE_HCA: "1", SGLANG_DISAGGREGATION_WAITING_TIMEOUT: "3600", CB_SGLANG_HOTFIXES: sm120-tilelang-dsa-v1-one-stage}
+    notes: >-
+      A-Only of the TP4 decode role: attention DP4 (TP1 per rank), the
+      target's routed experts on a simulated F; batch limits estimated.
+
+  - id: a-only-dtp8x{decode}
+    title: "A-Only {decode} x DTP8（attention DP8，每 rank TP1）"
+    stage: attention
+    priority: 20
+    grid: {start: 64, max: 1024, min: 2}
+    roles:
+      - role: decode
+        gpus_per_instance: 8
+        instances: 4
+        sglang:
+          tensor-parallel-size: 8
+          kv-cache-dtype: bfloat16
+          dsa-prefill-backend: tilelang
+          dsa-decode-backend: tilelang
+          moe-runner-backend: flashinfer_cutlass
+          fp4-gemm-backend: flashinfer_cutlass
+          linear-attn-prefill-backend: triton
+          linear-attn-decode-backend: triton
+          linear-attn-verify-backend: triton
+          mamba-ssm-dtype: float32
+          page-size: 64
+          chunked-prefill-size: 16384
+          max-prefill-tokens: 16384
+          max-running-requests: 512
+          watchdog-timeout: 3600
+          weight-loader-prefetch-checkpoints: true
+          model-loader-extra-config: {enable_multithread_load: true, num_threads: 32}
+          speculative-algorithm: EAGLE
+          speculative-num-steps: 3
+          speculative-eagle-topk: 1
+          speculative-num-draft-tokens: 4
+          enable-linear-replayssm-spec: true
+          disaggregation-mode: decode
+          disaggregation-transfer-backend: mooncake
+          mem-fraction-static: 0.88
+          cuda-graph-max-bs-decode: 64
+        env: {MC_FORCE_HCA: "1", SGLANG_DISAGGREGATION_WAITING_TIMEOUT: "3600", CB_SGLANG_HOTFIXES: sm120-tilelang-dsa-v1-one-stage}
+    notes: >-
+      A-Only of the TP8 decode role: attention DP8 (TP1 per rank), twice the
+      GPUs per F wait; batch limits estimated.
+
 ladder:
   - id: sm120-no-spec
     when: kernel_unsupported

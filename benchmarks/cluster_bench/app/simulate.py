@@ -27,7 +27,9 @@ from benchmarks.cluster_bench.adapters.diagnostics import (
     simulated_stdout as diagnostics_simulated_stdout,
 )
 from benchmarks.cluster_bench.adapters.nodefacts import simulated_stdout
+from benchmarks.cluster_bench.agents.sglang_afd import marker_line
 from benchmarks.cluster_bench.app.pipeline import Interrupted
+from benchmarks.cluster_bench.domain import afd
 from benchmarks.cluster_bench.domain.bandwidth import PointBandwidth
 from benchmarks.cluster_bench.domain.datasets import parse_dataset
 from benchmarks.cluster_bench.domain.fabric import (
@@ -320,7 +322,7 @@ class Simulator:
             if self._kernel_fails(container):
                 text = "RuntimeError: no kernel image is available for execution on the device"
             elif any(role in container for role in ("agg", "prefill", "decode")):
-                text = self._worker_log()
+                text = self._worker_log(container)
             return CommandResult(node, command, 0, text, "")
         if command.startswith("docker exec") and "environ" in command:
             env = self._env.get(container, {})
@@ -656,9 +658,14 @@ class Simulator:
     _env: dict[str, dict[str, str]] = field(default_factory=dict)
     _deploying_rungs: tuple[str, ...] = ()
 
-    def _worker_log(self) -> str:
-        """SGLang-format startup lines (lifecycle parsing in the dry-run)."""
+    def _worker_log(self, container: str) -> str:
+        """SGLang-format startup lines (lifecycle parsing in the dry-run).
+
+        A-Only workers (domain/afd.py) print the null-experts marker and load
+        only the A side: the target's routed experts stay on disk."""
         t0 = self._deploy_started
+        env = self._env.get(container, {})
+        attention_only = env.get(afd.ATTN_ONLY_ENV) == "1"
 
         def at(offset: float) -> str:
             stamp = datetime.fromtimestamp(t0 + offset, tz=timezone.utc)
@@ -666,11 +673,20 @@ class Simulator:
 
         tokens = int(self.gpu.hbm_gb * 4000)
         kv_gb = round(self.gpu.hbm_gb * 0.18, 2)
+        marker = []
+        if attention_only:
+            layers, wait = env.get(afd.TARGET_LAYERS_ENV, ""), env.get(
+                afd.F_WAIT_ENV, ""
+            )
+            marker.append(marker_line(layers, 3, wait))
+        weights_gb = 33.1 if attention_only else 89.4
         return "\n".join(
             [
                 f"{at(20)} Load weight begin. avail mem={self.gpu.hbm_gb - 2:.2f} GB",
+                *marker,
                 f"{at(170)} Load weight end. type=GlmMoeDsaForCausalLM, "
-                f"dtype=torch.bfloat16, avail mem=49.20 GB, mem usage=89.40 GB.",
+                f"dtype=torch.bfloat16, avail mem=49.20 GB, "
+                f"mem usage={weights_gb:.2f} GB.",
                 f"{at(172)} KV Cache is allocated. #tokens: {tokens}, KV size: {kv_gb} GB",
                 f"{at(172)} Memory pool end. avail mem=24.80 GB",
                 f"{at(174)} Capture cuda graph begin. This can take up to several "
@@ -732,18 +748,26 @@ class Simulator:
             peak *= max(0.35, 1.0 - 0.12 * math.log2(full / cand.nic_count))
         sat = 96.0 if family.startswith("pd") else 64.0
         isl, osl = 95000.0, 700.0
+        f_wait = 1.0  # A-Only: how much the simulated F slows a decode step
         if plan.stage == "decode":
             # D-Only: no prefill interleaved with decode, so more decode per
             # GPU and deeper batches (illustrative).
             peak *= 1.3
             sat = 128.0
+        elif plan.stage == "attention":
+            # A-Only: no routed experts on A and a KV pool per DP rank, so
+            # deeper batches than D-Only; each MoE layer waits for the
+            # simulated F unless the wait is off (null-F bound; illustrative).
+            f_wait = 1.0 if cand.null_f else 1.3
+            peak *= 1.3 * 1.6 / f_wait
+            sat = 192.0
         tps_gpu = peak * (1.0 - math.exp(-c / sat))
         # Deterministic +-1.5% wobble so the pilot sees non-zero noise.
         wobble = 1.0 + 0.015 * math.sin(len(ctx.store.events) * 1.7 + c)
         tps_gpu *= wobble
         total = tps_gpu * gpus
         # Per-user decode rate falls as the batch grows (illustrative).
-        user = 110.0 * 64 / (64 + c)
+        user = 110.0 * 64 / (64 + c) / f_wait
         if cand.p2p != "nvlink":
             user *= 0.64 if cand.p2p == "pcie" else 0.52
         slow = 110.0 * 64 / (64 + c) / user  # >1 with NVLink off

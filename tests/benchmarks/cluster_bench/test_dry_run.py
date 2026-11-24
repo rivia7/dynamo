@@ -9,8 +9,10 @@ import json
 import pytest
 import yaml
 
+from benchmarks.cluster_bench.app.phases.preflight import PreflightError
 from benchmarks.cluster_bench.app.store import EventStore
 from benchmarks.cluster_bench.cli import main
+from benchmarks.cluster_bench.domain import afd
 from benchmarks.cluster_bench.domain.schema import EventType, ExperimentSummary
 
 pytestmark = [pytest.mark.unit, pytest.mark.pre_merge, pytest.mark.gpu_0]
@@ -528,3 +530,167 @@ def test_glm_5_3_flash_d_only_checks_its_sglang_hotfix(tmp_path):
     assert (exp / "preflight" / "sglang_hotfixes.txt").exists()
     commands = (exp / "dry_run_commands.txt").read_text()
     assert "sglang_hotfix.py check sm120-tilelang-dsa-v1-one-stage" in commands
+
+
+def _a_only(tmp_path, *extra: str) -> int:
+    return _run(
+        tmp_path,
+        "--fake-gpu",
+        "rtx_pro_6000d",
+        "--fake-nodes",
+        "2",
+        "--stage",
+        "a-only",
+        "--checkpoint",
+        "nvfp4-nvidia",
+        *extra,
+    )
+
+
+def _f_waits(exp) -> list[str]:
+    """CB_AFD_F_WAIT of every A worker launched, checking its config."""
+    waits = []
+    for path in sorted((exp / "deployments").glob("*/plan.json")):
+        plan = json.loads(path.read_text())
+        assert plan["stage"] == "attention"
+        for cfg in plan["rendered_configs"].values():
+            assert cfg["enable-dp-attention"] is True
+            assert cfg["data-parallel-size"] == cfg["tensor-parallel-size"]
+            assert cfg["disaggregation-transfer-backend"] == "fake"
+        for spec in plan["containers"]:
+            if spec["role"] == "decode":
+                env = spec["env"]
+                assert env[afd.ATTN_ONLY_ENV] == "1"
+                assert afd.HOTFIX_ID in env["CB_SGLANG_HOTFIXES"].split(",")
+                waits.append(env[afd.F_WAIT_ENV])
+    return waits
+
+
+def _hotfixes(exp) -> set[str]:
+    """SGLang hotfix ids of the A workers launched."""
+    return {
+        hotfix
+        for path in (exp / "deployments").glob("*/plan.json")
+        for spec in json.loads(path.read_text())["containers"]
+        if spec["role"] == "decode"
+        for hotfix in spec["env"]["CB_SGLANG_HOTFIXES"].split(",")
+    }
+
+
+@pytest.mark.parametrize(
+    "model, families, hotfixes",
+    [
+        ("glm-5.3", {"a-only-dtp8x2"}, {afd.HOTFIX_ID}),
+        (
+            "glm-5.3-flash",
+            {"a-only-dtp4x4", "a-only-dtp8x2"},
+            {afd.HOTFIX_ID, "sm120-tilelang-dsa-v1-one-stage"},  # the profile's too
+        ),
+    ],
+)
+def test_a_only_waits_for_a_simulated_f_and_measures_the_null_f_bound(
+    tmp_path, model, families, hotfixes
+):
+    assert _a_only(tmp_path, "--model", model) == 0
+    summary = _summary(tmp_path)
+    assert summary.stage == "attention" and summary.verdict in ("ok", "partial")
+    measured = {f.family_id for f in summary.families if f.status == "measured"}
+    assert measured == families
+    lead = summary.point(summary.leader_point_id)
+    assert lead is not None and lead.candidate.simulate_acceptance
+    assert lead.mfu is not None and lead.mfu.precision == "bf16"
+    assert afd.MFU_NOTE in lead.mfu.notes
+    report = summary.afd
+    assert report is not None and report.n_a in (4, 8)
+    bound = report.bound
+    assert bound.status == "measured", bound.reason
+    null = summary.point(bound.null_point_id)
+    assert null is not None and null.key.purpose == "f_bound"
+    assert null.candidate == lead.candidate.model_copy(update={"null_f": True})
+    assert null.key.concurrency == lead.key.concurrency == bound.concurrency
+    assert bound.f_cost_pct is not None and bound.f_cost_pct > 0
+    traffic = report.traffic
+    assert traffic is not None and traffic.to_f_bytes_per_token > 0
+    assert traffic.sim_need_gbs_per_gpu and traffic.null_need_gbs_per_gpu
+    assert traffic.null_need_gbs_per_gpu > traffic.sim_need_gbs_per_gpu
+    assert report.steps and report.weight_gb_per_gpu is not None
+    expected = (report.null_weight_gb_per_gpu, report.loaded_weight_gb_per_gpu)
+    if model == "glm-5.3":  # the simulated config.json's experts fit its checkpoint
+        assert afd.weights_engaged(report.weight_gb_per_gpu, expected)
+    else:  # they outweigh Flash's 203 GB: no expected size, so no check
+        assert expected == (None, None)
+    exp = tmp_path / "experiments" / "t1"
+    assert _hotfixes(exp) == hotfixes
+    waits = _f_waits(exp)
+    assert afd.F_WAIT_OFF in waits and len(set(waits)) >= 2
+    assert (exp / "preflight" / "afd_wait_kernel.txt").exists()
+    assert "sglang_afd.py --check" in (exp / "dry_run_commands.txt").read_text()
+    md = (exp / "report" / "report.zh-CN.md").read_text()
+    assert "### 2.5 A-Only" in md and "--stage a-only" in md
+    a_side = afd.a_side_arch(summary.model_arch)  # MFU counts A's FLOPs only
+    assert f"激活参数约 {a_side.active_params() / 1e9:.1f}B" in md
+    records = [
+        json.loads(line)
+        for line in (tmp_path / "kb" / "index.jsonl").read_text().splitlines()
+    ]
+    (record,) = [r for r in records if r["exp_id"] == "t1"]
+    assert (record["stage"], record["afd_bound_status"]) == ("attention", "measured")
+    assert record["afd_f_cost_pct"] == pytest.approx(bound.f_cost_pct, abs=0.01)
+    need = record["afd_need_gbs_per_gpu"]
+    assert need == pytest.approx(traffic.sim_need_gbs_per_gpu, abs=1e-3)
+    (resources,) = (tmp_path / "kb" / "clusters").glob("*/resources.md")
+    assert "## A-Only: simulated F" in resources.read_text()
+
+
+def test_a_only_takes_its_f_from_the_command_line(tmp_path):
+    text = "bw_gbps=400,lat_us=8,microbatches=1"
+    assert _a_only(tmp_path, "--afd-f", text) == 0
+    summary = _summary(tmp_path)
+    assert summary.afd is not None
+    plan = summary.afd.plan
+    assert plan.spec == afd.parse_afd_f(text)
+    assert (plan.link_gbs_per_gpu, plan.lat_us) == (50.0, 8.0)
+    assert (plan.link_source, plan.lat_source) == ("--afd-f bw_gbs", "--afd-f lat_us")
+    # one microbatch: every MoE layer waits for F serially
+    assert all(row.overlap_us == row.serial_us for row in summary.afd.steps)
+    md = (tmp_path / "experiments" / "t1" / "report" / "report.zh-CN.md").read_text()
+    assert f"--afd-f {afd.format_afd_f(plan.spec)}" in md
+
+
+def test_a_only_takes_a_new_f_after_its_plan_failed(tmp_path):
+    exp = tmp_path / "experiments" / "t1"
+    # 0.01 GB/s: a forward would wait 43 s for F, so the plan stops the run
+    with pytest.raises(afd.AfdError, match="above 10 s"):
+        _a_only(tmp_path, "--afd-f", "bw_gbs=0.01")
+    assert not list((exp / "deployments").glob("*/plan.json"))
+    good = "bw_gbs=50,lat_us=14"
+    assert _a_only(tmp_path, "--afd-f", good) == 0
+    summary = _summary(tmp_path)
+    assert summary.afd is not None and summary.afd.plan.spec == afd.parse_afd_f(good)
+    md = (exp / "report" / "report.zh-CN.md").read_text()
+    assert f"--afd-f {afd.format_afd_f(summary.afd.plan.spec)}" in md
+
+
+def test_a_only_runs_a_model_repo_moe_given_its_expert_precision(tmp_path):
+    a_only = ("--fake-gpu", "rtx_pro_6000d", "--fake-nodes", "2", "--stage", "a-only")
+    repo = ("--model-repo", "org/moe", "--model-size-gb", "400")
+    # no profile, no variant name: the routed experts' precision is unknown
+    with pytest.raises(PreflightError, match="pass --afd-f expert_dtype="):
+        _run(tmp_path, *a_only, *repo)
+    assert _run(tmp_path, *a_only, *repo, "--afd-f", "expert_dtype=nvfp4") == 0
+    summary = _summary(tmp_path)
+    assert summary.afd is not None and summary.afd.plan.expert_dtype == "nvfp4"
+    assert summary.afd.bound.status == "measured"
+
+
+def test_a_only_resumes_with_the_f_it_planned(tmp_path):
+    exp = tmp_path / "experiments" / "t1"
+    assert _a_only(tmp_path, "--fake-crash-after", "3") == 75
+    assert _a_only(tmp_path) == 0
+    store = EventStore(exp / "events.jsonl")
+    plans = [
+        e for e in store.of_type(EventType.DECISION) if e.data.get("kind") == "afd_plan"
+    ]
+    assert len(plans) == 1  # resolved once, before the first deployment
+    waits = {w for w in _f_waits(exp) if w != afd.F_WAIT_OFF}
+    assert len(waits) == 1  # one A instance size: the same wait before and after

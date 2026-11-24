@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Sequence
 
 from benchmarks.cluster_bench.adapters.aiperf import dropped_trace_count
+from benchmarks.cluster_bench.app.afd_ops import afd_summary
 from benchmarks.cluster_bench.app.context import RunContext
 from benchmarks.cluster_bench.app.fabric_ops import fabric_event, stored_fabric
 from benchmarks.cluster_bench.app.facts_ops import FactsFold, fold_facts
@@ -43,28 +44,11 @@ from benchmarks.cluster_bench.domain.schema import (
     ProviderInfo,
     Verdict,
 )
-from benchmarks.cluster_bench.domain.stages import stage_label
+from benchmarks.cluster_bench.domain.stages import stage_label, stage_spec
 
 logger = logging.getLogger(__name__)
 
 PROVIDER_FILE = "provider.json"
-
-# What a P-Only / D-Only result rests on that no GPU run has checked yet.
-STAGE_UNVERIFIED: dict[str, tuple[str, ...]] = {
-    "prefill": (
-        "P-Only: the PD prefill role config run as an aggregated worker matches "
-        "a real prefill worker's cost (no KV send, no bootstrap queue)",
-        "P-Only: AIPerf max_completion_tokens:1 caps every AgentX turn at one "
-        "output token (audited per point: OSL <= 1.5)",
-    ),
-    "decode": (
-        "D-Only: dynamo.sglang decode with SGLang's fake KV transfer and no "
-        "prefill peer (source-checked against Dynamo 1.6.2 / SGLang 0.5.21 and 0.5.23; "
-        "preflight runs the shim's --check)",
-        "D-Only: MoE expert load over meaningless KV may differ from real "
-        "requests (EP balance), and MTP acceptance is simulated",
-    ),
-}
 
 UNVERIFIED_BASE = (
     "SGLang 0.5.21 Mooncake device flag --disaggregation-ib-device "
@@ -283,7 +267,7 @@ def accuracy_limitations(
         for c in checks
         if c.verdict.status == "fail"
     ]
-    if ctx.config.stage != "e2e":
+    if not stage_spec(ctx.config.stage).accuracy:
         out.append(
             f"accuracy gate not applicable to {stage_label(ctx.config.stage)}: "
             "the stage produces no end-to-end answers"
@@ -390,6 +374,7 @@ def build_summary(ctx: RunContext) -> ExperimentSummary:
         conditions.append(
             "DRY RUN: all measurements are synthetic and not hardware evidence"
         )
+    conditions.extend(stage_spec(ctx.config.stage).conditions)
     limitations = [e.data["text"] for e in ctx.store.of_type(EventType.NOTE)]
     if confirm_runs and not confirm:
         limitations.append(
@@ -428,7 +413,7 @@ def build_summary(ctx: RunContext) -> ExperimentSummary:
     # P-Only emits one token per request: no per-user decode rate to floor.
     floors = (
         ()
-        if ctx.config.stage == "prefill"
+        if not stage_spec(ctx.config.stage).floors
         else tuple(analysis.floor_result(rankable, f) for f in INTERACTIVITY_FLOORS)
     )
     spent_hours = spent_seconds(events, ctx.clock.now()) / 3600
@@ -483,7 +468,7 @@ def build_summary(ctx: RunContext) -> ExperimentSummary:
         conditions=tuple(conditions),
         limitations=tuple(analysis.collapse_container_notes(limitations)),
         unverified=UNVERIFIED_BASE
-        + STAGE_UNVERIFIED.get(ctx.config.stage, ())
+        + stage_spec(ctx.config.stage).unverified
         + profile_unverified(gpu),
         accuracy=accuracy,
         diagnostics=stored_diagnostics(ctx.store.of_type(EventType.DIAGNOSTICS)),
@@ -504,6 +489,7 @@ def build_summary(ctx: RunContext) -> ExperimentSummary:
         disk_reads=fold.disks,
         model_arch=arch,
         nvlink=nvlink_summary(ctx, history),
+        afd=afd_summary(ctx, history, leader, lead_deploy, lead_plan),
         interconnect=interconnect_needs(
             leader,
             nic_arms,
